@@ -1,0 +1,367 @@
+<title>Moon Mission Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@700;900&family=Overpass:ital,wght@0,300;0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: one centred column on Deep Blue; a gradient hero, then mission cards stacked in play order, then the research lab. Single dark look per the Space Apps guide. */
+:root {
+  color-scheme: dark;
+  --deep: #07173F;        /* 60%: page ground */
+  --electric: #0042A6;    /* 30%: cards and bands */
+  --neon: #0960E1;
+  --yonder: #2E96F5;
+  --white: #FFFFFF;
+  --soft: #C9D8F2;        /* quiet text on deep blue, 11:1 */
+  --yellow: #EAFE07;      /* 10%: links, buttons, highlights only */
+  --rocket: #E43700;      /* energy: thin strokes and icons only */
+  --line: rgba(255,255,255,.16);
+  --display: "Fira Sans", system-ui, sans-serif;
+  --body: "Overpass", system-ui, sans-serif;
+  --code: "Fira Code", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--deep); color: var(--white); }
+body { font-family: var(--body); font-size: 17px; line-height: 1.5; margin: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-weight: 900; text-transform: uppercase; letter-spacing: .05em; font-size: clamp(2rem, 6vw, 3.6rem); line-height: 1.05; }
+h2 { font-weight: 900; font-size: clamp(1.5rem, 3.5vw, 2.1rem); }
+h3 { font-weight: 700; font-size: 1.25rem; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--yellow); }
+.eyebrow { font-family: var(--code); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+code, .mono { font-family: var(--code); font-size: .88em; }
+
+/* Hero */
+.hero { position: relative; overflow: hidden; background: linear-gradient(45deg, var(--electric) 0%, var(--deep) 85%); border-bottom: 1px solid var(--line); }
+.hero svg.orbits { position: absolute; right: -120px; top: -80px; width: 560px; max-width: none; opacity: .25; pointer-events: none; }
+.hero .wrap { position: relative; padding-block: 56px 40px; display: grid; gap: 18px; }
+.hero p { font-size: 1.15rem; font-weight: 300; }
+.loop { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
+.loop span.step { border: 1px solid var(--line); background: rgba(7,23,63,.55); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: .95rem; }
+.loop span.arrow { color: var(--yonder); font-family: var(--code); }
+
+/* Mode switch */
+.modebar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--deep); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--deep); }
+.modebar .wrap { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding-block: 12px; }
+.modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.modes button { font: 700 .95rem var(--body); color: var(--white); background: transparent; border: 1.5px solid var(--yonder); border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+.modes button[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--deep); }
+.modes button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.modenote { color: var(--soft); font-size: .95rem; min-width: 0; flex: 1 1 280px; }
+
+section.block { padding-block: 48px 8px; display: grid; gap: 20px; }
+
+/* Ways to fail ladder */
+.ladder { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--display); font-weight: 700; color: var(--soft); font-size: .85rem; letter-spacing: .03em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tick { font-family: var(--code); }
+.tick.new { color: var(--yellow); font-weight: 500; }
+
+/* Mission cards */
+.missions { display: grid; gap: 28px; }
+.mission { background: var(--electric); border-radius: 14px; overflow: hidden; display: grid; grid-template-columns: 220px 1fr; }
+.mission .side { background: var(--deep); background: rgba(7,23,63,.55); padding: 24px; display: grid; gap: 14px; align-content: start; border-right: 1px solid var(--line); }
+.mission .num { font-family: var(--display); font-weight: 900; font-size: 4rem; line-height: 1; color: var(--yonder); }
+.mission .main { padding: 24px; display: grid; gap: 18px; min-width: 0; }
+.facts { display: grid; gap: 6px; font-size: .95rem; }
+.facts b { font-family: var(--display); font-weight: 700; display: block; font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; color: var(--soft); }
+.lock { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--yellow); border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: .9rem; }
+.lock svg { flex: none; }
+.goal { background: var(--deep); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; }
+.goal .target { font-family: var(--display); font-weight: 900; font-size: 1.35rem; }
+.goal .target mark { background: none; color: var(--yellow); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.cols > div { min-width: 0; display: grid; gap: 8px; align-content: start; }
+ul.fail { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+ul.fail li { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; }
+ul.fail li svg { margin-top: 3px; }
+ul.fail li.new strong::after { content: " NEW"; font-family: var(--code); font-size: .72rem; color: var(--yellow); letter-spacing: .06em; }
+.sim { overflow-x: auto; background: var(--deep); border-radius: 10px; }
+.sim table td, .sim table th { border-color: rgba(255,255,255,.12); }
+.stars { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stars .on { color: var(--yellow); }
+.stars .off { color: rgba(255,255,255,.28); }
+.small { font-size: .88rem; color: var(--soft); }
+
+/* Research lab */
+.lab { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.panel { border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.panel table td, .panel table th { padding: 8px 6px; }
+.path { display: grid; gap: 0; counter-reset: s; }
+.path li { list-style: none; display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.path li::before { counter-increment: s; content: counter(s); font-family: var(--display); font-weight: 900; color: var(--deep); background: var(--yonder); border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; font-size: .9rem; }
+.path ol { padding: 0; margin: 0; }
+footer { padding-block: 48px; color: var(--soft); font-size: .9rem; display: grid; gap: 6px; }
+
+@media (max-width: 760px) {
+  .mission { grid-template-columns: 1fr; }
+  .mission .side { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: auto 1fr; align-items: center; }
+  .mission .side .facts { grid-column: 1 / -1; }
+  .cols { grid-template-columns: 1fr; }
+  .hero svg.orbits { width: 380px; right: -160px; }
+}
+@media (prefers-reduced-motion: no-preference) { .modes button { transition: background .15s, color .15s; } }
+</style>
+
+<header class="hero">
+  <svg class="orbits" viewBox="0 0 560 560" aria-hidden="true">
+    <g fill="none" stroke="#2E96F5" stroke-width="1.5">
+      <circle cx="280" cy="280" r="70"/><circle cx="280" cy="280" r="140"/><circle cx="280" cy="280" r="210"/><circle cx="280" cy="280" r="275"/>
+    </g>
+    <g fill="#2E96F5"><circle cx="420" cy="280" r="7"/><circle cx="131" cy="131" r="5"/><circle cx="280" cy="5" r="6"/></g>
+  </svg>
+  <div class="wrap">
+    <div class="eyebrow">Moon base game · NASA Space Apps 2026</div>
+    <h1>Moon Mission Planner</h1>
+    <p>Three missions at the lunar south pole. Each one adds a new way for the base to get into trouble. Finish a mission, earn research points, and spend them in the lobby to open the next one.</p>
+    <div class="loop" aria-label="Game loop">
+      <span class="step">Play a mission</span><span class="arrow">→</span>
+      <span class="step">Earn research points</span><span class="arrow">→</span>
+      <span class="step">Unlock and upgrade in the lobby</span><span class="arrow">→</span>
+      <span class="step">Next mission opens</span>
+    </div>
+  </div>
+</header>
+
+<nav class="modebar" aria-label="Difficulty">
+  <div class="wrap">
+    <div class="modes" role="group" aria-label="Difficulty mode">
+      <button type="button" id="mode-Cadet" data-mode="Cadet" aria-pressed="false">Cadet · easy</button>
+      <button type="button" id="mode-Explorer" data-mode="Explorer" aria-pressed="true">Explorer · medium</button>
+      <button type="button" id="mode-Commander" data-mode="Commander" aria-pressed="false">Commander · hard</button>
+    </div>
+    <p class="modenote" id="modenote"></p>
+  </div>
+</nav>
+
+<main>
+  <section class="block wrap" aria-labelledby="track-h">
+    <div class="eyebrow">How the modes differ</div>
+    <h2 id="track-h">Harder modes give you more to keep track of</h2>
+    <p>The numbers only move a little between modes (crew use 25% less in Cadet and 10% more in Commander). Most of the extra challenge is attention: each step up hands the player more jobs.</p>
+    <div class="lab">
+      <div class="panel">
+        <h3>Cadet · 3 things</h3>
+        <ul class="fail">
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>Power and Oxygen meters</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>The mission goal (Water shows on Ice Hunters)</span></li>
+        </ul>
+        <p class="small">Helpers: robot parks diggers at night, battery forecast, 45-second storm warning, no broken panels. Crew can't come to harm; missing the goal still fails.</p>
+      </div>
+      <div class="panel">
+        <h3>Explorer · 8 things</h3>
+        <ul class="fail">
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>All four meters: Power, Oxygen, Water, Food</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>The mission goal</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>Parking diggers at night yourself</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>A regolith pile for the Oxygen maker</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>Storm warnings and broken panels</span></li>
+        </ul>
+        <p class="small">Helpers: battery forecast, 30-second storm warning. Crew may spend 30 seconds at an empty meter.</p>
+      </div>
+      <div class="panel">
+        <h3>Commander · 10 things</h3>
+        <ul class="fail">
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>Everything in Explorer</span></li>
+          <li class="new"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span><strong>Moon dust</strong><br>Panels lose 4% of their power a minute (down to half) until tapped clean, 1 regolith each.</span></li>
+          <li class="new"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span><strong>Pack the supply crate</strong><br>Same weight as Explorer's crate, but you split it between water, food and regolith.</span></li>
+        </ul>
+        <p class="small">No battery forecast, 15-second storm warning, 10 seconds allowed at an empty meter.</p>
+      </div>
+    </div>
+    <div class="ladder">
+      <table>
+        <thead><tr><th>Simulator check</th><th class="num">Cadet</th><th class="num">Explorer</th><th class="num">Commander</th></tr></thead>
+        <tbody>
+          <tr><td>Careful player, every mission</td><td class="num">3 stars</td><td class="num">3 stars</td><td class="num">3 stars</td></tr>
+          <tr><td>First Night: average stars after a mistake</td><td class="num">2.0</td><td class="num">1.0</td><td class="num">1.0</td></tr>
+          <tr><td>Ice Hunters: average stars after a mistake</td><td class="num">1.8</td><td class="num">1.2</td><td class="num">0.5</td></tr>
+          <tr><td>Storm Watch: average stars after a mistake</td><td class="num">1.2</td><td class="num">0.8</td><td class="num">0.6</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small">A careful player can earn 3 stars in every mode without upgrades, so Commander is fair. Mistakes cost more as the mode gets harder, and Commander adds two extra mistakes to make (dirty panels, a badly packed crate).</p>
+  </section>
+
+  <section class="block wrap" aria-labelledby="fail-h">
+    <div class="eyebrow">What makes a mission fail</div>
+    <h2 id="fail-h">Every mission adds new ways to fail</h2>
+    <p>Players get the same build menu every time. What they don't get is enough regolith to build everything at once, so the order and amount they build decide how it goes. A mission ends as "not complete yet" when the crew spend too long with an empty meter, or when the mission goal is missed. The match always plays out to dawn first.</p>
+    <div class="ladder">
+      <table>
+        <thead><tr><th>Way to fail</th><th>1. First Night</th><th>2. Ice Hunters</th><th>3. Storm Watch</th></tr></thead>
+        <tbody>
+          <tr><td>Oxygen runs out (no Oxygen maker, or too few)</td><td><span class="tick new">● new</span></td><td><span class="tick">●</span></td><td><span class="tick">●</span> 4 crew need 2</td></tr>
+          <tr><td>Power runs out at night, crew breathe suit air 2.5x faster</td><td><span class="tick new">● new</span></td><td><span class="tick">●</span> drills add load</td><td><span class="tick">●</span></td></tr>
+          <tr><td>Water runs out (no water in the supply crate)</td><td><span class="tick">–</span></td><td><span class="tick new">● new</span></td><td><span class="tick">●</span> 4 crew drink fast</td></tr>
+          <tr><td>Mission goal missed</td><td><span class="tick">–</span></td><td><span class="tick new">● new</span> water tank</td><td><span class="tick">●</span> storm shelter</td></tr>
+          <tr><td>Crew caught unshielded in a solar storm</td><td><span class="tick">–</span></td><td><span class="tick">–</span></td><td><span class="tick new">● new</span></td></tr>
+          <tr><td>New crew arrive with no Habitat bunk, breathe lander air 2x faster</td><td><span class="tick">–</span></td><td><span class="tick">–</span></td><td><span class="tick new">● new</span></td></tr>
+          <tr><td>Dusty solar panels lose power (Commander only)</td><td><span class="tick">●</span></td><td><span class="tick">●</span></td><td><span class="tick">●</span></td></tr>
+          <tr><td>Supply crate packed wrong (Commander only)</td><td><span class="tick">●</span></td><td><span class="tick">●</span></td><td><span class="tick">●</span></td></tr>
+          <tr><td>Micrometeoroid breaks 2 solar panels until repaired</td><td><span class="tick">–</span></td><td><span class="tick">–</span></td><td><span class="tick new">● new</span> not in Cadet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="block wrap" aria-labelledby="missions-h">
+    <div class="eyebrow">Mission planner</div>
+    <h2 id="missions-h">Three missions, each a little harder</h2>
+    <p class="small">Results come from <code>simulate.py</code>, which plays the rules in <code>BalanceConfig.lua</code> with scripted players and no research upgrades. On Commander, the careful player is also replayed without cleaning panels and with the default crate. Switch the mode above to compare.</p>
+    <div class="missions" id="missions"></div>
+  </section>
+
+  <section class="block wrap" aria-labelledby="lab-h">
+    <div class="eyebrow">Lobby research lab</div>
+    <h2 id="lab-h">Research points</h2>
+    <p>Points arrive after every mission, even an unfinished one, and are spent in the lobby. Unlocks add new modules and open missions; upgrades make the modules you already have better.</p>
+    <div class="lab">
+      <div class="panel">
+        <h3>Earning points</h3>
+        <p class="small">First Night pays up to 20, 30 or 40 by mode, including stars. 1 star pays half, 2 stars three quarters, 3 stars the full amount. Ice Hunters pays 1.5x, Storm Watch 2x.</p>
+        <table>
+          <thead><tr><th>Points for 1 / 2 / 3 stars</th><th class="num">Cadet</th><th class="num">Explorer</th><th class="num">Commander</th></tr></thead>
+          <tbody>
+            <tr><td>First Night (x1)</td><td class="num">10 / 15 / 20</td><td class="num">15 / 23 / 30</td><td class="num">20 / 30 / 40</td></tr>
+            <tr><td>Ice Hunters (x1.5)</td><td class="num">15 / 23 / 30</td><td class="num">23 / 34 / 45</td><td class="num">30 / 45 / 60</td></tr>
+            <tr><td>Storm Watch (x2)</td><td class="num">20 / 30 / 40</td><td class="num">30 / 45 / 60</td><td class="num">40 / 60 / 80</td></tr>
+          </tbody>
+        </table>
+        <p class="small">Not finished yet: 3, 5 or 6 points. Replaying a mission for a star count you already earned pays half.</p>
+      </div>
+      <div class="panel">
+        <h3>Unlocks</h3>
+        <table>
+          <thead><tr><th>Unlock</th><th>What it does</th><th class="num">Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Water Recycler</td><td>Crew use 75% less water</td><td class="num">20</td></tr>
+            <tr><td><strong>Ice Drill</strong></td><td>Mines crater ice for water. <strong>Opens Mission 2</strong></td><td class="num">10</td></tr>
+            <tr><td><strong>Regolith Shielding</strong></td><td>Bury a Habitat in moon dirt against storms. <strong>Opens Mission 3</strong></td><td class="num">20</td></tr>
+            <tr><td>Greenhouse</td><td>Later chapter</td><td class="num">50</td></tr>
+            <tr><td>Fission Reactor</td><td>Later chapter: power through the night</td><td class="num">80</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h3>Upgrades</h3>
+        <table>
+          <thead><tr><th>Upgrade</th><th>Each level</th><th class="num">Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Better Solar Panels</td><td>+20% power</td><td class="num">20 / 40</td></tr>
+            <tr><td>Bigger Batteries</td><td>+25% storage</td><td class="num">20 / 40</td></tr>
+            <tr><td>Faster Diggers</td><td>+20% regolith</td><td class="num">20 / 40</td></tr>
+            <tr><td>Efficient Oxygen Maker</td><td>25% less power</td><td class="num">25</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h3>A typical Explorer path</h3>
+        <ol class="path">
+          <li><div>First Night, 2 stars: <strong>23 points</strong>. Buy the Ice Drill (10). 13 left.</div></li>
+          <li><div>Ice Hunters, 2 stars: <strong>34 points</strong>, 47 total. Buy Regolith Shielding (20). 27 left.</div></li>
+          <li><div>Storm Watch, 2 stars: <strong>45 points</strong>, 72 total. Enough for three first-level upgrades, or the Water Recycler and two upgrades.</div></li>
+        </ol>
+        <p class="small">Any finished First Night opens Mission 2 straight away. Almost every pair of finishes opens Mission 3. The one exception is a Cadet with 1 star on both, who is 5 short; one replay closes the gap.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <div>Numbers live in <code>balancing/BalanceConfig.lua</code>; check any change with <code>python3 simulate.py</code>.</div>
+  <div>Facts: lunar night about 14 Earth days; shadowed craters below −246°C; the Space Station recycles 98% of its water (NASA). Mission design is our own.</div>
+</footer>
+
+<script>
+const SIM = {"FirstNight": {"Cadet": [{"name": "Careful: 3 batteries", "stars": 3, "rp": 20, "low": 60, "blackout": 0, "note": ""}, {"name": "Oxygen maker late (6:00)", "stars": 3, "rp": 20, "low": 43, "blackout": 0, "note": ""}, {"name": "1 battery, diggers on", "stars": 3, "rp": 20, "low": 60, "blackout": 0, "note": ""}, {"name": "No batteries", "stars": 1, "rp": 10, "low": 60, "blackout": 210, "note": ""}, {"name": "Forgets the oxygen maker", "stars": 1, "rp": 10, "low": 0, "blackout": 0, "note": ""}], "Explorer": [{"name": "Careful: 3 batteries", "stars": 3, "rp": 30, "low": 45, "blackout": 0, "note": ""}, {"name": "Oxygen maker late (6:00)", "stars": 2, "rp": 23, "low": 34, "blackout": 148, "note": ""}, {"name": "1 battery, diggers on", "stars": 1, "rp": 15, "low": 45, "blackout": 194, "note": ""}, {"name": "No batteries", "stars": 1, "rp": 15, "low": 30, "blackout": 320, "note": ""}, {"name": "Forgets the oxygen maker", "stars": 0, "rp": 3, "low": 0, "blackout": 0, "note": "crew at zero for 501s"}], "Commander": [{"name": "Careful: 3 batteries", "stars": 3, "rp": 40, "low": 41, "blackout": 0, "note": ""}, {"name": "Oxygen maker late (6:00)", "stars": 0, "rp": 3, "low": 0, "blackout": 388, "note": "crew at zero for 184s"}, {"name": "1 battery, diggers on", "stars": 1, "rp": 20, "low": 3, "blackout": 419, "note": ""}, {"name": "No batteries", "stars": 1, "rp": 20, "low": 7, "blackout": 412, "note": ""}, {"name": "Forgets the oxygen maker", "stars": 0, "rp": 3, "low": 0, "blackout": 0, "note": "crew at zero for 564s"}, {"name": "Careful: 3 batteries, never cleans dust", "stars": 2, "rp": 30, "low": 41, "blackout": 128, "note": ""}, {"name": "Careful: 3 batteries, default crate", "stars": 2, "rp": 30, "low": 39, "blackout": 0, "note": ""}]}, "IceHunters": {"Cadet": [{"name": "Careful: 1 drill, runs all night", "stars": 3, "rp": 30, "low": 50, "blackout": 0, "note": ""}, {"name": "2 drills, both run at night", "stars": 2, "rp": 23, "low": 50, "blackout": 86, "note": ""}, {"name": "1 drill, parks it at night", "stars": 3, "rp": 30, "low": 50, "blackout": 0, "note": ""}, {"name": "Drill built late (7:00)", "stars": 2, "rp": 23, "low": 34, "blackout": 0, "note": ""}, {"name": "Never drills (First Night plan)", "stars": 0, "rp": 5, "low": 5, "blackout": 0, "note": "goal missed (water at end 5/40)"}], "Explorer": [{"name": "Careful: 1 drill, runs all night", "stars": 3, "rp": 45, "low": 48, "blackout": 0, "note": ""}, {"name": "2 drills, both run at night", "stars": 2, "rp": 34, "low": 48, "blackout": 96, "note": ""}, {"name": "1 drill, parks it at night", "stars": 3, "rp": 45, "low": 48, "blackout": 0, "note": ""}, {"name": "Drill built late (7:00)", "stars": 0, "rp": 5, "low": 29, "blackout": 0, "note": "goal missed (water at end 68/70)"}, {"name": "Never drills (First Night plan)", "stars": 0, "rp": 5, "low": 0, "blackout": 0, "note": "goal missed (water at end 0/70); crew at zero for 200s"}], "Commander": [{"name": "Careful: 1 drill, runs all night", "stars": 3, "rp": 60, "low": 41, "blackout": 0, "note": ""}, {"name": "2 drills, both run at night", "stars": 0, "rp": 5, "low": 20, "blackout": 369, "note": "goal missed (water at end 78/80)"}, {"name": "1 drill, parks it at night", "stars": 0, "rp": 5, "low": 46, "blackout": 168, "note": "goal missed (water at end 65/80)"}, {"name": "Drill built late (7:00)", "stars": 0, "rp": 5, "low": 27, "blackout": 108, "note": "goal missed (water at end 58/80)"}, {"name": "Never drills (First Night plan)", "stars": 0, "rp": 5, "low": 0, "blackout": 0, "note": "goal missed (water at end 0/80); crew at zero for 291s"}, {"name": "Careful: 1 drill, runs all night, never cleans dust", "stars": 1, "rp": 30, "low": 41, "blackout": 227, "note": ""}, {"name": "Careful: 1 drill, runs all night, default crate", "stars": 2, "rp": 45, "low": 46, "blackout": 75, "note": ""}]}, "StormWatch": {"Cadet": [{"name": "Careful: 2nd habitat, shields both", "stars": 3, "rp": 40, "low": 55, "blackout": 0, "note": ""}, {"name": "Only one oxygen maker for 4 crew", "stars": 3, "rp": 40, "low": 55, "blackout": 0, "note": ""}, {"name": "Never fixes the broken panels", "stars": 3, "rp": 40, "low": 52, "blackout": 0, "note": ""}, {"name": "Shields one habitat only", "stars": 0, "rp": 6, "low": 55, "blackout": 0, "note": "goal missed (storm crew-seconds 240/120)"}, {"name": "Shields after the 1st storm", "stars": 0, "rp": 6, "low": 55, "blackout": 0, "note": "goal missed (storm crew-seconds 240/120)"}, {"name": "Habitat late, crew wait in lander", "stars": 0, "rp": 6, "low": 53, "blackout": 0, "note": "goal missed (storm crew-seconds 240/120)"}], "Explorer": [{"name": "Careful: 2nd habitat, shields both", "stars": 3, "rp": 60, "low": 49, "blackout": 0, "note": ""}, {"name": "Only one oxygen maker for 4 crew", "stars": 2, "rp": 45, "low": 33, "blackout": 0, "note": ""}, {"name": "Never fixes the broken panels", "stars": 2, "rp": 45, "low": 40, "blackout": 110, "note": ""}, {"name": "Shields one habitat only", "stars": 0, "rp": 6, "low": 42, "blackout": 0, "note": "goal missed (storm crew-seconds 240/60)"}, {"name": "Shields after the 1st storm", "stars": 0, "rp": 6, "low": 49, "blackout": 0, "note": "goal missed (storm crew-seconds 240/60)"}, {"name": "Habitat late, crew wait in lander", "stars": 0, "rp": 6, "low": 49, "blackout": 0, "note": "goal missed (storm crew-seconds 240/60)"}], "Commander": [{"name": "Careful: 2nd habitat, shields both", "stars": 3, "rp": 80, "low": 43, "blackout": 0, "note": ""}, {"name": "Only one oxygen maker for 4 crew", "stars": 1, "rp": 40, "low": 11, "blackout": 0, "note": ""}, {"name": "Never fixes the broken panels", "stars": 0, "rp": 6, "low": 0, "blackout": 461, "note": "crew at zero for 279s"}, {"name": "Shields one habitat only", "stars": 0, "rp": 6, "low": 18, "blackout": 101, "note": "goal missed (storm crew-seconds 240/0)"}, {"name": "Shields after the 1st storm", "stars": 0, "rp": 6, "low": 0, "blackout": 424, "note": "goal missed (storm crew-seconds 240/0); crew at zero for 231s"}, {"name": "Habitat late, crew wait in lander", "stars": 0, "rp": 6, "low": 0, "blackout": 284, "note": "goal missed (storm crew-seconds 240/0); crew at zero for 121s"}, {"name": "Careful: 2nd habitat, shields both, never cleans dust", "stars": 1, "rp": 40, "low": 27, "blackout": 206, "note": ""}, {"name": "Careful: 2nd habitat, shields both, default crate", "stars": 2, "rp": 60, "low": 38, "blackout": 0, "note": ""}]}};
+const MODE_NOTES = {
+  Cadet: "Ages 6 to 8. Track Power, Oxygen and the mission goal. A robot helper parks diggers at night, and running out never fails the mission.",
+  Explorer: "Ages 9 to 11. Track all four meters, park your own diggers, keep regolith for the Oxygen maker, and handle storms and broken panels.",
+  Commander: "Ages 12 and up. Everything in Explorer, plus dusty solar panels to clean and a supply crate to pack yourself. No battery forecast."
+};
+const MISSIONS = [
+  { id: "FirstNight", n: 1, name: "First Night", crew: "2 astronauts", needs: null,
+    story: "The first crew lands at Shackleton Connecting Ridge. Build in sunlight, then keep them safe through a 6-minute lunar night.",
+    start: "Habitat, 1 Solar panel, 1 Digger, 30 regolith",
+    goal: { Cadet: "Get the crew to dawn", Explorer: "Get the crew to dawn", Commander: "Get the crew to dawn" },
+    goalNote: "Survive the night",
+    changes: ["Supply crate at 6:00 brings water and food", "Night from 12:00 to 18:00: solar stops, heaters double"],
+    fails: [ { t: "Oxygen runs out", d: "Crew breathe 6 a minute and nothing makes more until an Oxygen maker is built. Empty at about 11:40.", n: true },
+             { t: "Dark night", d: "No batteries means no power for heaters and air cleaners, so crew use suit air 2.5x faster.", n: true } ],
+    hard: { Cadet: "", Explorer: "", Commander: "Commander 3 stars: clean panels every few minutes and pack the crate with 40 water and 25 food." } },
+  { id: "IceHunters", n: 2, name: "Ice Hunters", crew: "2 astronauts", needs: "Ice Drill · 10 points",
+    story: "No water comes from Earth this time. Drive into a permanently shadowed crater, where NASA's VIPER mission looks for ice, and drill it.",
+    start: "Habitat, 2 Solar panels, 1 Digger, 45 regolith, water at 50",
+    goal: { Cadet: 40, Explorer: 70, Commander: 80 },
+    goalNote: "Water tank at dawn, for the next crew",
+    changes: ["Supply crate brings food only", "Ice Drill: +6 water a minute, uses 5 power, crater zone only"],
+    fails: [ { t: "Water runs out", d: "Crew drink 3 a minute. Without a drill, water is gone by about 17:00.", n: true },
+             { t: "Tank not full enough", d: "Drilling late or parking the drill at night leaves the tank short of the goal.", n: true },
+             { t: "Drills drain the night", d: "Each drill running in the dark adds 5 power a minute on top of the heaters.", n: false } ],
+    hard: { Cadet: "", Explorer: "", Commander: "Commander 3 stars: run the drill all night, clean panels, and swap 5 food for 5 regolith in the crate. With Better Solar Panels the default crate also works." } },
+  { id: "StormWatch", n: 3, name: "Storm Watch", crew: "2 astronauts, then 2 more at 3:00", needs: "Regolith Shielding · 20 points",
+    story: "Two solar storms are forecast and a second crew is on the way. Give everyone a bunk, bury the Habitats in regolith, and keep the lights on.",
+    start: "Habitat, Oxygen maker, Battery, 2 Solar panels, 2 Diggers, 50 regolith, oxygen at 55",
+    goal: { Cadet: 120, Explorer: 60, Commander: 0 },
+    goalNote: "Most crew-seconds caught unshielded in storms",
+    changes: ["Solar storms at 5:00 and 15:00, 1 minute each; robots shelter too", "Micrometeoroid at 9:00 breaks 2 solar panels (5 regolith each to fix)", "Two supply crates, at 6:00 and 13:00"],
+    fails: [ { t: "Caught in a storm", d: "Each astronaut in a Habitat without Shielding during a storm counts against the goal.", n: true },
+             { t: "No bunk", d: "Each Habitat holds 2. The new crew wait in the lander and breathe 2x faster until there is room.", n: true },
+             { t: "Broken panels", d: "Unrepaired panels mean less charge before the night.", n: true },
+             { t: "One Oxygen maker is not enough", d: "4 crew use 12 a minute; one maker makes 10.", n: false } ],
+    hard: { Cadet: "", Explorer: "", Commander: "Commander 3 stars: shield both Habitats first, build batteries before the second Oxygen maker, clean panels, and pack extra water in the first crate." } }
+];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const starRow = k => `<span class="stars" aria-label="${k} of 3 stars"><span class="on">${"★".repeat(k)}</span><span class="off">${"★".repeat(3 - k)}</span> ${k}</span>`;
+const warnIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E43700" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+const lockIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EAFE07" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+
+function goalText(m, mode) {
+  const v = m.goal[mode];
+  if (m.id === "IceHunters") return `Water tank at <mark>${v}</mark> or more at dawn`;
+  if (m.id === "StormWatch") return v === 0 ? `<mark>Nobody</mark> caught unshielded in a storm` : `No more than <mark>${v}</mark> crew-seconds unshielded`;
+  return `<mark>${esc(v)}</mark>`;
+}
+function render(mode) {
+  document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  document.getElementById("modenote").textContent = MODE_NOTES[mode];
+  document.getElementById("missions").innerHTML = MISSIONS.map(m => {
+    const rows = SIM[m.id][mode].map(r => `<tr><td>${esc(r.name)}</td><td>${starRow(r.stars)}</td><td class="num">${r.rp}</td><td>${r.note ? esc(r.note) : (r.blackout ? `power out ${Math.floor(r.blackout / 60)} min ${r.blackout % 60} s` : "no blackout")}</td></tr>`).join("");
+    const hard = m.hard[mode] ? `<p class="small">${esc(m.hard[mode])}</p>` : "";
+    return `<article class="mission" aria-labelledby="m${m.n}">
+      <div class="side">
+        <div class="num" aria-hidden="true">${m.n}</div>
+        <div><div class="eyebrow">Mission ${m.n}</div><h3 id="m${m.n}">${esc(m.name)}</h3></div>
+        <div class="facts">
+          <div><b>Crew</b>${esc(m.crew)}</div>
+          <div><b>Starts with</b>${esc(m.start)}</div>
+          <div><b>To open</b>${m.needs ? `<span class="lock">${lockIcon}${esc(m.needs)}</span>` : "Open from the start"}</div>
+        </div>
+      </div>
+      <div class="main">
+        <p>${esc(m.story)}</p>
+        <div class="goal"><span class="eyebrow">Mission goal · ${esc(mode)}</span><span class="target">${goalText(m, mode)}</span><span class="small">${esc(m.goalNote)}, plus the crew safe through the night.</span></div>
+        <div class="cols">
+          <div><h3>What's different</h3><ul class="fail">${m.changes.map(c => `<li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E96F5" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg><span>${esc(c)}</span></li>`).join("")}</ul></div>
+          <div><h3>Ways to fail</h3><ul class="fail">${m.fails.map(f => `<li class="${f.n ? "new" : ""}">${warnIcon}<span><strong>${esc(f.t)}</strong><br>${esc(f.d)}</span></li>`).join("")}</ul></div>
+        </div>
+        <div class="sim"><table>
+          <thead><tr><th>Scripted player</th><th>Stars</th><th class="num">Points</th><th>What happened</th></tr></thead>
+          <tbody>${rows}</tbody></table></div>
+        ${hard}
+      </div>
+    </article>`;
+  }).join("");
+  try { localStorage.setItem("planner-mode", mode); } catch (e) {}
+}
+document.querySelectorAll(".modes button").forEach(b => b.addEventListener("click", () => render(b.dataset.mode)));
+let start = "Explorer";
+try { const s = localStorage.getItem("planner-mode"); if (s && MODE_NOTES[s]) start = s; } catch (e) {}
+render(start);
+</script>

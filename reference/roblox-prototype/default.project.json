@@ -1,0 +1,43 @@
+{
+  "name": "grid-practice",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "BalanceConfig": {
+        "$path": "../balancing/BalanceConfig.lua"
+      },
+      "GridConfig": {
+        "$path": "GridConfig.lua"
+      },
+      "GridMath": {
+        "$path": "GridMath.lua"
+      },
+      "ModuleVisuals": {
+        "$path": "ModuleVisuals.lua"
+      },
+      "ModuleArt": {
+        "$path": "ModuleArt.lua"
+      }
+    },
+    "ServerScriptService": {
+      "PlacementServer": {
+        "$path": "PlacementServer.server.lua"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "PlacementClient": {
+          "$path": "PlacementClient.client.lua"
+        },
+        "LandingClient": {
+          "$path": "LandingClient.client.lua"
+        }
+      }
+    },
+    "ServerStorage": {
+      "MakeTestTerrain": {
+        "$path": "MakeTestTerrain.lua"
+      }
+    }
+  }
+}

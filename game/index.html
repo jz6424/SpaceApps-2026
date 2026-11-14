@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junior Astronaut Moon Base Trainer</title>
+<meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code&family=Fira+Sans:wght@700;900&family=Overpass:ital,wght@0,300;0,400;0,700;1,400&display=swap">
+</head>
+<body>
+
+<!-- In-mission HUD -->
+<div id="hud" hidden>
+  <section id="meters" class="panel" aria-label="Base meters"></section>
+  <section id="clock" class="panel" aria-label="Sun clock"></section>
+  <aside id="mission-card" class="panel" aria-label="Current mission">
+    <h2 id="hud-title"></h2>
+    <p id="hud-mode" class="fine"></p>
+    <p id="hint" role="status"></p>
+    <div class="row">
+      <button class="btn small" id="speed" aria-pressed="false"></button>
+      <button class="btn small" data-do="menu">Pause</button>
+    </div>
+  </aside>
+  <ul id="feed" aria-live="polite" aria-label="Messages"></ul>
+  <p id="prompt" class="panel" hidden></p>
+  <button id="back-in" class="btn primary" hidden>Back to the airlock</button>
+  <p id="keys" class="panel fine"><kbd>WASD</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · <kbd>drag</kbd> look · <kbd>E</kbd> use · <kbd>F</kbd> speed · <kbd>Esc</kbd> pause<br>Inside, click a station label to walk there.</p>
+</div>
+<div id="storm-frame" hidden><p id="storm-text"></p></div>
+
+<div id="station" class="panel" role="dialog" aria-modal="false" aria-labelledby="station-title" hidden>
+  <div class="st-head"><h3 id="station-title"></h3><button id="station-close" class="btn small" aria-label="Close station">Close</button></div>
+  <div id="station-body"></div>
+</div>
+
+<!-- Start -->
+<main id="start" class="screen">
+  <svg class="orbits" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
+  <div class="inner">
+    <div class="text">
+      <p class="eyebrow">Junior astronaut mission trainer</p>
+      <h1>Moon Base Trainer</h1>
+      <p class="lede">Keep a base alive at the real lunar south pole. Share your power, watch your air, and hide from solar storms. Every choice costs something, and the Moon you walk on is built from NASA data.</p>
+      <div id="start-actions"></div>
+      <p id="start-status" role="status"></p>
+      <div class="row">
+        <button class="link" data-do="how">How to play</button>
+        <button class="link" data-do="credits">Credits and NASA data</button>
+      </div>
+      <p class="fine">Plays in your browser with no download or account.<br>Made for NASA Space Apps 2026. Not affiliated with or endorsed by NASA.</p>
+    </div>
+    <div class="frame"><img id="start-picture" alt="The moon base: a white habitat on legs, solar panels and a robot on grey ground under a black sky" hidden></div>
+  </div>
+</main>
+
+<!-- Mission menu -->
+<main id="missions" class="screen" hidden>
+  <svg class="orbits" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
+  <div class="inner">
+    <div class="topbar">
+      <button class="btn small" data-do="home">Back</button>
+      <p class="score">Research points: <b id="points">0</b></p>
+    </div>
+    <h2>Choose your mission</h2>
+    <section aria-label="Difficulty">
+      <div id="mode-choice" role="group" aria-label="Difficulty mode"></div>
+      <p id="mode-about"></p>
+    </section>
+    <section id="mission-list" aria-label="Missions"></section>
+    <div class="footnotes">
+      <p id="save-note" class="fine"></p>
+      <div id="erase" class="fine"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Briefing before a mission -->
+<main id="brief" class="screen" hidden>
+  <div class="dialog wide">
+    <p class="eyebrow">Mission briefing</p>
+    <h2 id="brief-title"></h2>
+    <p id="brief-text"></p>
+    <p class="goal"><b>Goal:</b> <span id="brief-goal"></span></p>
+    <div id="brief-site" class="sitefacts"></div>
+    <p id="brief-flare" class="fine"></p>
+    <div class="row">
+      <button class="btn primary" data-do="launch">Start mission</button>
+      <button class="btn" data-do="open-missions">Back</button>
+    </div>
+  </div>
+</main>
+
+<div id="pause" class="screen" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+  <div class="dialog">
+    <h2 id="pause-title"></h2>
+    <p>Time is stopped. Take a breath!</p>
+    <div class="row">
+      <button class="btn primary" data-do="resume">Keep playing</button>
+      <button class="btn" data-do="restart">Start over</button>
+      <button class="btn" data-do="leave">Mission menu</button>
+    </div>
+  </div>
+</div>
+
+<main id="debrief" class="screen" hidden>
+  <div class="dialog wide">
+    <p class="eyebrow">Debrief</p>
+    <h2 id="debrief-title"></h2>
+    <p id="debrief-reason"></p>
+    <p id="debrief-stars"></p>
+    <dl id="debrief-stats" class="facts"></dl>
+    <p id="debrief-points"></p>
+    <p class="lesson"><b>What you just learned:</b> <span id="debrief-lesson"></span></p>
+    <ul id="debrief-tips"></ul>
+    <article class="card">
+      <h3 id="card-title"></h3>
+      <p id="card-body"></p>
+      <p class="fine">Source: <span id="card-source"></span></p>
+    </article>
+    <div class="row">
+      <button class="btn primary" data-do="open-missions">Next mission</button>
+      <button class="btn" id="debrief-again" data-do="again">Play again</button>
+    </div>
+  </div>
+</main>
+
+<main id="how" class="screen" hidden>
+  <div class="dialog wide">
+    <h2>How to play</h2>
+    <ol class="steps">
+      <li><b>You are the whole crew.</b> Walk around the Habitat and use its stations. Click a station's label and you'll walk there.</li>
+      <li><b>Watch three meters.</b> <em>Power</em> comes from solar panels, and only while the Sun is up. <em>Life Support</em> is your air and water. <em>Radiation dose</em> goes up a little all the time, and a lot in solar storms.</li>
+      <li><b>Nothing is free.</b> The antenna, grow lights, robot and Boost all use power. Moon dirt can buy shielding, repairs or extra oxygen, but not all three.</li>
+      <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back.</li>
+      <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
+    </ol>
+    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause.</p>
+    <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
+  </div>
+</main>
+
+<main id="credits" class="screen" hidden>
+  <div class="dialog wide">
+    <h2>Credits and NASA data</h2>
+    <h3>Real NASA data in this game</h3>
+    <ul id="sources" class="sources"></ul>
+    <p class="fine">Game rates (power, air, dose) are made simple and sped up so a lunar night fits in a few minutes. The data cards after each mission give the real numbers. Solar flares come live from NASA DONKI when your browser can reach it, otherwise from a list of real past flares. The game always says which one you got.</p>
+    <h3>Made by</h3>
+    <p>Team BaseRace for NASA Space Apps Challenge 2026: "Build a Junior Astronaut Mission Trainer". 3D models are our own designs, built in Blender and inspired by real NASA hardware like the Foundation Surface Habitat and VSAT solar towers.</p>
+    <h3>Use of AI</h3>
+    <p>We used Claude, an AI assistant made by Anthropic, to help write code, balance the game numbers, script the Blender models, check science facts and write text. Our team chose the design, directed the work and reviewed and tested the results.</p>
+    <h3>Open-source tools</h3>
+    <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Fira Sans, Overpass and Fira Code (SIL Open Font License). Icons drawn in the style of Feather (MIT).</p>
+    <p class="fine">NASA data is public domain. This game is not affiliated with or endorsed by NASA.</p>
+    <div class="row"><button class="btn primary" data-do="home">Back</button></div>
+  </div>
+</main>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

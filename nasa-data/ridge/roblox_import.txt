@@ -1,0 +1,57 @@
+ROBLOX TERRAIN IMPORT SETTINGS
+Heightmap: heightmap.png   Colormap: colormap.png
+Select tool Size:  X = 2048   Y = 335   Z = 2048   (studs)
+Position: centre where you like, e.g. 0, 167, 0
+Real area: 2.56 x 2.56 km; 1 stud = 1.25 m
+Height: 1541 m to 1959 m (419 m relief, x1.0 exaggeration)
+Each grey level = 1.64 m. Ground flatter than 15.0 deg: 77%
+If Y is over 1024 studs, use --downsample 2 or a smaller --size.
+
+{
+  "source": "Site01_final_adj_5mpp_surf.tif",
+  "crop_pixels": [
+    1344,
+    1344,
+    512,
+    512
+  ],
+  "output_pixels": [
+    512,
+    512
+  ],
+  "metres_per_pixel": 5.0,
+  "metres_per_stud": 1.25,
+  "real_area_km": [
+    2.56,
+    2.56
+  ],
+  "elevation_m": [
+    1540.9,
+    1959.5
+  ],
+  "relief_m": 418.6,
+  "height_step_m": 1.64,
+  "buildable_share": 0.768,
+  "mean_slope_deg": 10.6,
+  "roblox_size_studs": [
+    2048,
+    334.9,
+    2048
+  ],
+  "exaggeration": 1.0,
+  "psr_min_mean_max": [
+    0.0,
+    0.023,
+    1.0
+  ],
+  "sun_min_mean_max": [
+    0.0,
+    0.412,
+    0.879
+  ],
+  "earth_min_mean_max": [
+    0.0,
+    0.364,
+    0.582
+  ]
+}
