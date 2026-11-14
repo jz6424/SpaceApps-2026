@@ -4,3 +4,4 @@ game/dist/
 # Raw NASA rasters are big (~160 MB); keep them out of git
 nasa-data/*.tif
 nasa-data/*.tiff
+_site/

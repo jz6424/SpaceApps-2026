@@ -13,8 +13,14 @@ npm install
 npm run dev        # then open http://localhost:5174
 ```
 
-`npm run build` writes a static site to `game/dist/` (works from any folder, e.g. GitHub Pages).
-**Online:** every push to `main` builds the game and publishes it to https://jz6424.github.io/SpaceApps-2026/ (`.github/workflows/pages.yml`; one-time setup: repo Settings > Pages > Source = GitHub Actions).
+`npm run build` writes the game as a static site to `game/dist/` (works from any folder).
+
+**Online:** https://jz6424.github.io/SpaceApps-2026/ is the project website (`site/`), with the game
+embedded and a full-screen button. The game alone is at `/play/`. Every push to `main` rebuilds and
+publishes both (`.github/workflows/pages.yml`; one-time setup: repo Settings > Pages > Source = GitHub Actions).
+To preview the whole website locally: `./build-site.sh`, then `python3 -m http.server -d _site 5175`
+and open http://localhost:5175.
+
 Opening `game/dist/index.html` straight from Finder (a `file://` address) won't work, because browsers block loading the terrain and models that way; use `npm run preview` or the online link.
 
 Add `?low` to the address for simple graphics on slow computers (the game also switches by itself).
@@ -45,11 +51,35 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 
 Raw downloads and the scripts that cut them are in `nasa-data/` (big TIFFs, ~160 MB).
 
+### Getting the raw NASA data (optional)
+
+You don't need it to run or change the game: the small cut-outs the game loads are committed in
+`game/public/terrain/`. The raw GeoTIFFs are only needed to re-cut the terrain or pick a new site, and
+they are too big for git, so download them from NASA Goddard's PGDA into `nasa-data/`:
+
+```
+cd nasa-data
+B=https://pgda.gsfc.nasa.gov/data
+curl -LO $B/LOLA_5mpp/Site01/Site01_final_adj_5mpp_surf.tif                               # Connecting Ridge, 41 MB
+curl -LO $B/LOLA_5mpp/Site06/Site06_final_adj_5mpp_surf.tif                               # Nobile Rim, 64 MB
+curl -L  $B/MoonIllumination/AVGVISIB_85S_060M_201608.TIF       -o AVGVISIB_85S_060M_201608.tiff        # sunlight, 34 MB
+curl -L  $B/MoonIllumination/AVGVISIB_85S_060M_201608_EARTH.TIF -o AVGVISIB_85S_060M_201608_EARTH.tiff  # Earth view, 25 MB
+curl -L  $B/MoonIllumination/LPSR_85S_060M_201608.TIF           -o LPSR_85S_060M_201608.tiff            # permanent shadow, 1 MB
+pip install rasterio numpy pillow scipy
+```
+
+Keep the file names exactly as above (the scripts look for them). Product pages:
+[LOLA 5 m site models (78)](https://pgda.gsfc.nasa.gov/products/78),
+[south pole illumination maps (69)](https://pgda.gsfc.nasa.gov/products/69).
+Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_heights.f32`, and
+`python nasa-data/lola_to_roblox.py -h` shows how to cut a new area.
+
 ## Folders
 
 | Folder | What's inside |
 |---|---|
 | `game/` | The browser game (three.js, Rapier physics, Vite). Rules in `src/sim.js`, numbers in `src/config.js`. |
+| `site/` | The project website that hosts the game (plain HTML, CSS, JS). `build-site.sh` puts it and the built game into `_site/`. |
 | `game/tools/simulate.mjs` | `npm run balance`: plays every mission x mode with careful, careless and idle bots. |
 | `nasa-data/` | NASA LOLA rasters, cut-outs for Connecting Ridge and Nobile Rim, and the conversion scripts. |
 | `balancing/` | Original Roblox `BalanceConfig.lua` and `simulate.py` (the JS config was ported from these). |

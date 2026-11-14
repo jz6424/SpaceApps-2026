@@ -1,5 +1,5 @@
 # Writes the Connecting Ridge elevations as raw metres for the browser game, from the same NASA
-# crop as site-data/ridge_best. heightmap.png has only 256 grey levels (1.38 m per level), which
+# crop as nasa-data/ridge_best. heightmap.png has only 256 grey levels (1.38 m per level), which
 # shows up as terraces at walking scale, so the game reads these floats instead.
 # Output: 512 x 512 little-endian float32, row by row, metres above the lowest point.
 import json
@@ -11,7 +11,7 @@ from PIL import Image
 from rasterio.windows import Window
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SITE = os.path.join(HERE, "..", "..", "site-data")
+SITE = os.path.join(HERE, "..", "..", "nasa-data")
 OUT = os.path.join(HERE, "..", "public", "terrain", "ridge_heights.f32")
 
 meta = json.loads(open(os.path.join(SITE, "ridge_best", "roblox_import.txt")).read().split("\n\n", 1)[1])

@@ -128,7 +128,7 @@ def main():
                     path = stem + ext  # browsers often save .TIF as .tiff
                     break
             else:
-                raise SystemExit(f"Can't find layer file {path}. Check the name in site-data.")
+                raise SystemExit(f"Can't find layer file {path}. Check the name in nasa-data.")
         dst = np.full(z.shape, np.nan, dtype="float64")
         with rasterio.open(path) as lsrc:
             reproject(

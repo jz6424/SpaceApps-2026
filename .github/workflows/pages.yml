@@ -1,4 +1,4 @@
-# Builds the game in game/ and publishes it to GitHub Pages on every push to main.
+# Builds the website (site/ at the root, the game from game/ at play/) and publishes it to GitHub Pages on every push to main.
 # One-time setup: repo Settings > Pages > Source = "GitHub Actions".
 name: Deploy game to GitHub Pages
 
@@ -30,10 +30,11 @@ jobs:
           cache: npm
           cache-dependency-path: game/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - run: ./build-site.sh
+        working-directory: .
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: game/dist
+          path: _site
 
   deploy:
     needs: build
