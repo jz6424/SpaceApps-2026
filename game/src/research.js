@@ -31,19 +31,19 @@ export const BRANCHES = [
     nodes: [
       {
         id: 'HeatBlankets', icon: 'moon', name: 'Heat blankets', cost: 10,
-        science: 'The lunar night is colder than -170 C. Spacecraft are wrapped in many thin, shiny layers called multi-layer insulation. Each layer reflects heat back inside.',
+        science: 'The lunar night is colder than -170 C. Engineers wrap spacecraft in many thin, shiny layers called multi-layer insulation. Each layer reflects heat back inside.',
         change: 'Night heaters use 20% less power.',
         effects: [{ path: 'power.heaters', times: 0.8 }],
       },
       {
         id: 'SunTracking', icon: 'sun', name: 'Sun-tracking panels', cost: 15, needs: 'HeatBlankets',
-        science: 'At the south pole the Sun never climbs high. It circles low around the horizon, so panels that stand upright and turn to face it catch more light. NASA is developing tall solar towers like this, called VSAT.',
+        science: 'At the south pole the Sun never rises high. It circles low around the horizon, so panels that stand upright and turn to face it collect more light. NASA is developing tall solar towers like this, called VSAT.',
         change: 'Solar panels make 10% more power.',
         effects: [{ path: 'solar.perPanel', times: 1.1 }],
       },
       {
         id: 'DishAntenna', icon: 'radio', name: 'Dish antenna', cost: 8,
-        science: 'A dish squeezes the radio signal into a narrow beam aimed at Earth. Less of the signal is lost into empty space, so the radio needs less power.',
+        science: 'A dish focuses the radio signal into a narrow beam aimed at Earth. Less of the signal misses Earth, so the radio needs less power.',
         change: 'The antenna uses 25% less power.',
         effects: [{ path: 'power.comms', times: 0.75 }],
       },
@@ -51,23 +51,23 @@ export const BRANCHES = [
   },
   {
     id: 'air', name: 'Life Support', icon: 'wind',
-    about: 'Keep your air and water going for longer.',
+    about: 'Make your air and water last longer.',
     nodes: [
       {
         id: 'Scrubber', icon: 'wind', name: 'Better CO2 scrubber', cost: 10,
-        science: 'You breathe out carbon dioxide, and too much of it is dangerous. A scrubber pulls it out of the air. The Space Station traps it in a mineral called zeolite, so the crew can breathe the same air again.',
+        science: 'You breathe out carbon dioxide, and too much of it is dangerous. A scrubber removes it from the air. The Space Station traps it in a mineral called zeolite, so the crew can breathe the same air again.',
         change: 'Life Support drains 5% slower.',
         effects: [{ path: 'air.crewUse', times: 0.95 }],
       },
       {
         id: 'Sabatier', icon: 'droplet', name: 'Sabatier reactor', cost: 18, needs: 'Scrubber',
-        science: 'A Sabatier reactor mixes the carbon dioxide you breathe out with hydrogen. The two react and become water and methane. The Space Station has used one to get water back.',
+        science: 'A Sabatier reactor mixes the carbon dioxide you breathe out with hydrogen. The two react and become water and methane. The Space Station has used one to make water for the crew.',
         change: 'The Life Support machine refills 10% faster on every setting.',
         effects: [{ path: 'air.make', times: 1.1 }],
       },
       {
         id: 'RegolithOxygen', icon: 'box', name: 'Oxygen from moon dirt', cost: 15, needs: 'Scrubber',
-        science: 'Moon dirt is about 45% oxygen by weight, locked inside the rock. Melting the dirt and passing electricity through it sets the oxygen free. This is called molten regolith electrolysis.',
+        science: 'Moon dirt is about 45% oxygen by weight, but the oxygen is bonded to the rock. Melting the dirt and passing electricity through it releases the oxygen. Scientists call this molten regolith electrolysis.',
         change: 'Boost uses 30% less moon dirt.',
         effects: [{ path: 'air.boostRegolith', times: 0.7 }],
       },
@@ -75,22 +75,22 @@ export const BRANCHES = [
   },
   {
     id: 'radiation', name: 'Radiation', icon: 'radiation',
-    about: 'Take a smaller dose when the Sun throws a storm at you.',
+    about: 'Take a smaller radiation dose during solar storms.',
     nodes: [
       {
         id: 'Shielding', icon: 'shield', name: 'Regolith Shielding', mission: 'SolarStorm',
         science: 'Solar storm particles lose energy as they pass through matter. A thick layer of moon dirt piled on the Habitat stops many of them before they reach you.',
-        change: 'You can pile moon dirt on the Storm Shelter to cut your storm dose.',
+        change: 'You can pile moon dirt on the Storm Shelter to lower your storm dose.',
       },
       {
         id: 'ParticleDetector', icon: 'alert', name: 'Particle detector', cost: 12, needs: 'Shielding',
-        science: 'The fastest particles from a solar flare arrive before the main storm. A detector on the Habitat spots them, so you get a warning even when Earth can\'t reach you.',
-        change: 'Your own storm warning comes 10 seconds early, up from 5.',
+        science: 'The fastest particles from a solar flare arrive before the main storm. A sensor on the Habitat detects them, so you get a warning even when Earth can\'t reach you.',
+        change: 'Your own sensor warns you 10 seconds before a storm, up from 5.',
         effects: [{ path: 'ownSensorWarning', add: 5 }],
       },
       {
         id: 'WaterWall', icon: 'door', name: 'Water wall', cost: 20, needs: 'Shielding',
-        science: 'Hydrogen is very good at stopping space radiation, and water is full of hydrogen. Lining the shelter walls with water tanks adds shielding without hauling extra metal from Earth.',
+        science: 'Hydrogen stops space radiation well, and every water molecule has two hydrogen atoms. Lining the shelter walls with water tanks adds shielding without bringing extra metal from Earth.',
         change: 'Your storm dose inside the Storm Shelter is 25% lower.',
         effects: [{ path: 'dose.storm.shelter', times: 0.75 }],
       },
@@ -98,22 +98,22 @@ export const BRANCHES = [
   },
   {
     id: 'food', name: 'Food and water', icon: 'leaf',
-    about: 'Grow meals on the Moon and stop wasting water.',
+    about: 'Grow food on the Moon and reuse your water.',
     nodes: [
       {
         id: 'Greenhouse', icon: 'leaf', name: 'Greenhouse', mission: 'IceAndGreens',
-        science: 'Plants turn light, water and the carbon dioxide you breathe out into food, and they give back oxygen. Astronauts have grown lettuce on the Space Station in a garden called Veggie.',
-        change: 'Adds grow lights to the Galley, so you can grow meals.',
+        science: 'Plants turn light, water and the carbon dioxide you breathe out into food, and they release oxygen. Astronauts have grown lettuce on the Space Station in a garden called Veggie.',
+        change: 'The Galley gets grow lights, so you can grow your own food.',
       },
       {
         id: 'GrowLights', icon: 'bolt', name: 'Red and blue grow lights', cost: 12, needs: 'Greenhouse',
-        science: 'Plants use mostly red and blue light to grow. LED lamps that make mainly those two colours waste less electricity than white lamps.',
+        science: 'Plants use mostly red and blue light to grow. LED lamps that make mainly those two colours use less electricity than white lamps.',
         change: 'Grow lights use 20% less power.',
         effects: [{ path: 'power.greenhouse', times: 0.8 }],
       },
       {
         id: 'WaterRecycling', icon: 'droplet', name: 'Water recycling', cost: 15, needs: 'Greenhouse',
-        science: 'Plants breathe most of the water they drink back into the air as vapour. Catching that vapour and cleaning it lets you use the same water again. The Space Station recycles about 98% of its water.',
+        science: 'Plants release most of the water they take up into the air as vapour. Collecting that vapour and cleaning it lets you use the same water again. The Space Station recycles about 98% of its water.',
         change: 'The greenhouse uses 25% less water.',
         effects: [{ path: 'food.water', times: 0.75 }],
       },
@@ -121,23 +121,23 @@ export const BRANCHES = [
   },
   {
     id: 'outside', name: 'Robots and moonwalks', icon: 'map',
-    about: 'Get more done outside the Habitat.',
+    about: 'Dig faster, fetch ice faster and stay outside longer.',
     nodes: [
       {
         id: 'DrumDigger', icon: 'box', name: 'Bucket-drum digger', cost: 10,
-        science: 'In low gravity a light robot gets pushed backwards when it digs. NASA\'s RASSOR robot has two digging drums that spin in opposite directions, so the two pushes cancel out.',
+        science: 'In low gravity, digging pushes a light robot backwards. NASA\'s RASSOR robot has two digging drums that spin in opposite directions, so the two pushes cancel out.',
         change: 'The robot digs moon dirt 25% faster.',
         effects: [{ path: 'robot.dig', times: 1.25 }],
       },
       {
         id: 'IceDrill', icon: 'droplet', name: 'Ice drill', cost: 15, needs: 'DrumDigger',
-        science: 'Ice in the shadowed craters is mixed into ground colder than -200 C, frozen as hard as rock. NASA built a drill called TRIDENT that hammers while it turns to cut through ground like that.',
+        science: 'The shadowed craters are colder than -200 C, so the icy ground there is frozen hard. NASA built a drill called TRIDENT that hammers while it turns to break through it.',
         change: 'The robot brings back ice 25% faster.',
         effects: [{ path: 'robot.ice', times: 1.25 }],
       },
       {
         id: 'SuitTank', icon: 'door', name: 'Bigger suit tank', cost: 12,
-        science: 'The backpack on a spacesuit carries your oxygen and scrubs out the carbon dioxide you breathe out. A bigger oxygen tank gives you more time outside.',
+        science: 'The backpack on a spacesuit carries your oxygen and removes the carbon dioxide you breathe out. A bigger oxygen tank gives you more time outside.',
         change: 'Suit air lasts 110 seconds, up from 90.',
         effects: [{ path: 'suit.seconds', add: 20 }],
       },

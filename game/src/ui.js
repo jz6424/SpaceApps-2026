@@ -159,8 +159,8 @@ function panelHtml(node) {
   const mission = node.mission && missionById(node.mission);
   const status = {
     owned: `<p class="n-status done">${glyph('check', 16)} Researched</p>`,
-    soon: `<p class="n-status">${glyph('lock', 16)} Locked. This upgrade is coming in a later update.</p>`,
-    locked: `<p class="n-status">${glyph('lock', 16)} Locked. Research ${nodeById(node.needs)?.name} first.</p>`,
+    soon: `<p class="n-status">${glyph('lock', 16)} This upgrade is locked until a later update.</p>`,
+    locked: `<p class="n-status">${glyph('lock', 16)} Research ${nodeById(node.needs)?.name} first to unlock this.</p>`,
     short: `<button class="btn small" disabled>Need ${node.cost - save.points} more points</button>`,
     ready: `<button class="btn primary small" data-do="buy" data-id="${node.id}">Research for ${node.cost} points</button>`,
   }[state];
@@ -188,7 +188,7 @@ function renderResearch() {
   $('research-points').textContent = save.points;
   $('research-note').textContent = UPGRADES_LIVE
     ? 'Pick a circle to see what it does. Spend research points to add it to your base.'
-    : 'Pick a circle to see what it does. Spend research points to open new missions. The upgrades are still being built, so they stay locked until a later update.';
+    : 'Pick a circle to see what it does. Spend research points to open new missions. We are still building the upgrades, so they stay locked until a later update.';
   $('research-map').innerHTML = mapHtml();
   $('research-panel').innerHTML = panelHtml(nodeById(picked));
 }
