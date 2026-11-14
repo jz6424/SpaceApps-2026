@@ -86,7 +86,7 @@ const SHORT = {
   'Moon dirt': ['Building material the robot digs up.', 'Spend it on repairs, Boost and shielding.'],
   'Research points': ['Rewards for science: +2 per rock sample, +1 per data upload.', 'Spend them in the Research Tree.'],
   'The Sun clock': ['The whole day. The white marker is now.', 'Yellow is sunlight. Blue is night, with no solar power.', 'Red is a solar storm. Dashes mean no Earth signal.'],
-  'Your missions box': ['Your next step is in the blue hint.', 'F or the speed button fast-forwards. Bottom right is fullscreen.'],
+  'Your missions box': ['Your next step is in the blue hint.', 'The gear pauses the game and holds the settings. F fast-forwards.'],
   'Research bar': ['Your points toward the next unlock.', 'Collect rock samples and send data to fill it.'],
   'Now the stations': ['7 stations, each with a floating label.', 'Click a label to walk there, or press E when close.'],
   'Power station': ['Your battery, and what charges or drains it.', 'See "What is using power right now" below.'],
@@ -136,14 +136,14 @@ function buildSteps() {
       ],
     },
     {
-      title: 'Moon dirt', target: '#meters .chips span:nth-child(1)', side: 'right', at: 'right', freeze: true,
+      title: 'Moon dirt', target: '#supplies .supply', side: 'left', at: 'center', freeze: true,
       text: [
         '<b>Moon dirt (regolith) is a building material.</b> The robot digs it up (see the Robot Map).',
         'You spend it on repairs, on Boost (extra air from Life Support), and on radiation shielding once you have unlocked it.',
       ],
     },
     {
-      title: 'Research points', target: '#meters .chips span:nth-child(2)', side: 'right', at: 'right', freeze: true,
+      title: 'Research points', target: '#rp-bar .rp-top', side: 'left', at: 'center', freeze: true,
       text: [
         '<b>These points reward science.</b> On a moonwalk, each of the 3 glowing rock samples gives <b>+2</b>. At Comms, each data upload to Earth gives <b>+1</b>.',
         'You keep them after the mission and spend them in the Research Tree to unlock new missions.',
@@ -161,7 +161,7 @@ function buildSteps() {
       title: 'Your missions box', target: '#mission-card', side: 'left', at: 'bottom', freeze: true,
       text: [
         '<b>This box tells you what to do next.</b> The blue hint changes as the situation changes.',
-        'The <b>speed button</b> (or the F key) fast-forwards time. <b>Pause</b> opens the menu. The square icon at the bottom right is <b>Fullscreen</b>.',
+        'The <b>gear button</b> pauses the game and opens the settings: game speed, sound and full screen. The <b>F</b> key fast-forwards time. The square icon at the bottom right is also <b>Fullscreen</b>.',
       ],
     },
     {

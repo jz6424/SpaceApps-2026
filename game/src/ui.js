@@ -32,7 +32,9 @@ const commit = () => { saveWorks = writeSave(save); };
 
 function show(name) {
   for (const key of SCREENS) $(key).hidden = key !== name;
-  $(name ?? '')?.querySelector('button:not([disabled])')?.focus();
+  // Start on the screen's main button, so Enter does the expected thing.
+  const screen = $(name ?? '');
+  (screen?.querySelector('.btn.primary:not([disabled])') ?? screen?.querySelector('button:not([disabled])'))?.focus();
 }
 
 const isOpen = mission => !mission.requires || unlocksNow().includes(mission.requires.id);
@@ -363,7 +365,7 @@ function pause() {
   if (!hud) return;
   hud.close();
   game.pause();
-  $('pause-title').textContent = sim.mission.name;
+  $('pause-mission').textContent = `${sim.mission.name}, ${sim.modeName} mode.`;
   show('pause');
 }
 

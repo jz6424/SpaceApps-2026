@@ -24,6 +24,7 @@ export const ICONS = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
   food: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
@@ -48,11 +49,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('hud-title').textContent = sim.mission.name;
   $('hud-mode').textContent = `· ${sim.modeName} mode`;
   $('mc-pin').innerHTML = icon('pin', 20);
+  $('settings').innerHTML = icon('gear', 22);
   // The Missions box grows in the middle of the screen, then settles into its corner.
   const card = $('mission-card');
   card.classList.remove('intro');
   if (!sim.mission.tutorial) { void card.offsetWidth; card.classList.add('intro'); } // First Night uses the centre for the tour
 
+  // The speed, sound and full screen buttons live in the Game paused panel (the gear button, or Esc).
   // Full screen button (F11 works too).
   const fsBtn = () => {
     if (document.fullscreenElement) document.exitFullscreen?.();
@@ -60,6 +63,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   };
   $('fullscreen').innerHTML = icon('expand', 26);
   $('fullscreen').addEventListener('click', fsBtn);
+  $('fullscreen-setting').addEventListener('click', fsBtn); // the same switch, inside the Game paused panel
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
   function renderRp() {
@@ -506,6 +510,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
+      $('fullscreen-setting').removeEventListener('click', fsBtn);
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;

@@ -288,44 +288,46 @@ function iconPath(ctx, name, x, y, s, width = 2) {
   ctx.restore();
 }
 
-// A floating tag: no fill, a thin sharp-cornered outline with two clipped corners, a line icon and
-// spaced capitals. A dark edge under every white line keeps it readable over the pale Habitat walls
-// as well as the black sky. Station tags are white; a colour marks something special (red = broken).
+// A floating tag over something you can use: a dark see-through plate with a sharp outline and
+// two clipped corners, a line icon, spaced capitals, and a small pointer down to the thing it names.
+// A soft shadow lifts it off the pale Habitat walls. Station tags have a white outline and a
+// yellow icon; a coloured outline marks something special (red = broken, blue = ice).
 function labelSprite(text, icon, color = '#FFFFFF') {
-  const W = 512, H = 128, DARK = 'rgba(3, 8, 24, .7)';
+  const W = 512, H = 144;
   const canvas = document.createElement('canvas');
   canvas.width = W * 2; canvas.height = H * 2; // drawn at twice the size so the lines stay crisp up close
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
   const label = text.toUpperCase();
-  ctx.font = '700 40px "Fira Sans", system-ui, sans-serif';
+  ctx.font = '700 44px "Fira Sans", system-ui, sans-serif';
   ctx.textBaseline = 'middle';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
-  const ICON = 52, GAP = 18, PAD = 26, textMax = W - 20 - 2 * PAD - ICON - GAP;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  const ICON = 56, GAP = 16, PAD = 24, textMax = W - 28 - 2 * PAD - ICON - GAP;
   const textW = Math.min(textMax, ctx.measureText(label).width);
-  const boxW = PAD + ICON + GAP + textW + PAD, x0 = (W - boxW) / 2, y0 = 18, y1 = H - 18, cut = 20;
-  const outline = () => {
-    ctx.beginPath();
-    ctx.moveTo(x0, y0); ctx.lineTo(x0 + boxW - cut, y0); ctx.lineTo(x0 + boxW, y0 + cut);
-    ctx.lineTo(x0 + boxW, y1); ctx.lineTo(x0 + cut, y1); ctx.lineTo(x0, y1 - cut);
-    ctx.closePath();
-  };
+  const boxW = PAD + ICON + GAP + textW + PAD, x0 = (W - boxW) / 2, x1 = x0 + boxW, y0 = 16, y1 = 108, cut = 20, mid = W / 2;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0); ctx.lineTo(x1 - cut, y0); ctx.lineTo(x1, y0 + cut); ctx.lineTo(x1, y1);
+  ctx.lineTo(mid + 14, y1); ctx.lineTo(mid, y1 + 18); ctx.lineTo(mid - 14, y1); // the pointer
+  ctx.lineTo(x0 + cut, y1); ctx.lineTo(x0, y1 - cut);
+  ctx.closePath();
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, .6)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+  ctx.fillStyle = 'rgba(7, 23, 63, .84)';
+  ctx.fill();
+  ctx.restore();
   ctx.lineJoin = 'miter';
-  outline(); ctx.strokeStyle = DARK; ctx.lineWidth = 7; ctx.stroke();
-  outline(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
-  const ix = x0 + PAD, iy = (H - ICON) / 2;
-  ctx.strokeStyle = DARK; iconPath(ctx, icon, ix, iy, ICON, 3.6);
-  ctx.strokeStyle = '#FFFFFF'; iconPath(ctx, icon, ix, iy, ICON, 1.75);
-  const tx = ix + ICON + GAP, ty = H / 2 + 3;
-  ctx.lineJoin = 'round'; ctx.lineWidth = 6; ctx.strokeStyle = DARK;
-  ctx.strokeText(label, tx, ty, textMax);
+  ctx.strokeStyle = color; ctx.lineWidth = 3.5; ctx.stroke();
+  const ix = x0 + PAD, iy = (y0 + y1 - ICON) / 2;
+  ctx.strokeStyle = color === '#FFFFFF' ? '#EAFE07' : '#FFFFFF';
+  iconPath(ctx, icon, ix, iy, ICON, 2);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(label, tx, ty, textMax);
+  ctx.fillText(label, ix + ICON + GAP, (y0 + y1) / 2 + 3, textMax);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.scale.set(1.9, 0.475, 1);
+  sprite.scale.set(2.3, 2.3 * H / W, 1);
+  sprite.userData.size = sprite.scale.clone(); // its resting size; it grows a little when pointed at
   sprite.renderOrder = 10;
   return sprite;
 }
@@ -684,13 +686,20 @@ function goToStation(id) {
 
 // --- Loop ---
 let vy = 0, grounded = false;
+// The astronaut eases into a walk and swings round to face the way they are going, instead of
+// snapping. Higher numbers are snappier, lower ones are floatier.
+const ACCEL = 7;       // how quickly the walking speed catches up with the keys
+const BRAKE = 10;      // how quickly they stop when you let go
+const TURN = 7;        // how quickly the body turns to face its direction
+const TURN_MAX = 7;    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
+let velX = 0, velZ = 0, facing = 0;
 const camRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
 const head = new THREE.Vector3(), camDir = new THREE.Vector3();
 
 function teleport(p) {
   crewBody.setTranslation(p, true);
   crewBody.setNextKinematicTranslation(p);
-  vy = 0;
+  vy = velX = velZ = 0;
 }
 
 function isInside(p) {
@@ -753,9 +762,15 @@ function tick(dt) {
   const len = Math.hypot(mx, mz);
   if (len > 0) { mx *= speedWalk / len; mz *= speedWalk / len; }
 
+  // Speed drifts toward what the keys ask for, so starts, stops and changes of direction are curves.
+  const ease = rate => 1 - Math.exp(-rate * dt);
+  const pull = ease(len > 0 ? ACCEL : BRAKE);
+  velX += (mx - velX) * pull;
+  velZ += (mz - velZ) * pull;
+
   if (grounded && keys.has('Space')) vy = JUMP;
   vy -= GRAVITY * dt;
-  const want = { x: mx * dt, y: vy * dt, z: mz * dt };
+  const want = { x: velX * dt, y: vy * dt, z: velZ * dt };
   controller.computeColliderMovement(crewCollider, want);
   const got = controller.computedMovement();
   grounded = controller.computedGrounded();
@@ -775,8 +790,15 @@ function tick(dt) {
   const now = crewBody.translation();
   if (now.y < groundAt(now.x, now.z) - 3) teleport(outsideSpot()); // fell through a seam in the ground
   crew.position.set(now.x, now.y, now.z);
-  if (len > 0) crew.rotation.y = Math.atan2(mx, mz);
-  setMove(len > 0 ? (speedWalk === RUN ? 'Run' : 'Walk') : 'Idle');
+  // The body turns toward the way it is actually moving, taking the short way round.
+  const pace = Math.hypot(velX, velZ);
+  if (pace > 0.15) {
+    const turn = Math.atan2(velX, velZ) - facing;
+    const step = Math.atan2(Math.sin(turn), Math.cos(turn)) * ease(TURN);
+    facing += THREE.MathUtils.clamp(step, -TURN_MAX * dt, TURN_MAX * dt);
+    crew.rotation.y = facing;
+  }
+  setMove(pace > (WALK + RUN) / 2 ? 'Run' : pace > 0.3 ? 'Walk' : 'Idle');
   crewMixer.update(dt);
 
   const inside = isInside(now);
@@ -789,6 +811,7 @@ function tick(dt) {
     const on = inside && (hovered === s.id || nearestUsable()?.id === s.id);
     s.glow += ((on ? 1 : 0) - s.glow) * Math.min(1, dt * 8);
     s.mats.forEach(m => { m.emissive?.setRGB(0.05 * s.glow, 0.26 * s.glow, 0.55 * s.glow); });
+    s.marker.scale.copy(s.marker.userData.size).multiplyScalar(1 + 0.15 * s.glow); // the tag you point at grows
   });
 
   head.set(now.x, now.y + 0.6, now.z);
@@ -918,6 +941,7 @@ gameReady({
     speed = 1;
     fitWindow();
     teleport(startSpot());
+    facing = crew.rotation.y;
     robot.position.copy(dock);
     yaw = Math.PI / 2;
     pitch = 1;

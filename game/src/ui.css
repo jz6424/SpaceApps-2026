@@ -155,7 +155,8 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 }
 
 /* Pause, briefing, debrief, how to play, credits: a solid panel in the middle */
-#pause { background: rgba(7, 23, 63, .82); display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
+/* Above everything in the mission screen, the guided tour included. */
+#pause { background: rgba(7, 23, 63, .82); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
 #debrief, #brief, #how, #credits { display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
 .dialog { position: relative; background: var(--deep); border: 1px solid var(--line); border-radius: var(--r3); padding: 24px; display: grid; gap: 16px; width: min(520px, 100%); box-sizing: border-box; justify-items: start; }
 .dialog.wide { width: min(760px, 100%); }
@@ -241,12 +242,21 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 #mission-card { top: 12px; right: 12px; width: 300px; display: grid; gap: 8px; border-color: var(--yellow); }
 #mission-card.intro { animation: mc-intro 4.5s var(--ease); z-index: 5; }
 #mission-card h2 { font: 900 20px/1.2 var(--head); margin: 0; }
+.mc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* A round button that is only an icon (the gear). */
+.icon-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; border-radius: 50%; color: var(--text); background: var(--deep); border: 2px solid var(--yonder); cursor: pointer; transition: border-color .15s var(--ease), color .15s var(--ease); }
+.icon-btn .ico { vertical-align: 0; }
+.icon-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+.icon-btn:active { transform: scale(.96); }
 .mc-head { display: flex; align-items: center; gap: 8px; color: var(--yellow); }
 .mc-head .ico { vertical-align: 0; }
 .mc-name { margin: 0; font-size: 14px; }
 #hint { margin: 0; background: var(--electric); border-left: 4px solid var(--yellow); padding: 8px 12px; border-radius: var(--r1); font-weight: 700; font-size: 16px; }
 @keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 90px)) scale(1.4); } 100% { transform: none; } }
-#fullscreen { white-space: nowrap; }
+/* Game paused: the settings, one per row, then what to do next. */
+.settings { display: grid; gap: 8px; width: 100%; }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 8px 8px 16px; border: 1px solid var(--line); border-radius: var(--r2); font-weight: 700; }
+.setting .btn { min-width: 132px; white-space: nowrap; }
 #speed[aria-pressed="true"] { border-color: var(--yellow); color: var(--yellow); }
 #air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; border-radius: var(--r2); font: 700 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
 #air-toast.warn { background: var(--glass); border: 2px solid var(--yellow); color: var(--yellow); }
@@ -319,7 +329,7 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   #clock { order: 1; }
   #mission-card { order: 2; }
   #mission-card.intro { animation: none; }
-  .mc-head, .mc-name { display: none; }
+  .mc-name { display: none; }
   #feed { order: 3; max-height: 18vh; }
   #prompt { order: 4; align-self: center; margin-top: auto; }
   #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; }

@@ -16,14 +16,12 @@
   <ul id="feed" aria-live="polite" aria-label="Messages" tabindex="0"></ul>
   <section id="clock" class="panel" aria-label="Sun clock"></section>
   <aside id="mission-card" class="panel" aria-label="Current mission">
-    <h2 class="mc-head"><span id="mc-pin"></span> Missions</h2>
+    <div class="mc-top">
+      <h2 class="mc-head"><span id="mc-pin"></span> Missions</h2>
+      <button class="icon-btn" id="settings" data-do="menu" aria-label="Settings and pause" title="Settings and pause"></button>
+    </div>
     <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
     <p id="hint" role="status"></p>
-    <div class="row">
-      <button class="btn small" id="speed" aria-pressed="false"></button>
-      <button class="btn small" data-do="menu">Pause</button>
-      <button class="btn small" id="sound" aria-pressed="true">Sound on</button>
-    </div>
   </aside>
   <section id="meters" class="panel" aria-label="Base meters"></section>
   <div id="corner">
@@ -140,8 +138,13 @@
 
 <div id="pause" class="screen" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
   <div class="dialog">
-    <h2 id="pause-title"></h2>
-    <p>Time is stopped. Take a breath.</p>
+    <h2 id="pause-title">Game paused</h2>
+    <p><b id="pause-mission"></b> Time is stopped. Take a breath.</p>
+    <div class="settings" role="group" aria-label="Settings">
+      <div class="setting"><span>Game speed</span><button class="btn small" id="speed" aria-pressed="false"></button></div>
+      <div class="setting"><span>Sound</span><button class="btn small" id="sound" aria-pressed="true">Sound on</button></div>
+      <div class="setting"><span>Screen</span><button class="btn small" id="fullscreen-setting">Full screen</button></div>
+    </div>
     <div class="row">
       <button class="btn primary" data-do="resume">Keep playing</button>
       <button class="btn" data-do="restart">Start over</button>
@@ -185,7 +188,7 @@
       <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back. Every storm is sized from a real solar flare, and they change each time you play.</li>
       <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
     </ol>
-    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause.</p>
+    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the speed, sound and full screen settings.</p>
     <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
   </div>
 </main>
