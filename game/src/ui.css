@@ -1,31 +1,65 @@
-/* Space Apps brand (docs/space-apps-style-spec.md): blues lead, Neon Yellow only on buttons, links
-   and highlights, Rocket Red for danger. Matches site/site.css.
-   One system for the whole game:
-   - spacing on a 4px grid
-   - three corner sizes: 4 (tags, keycaps), 8 (controls, cards), 12 (panels, dialogs); buttons are pills
-   - things you can press have a blue outline; boxes that only hold things have a quiet hairline
-   - text is white or soft blue; icons take the colour of the text next to them
-   - two text sizes in the mission screen: 14 for labels and notes, 16 for what you read first */
+/* The game's look: a see-through instrument console.
+   - Panels are dark glass you can see the Moon through. Instead of a full border, each one is
+     marked by four corner brackets, so the lines never join up.
+   - Things you can press have the same brackets and a faint fill; they light up yellow.
+   - Labels are small spaced capitals, numbers are in a fixed-width face, bars are cut into segments.
+   - Colours are the Space Apps palette (docs/space-apps-style-spec.md): blues, white, Neon Yellow
+     for the thing to press or look at, Rocket Red for danger.
+   - Spacing sits on a 4px grid. Text in the mission screen is never smaller than 14px. */
 :root {
   --deep: #07173F; --electric: #0042A6; --yonder: #2E96F5;
   --yellow: #EAFE07; --red: #E43700; --martian: #8E1100;
   --text: #fff; --soft: #C9D8F2;
   --line: rgba(201, 216, 242, .24);
-  --glass: rgba(7, 23, 63, .92);
+  --glass: rgba(5, 14, 40, .4);         /* over the 3D view, with the view behind it blurred and dimmed */
+  --glass-solid: rgba(5, 14, 40, .84);  /* where the browser can't blur, or simple graphics is on */
   --head: "Fira Sans", system-ui, sans-serif;
   --body: Overpass, system-ui, sans-serif;
+  --mono: "Fira Code", ui-monospace, monospace;
   --ease: cubic-bezier(.22, 1, .36, 1);
-  --r1: 4px; --r2: 8px; --r3: 12px;
+  /* A bar cut into short segments. */
+  --segments: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px);
 }
 html, body { margin: 0; height: 100%; background: var(--deep); color: var(--text); overflow: hidden; font: 400 16px/1.5 var(--body); }
 canvas { display: block; touch-action: none; cursor: grab; }
 canvas:active { cursor: grabbing; }
-.panel { position: fixed; background: var(--glass); border: 1px solid var(--line); border-radius: var(--r3); padding: 12px 16px; box-sizing: border-box; }
-kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var(--deep); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r1); padding: 0 4px; }
-.ico { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; flex: none; }
+
+/* Everything framed by brackets shares this. */
+.panel, .dialog, .card, .mission, .score, .sitefacts div, .setting, .opt, .btn, .seg, .icon-btn, .fs-btn, #research-panel {
+  --fr: rgba(255, 255, 255, .9); --fl: 12px; --fw: 1.5px; --fill: transparent;
+  /* Four corner brackets, drawn as eight short lines: --fr is the line colour, --fl how long each
+     leg is, --fw how thick, --fill what is behind. */
+  --frame:
+    linear-gradient(var(--fr), var(--fr)) 0 0 / var(--fl) var(--fw) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 0 0 / var(--fw) var(--fl) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 100% 0 / var(--fl) var(--fw) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 100% 0 / var(--fw) var(--fl) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 0 100% / var(--fl) var(--fw) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 0 100% / var(--fw) var(--fl) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 100% 100% / var(--fl) var(--fw) no-repeat,
+    linear-gradient(var(--fr), var(--fr)) 100% 100% / var(--fw) var(--fl) no-repeat;
+  border: 0; border-radius: 0; box-sizing: border-box;
+  background: var(--frame), var(--fill);
+}
+.panel {
+  position: fixed; padding: 12px 16px; --fill: var(--glass);
+  -webkit-backdrop-filter: blur(10px) brightness(.6); backdrop-filter: blur(10px) brightness(.6);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .panel { --fill: var(--glass-solid); } }
+/* Simple graphics (slow computers): no blur, so the glass is made darker instead. */
+.low .panel { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: var(--glass-solid); }
+#hud, #station { text-shadow: 0 1px 2px rgba(0, 0, 0, .5); }
+
+kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255, 255, 255, .45); border-radius: 2px; padding: 0 4px; }
+.ico { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; flex: none; }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* Small spaced capitals: the label on every instrument. */
+.label, .m-label, .supply span, .rp-top span, .mc-head, .st-head h3, #station-body h4, .setting > span, .eyebrow, .n-change b {
+  font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+}
+
 .screen {
   position: fixed; inset: 0; overflow-y: auto; font-size: 17px; line-height: 1.5;
   background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%);
@@ -36,25 +70,38 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .screen h2 { font-weight: 900; font-size: clamp(1.5rem, 4vw, 2.2rem); }
 .screen h3 { font-weight: 700; font-size: 1.35rem; }
 .screen p { margin: 0; }
-.orbits { position: fixed; right: -140px; top: -120px; width: 620px; opacity: .25; pointer-events: none; }
-.orbits g { fill: none; stroke: var(--yonder); stroke-width: 1.5; }
+/* The orbit rings in the corner are broken arcs. */
+.orbits { position: fixed; right: -140px; top: -120px; width: 620px; opacity: .3; pointer-events: none; }
+.orbits g { fill: none; stroke: var(--yonder); stroke-width: 1.25; }
+.orbits circle:nth-child(1) { stroke-dasharray: 150 60 40 80; }
+.orbits circle:nth-child(2) { stroke-dasharray: 260 90 30 50 120 110; }
+.orbits circle:nth-child(3) { stroke-dasharray: 90 70 380 120; }
+.orbits circle:nth-child(4) { stroke-dasharray: 520 160 60 90; }
 
+/* Buttons: brackets and a faint fill. The main button on a screen is solid yellow with two
+   clipped corners. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font: 700 1.05rem var(--body); color: var(--text); background: var(--deep);
-  border: 2px solid var(--yonder); border-radius: 999px; padding: 0 24px; min-height: 48px; cursor: pointer;
-  transition: border-color .15s var(--ease), background-color .15s var(--ease), color .15s var(--ease);
+  font: 700 .9rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
+  --fill: rgba(255, 255, 255, .07); --fl: 8px;
+  padding: 0 20px; min-height: 48px; cursor: pointer;
+  transition: color .15s var(--ease), transform .15s var(--ease);
 }
 .btn .ico { vertical-align: 0; }
-.btn:hover:not(:disabled) { border-color: var(--yellow); }
+.btn:hover:not(:disabled):not(.primary) { --fr: var(--yellow); --fill: rgba(234, 254, 7, .1); color: var(--yellow); }
 .btn:active:not(:disabled) { transform: scale(.98); }
-.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--deep); }
-.btn.primary:hover:not(:disabled) { background: #fff; border-color: #fff; }
-.btn.small { font-size: 1rem; padding: 0 16px; min-height: 44px; }
-.btn:disabled { color: var(--soft); border-color: rgba(201, 216, 242, .4); cursor: default; }
+.btn.primary {
+  --pf: var(--yellow); color: var(--deep);
+  background:
+    linear-gradient(225deg, transparent 9px, var(--pf) 0) right / 51% 100% no-repeat,
+    linear-gradient(45deg, transparent 9px, var(--pf) 0) left / 51% 100% no-repeat;
+}
+.btn.primary:hover:not(:disabled) { --pf: #fff; }
+.btn.small { font-size: .875rem; padding: 0 16px; min-height: 44px; }
+.btn:disabled { color: rgba(201, 216, 242, .7); --fr: rgba(201, 216, 242, .4); --fill: transparent; cursor: default; }
 /* A text link you can press: tall enough for a finger, without changing the line it sits in. */
-.link { font: inherit; color: var(--yellow); background: none; border: 0; padding: 12px 0; margin: -4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
-.screen :focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
+.link { font: inherit; color: var(--yellow); background: none; border: 0; padding: 12px 0; margin: -4px 0; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.screen :focus-visible { outline: 2px solid var(--yellow); outline-offset: 4px; }
 
 /* Start */
 #start .inner {
@@ -62,39 +109,48 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   padding: 32px 24px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: center;
 }
 #start .text { display: grid; gap: 16px; justify-items: start; }
-.eyebrow { font: 700 .9rem/1.3 var(--head); color: var(--soft); }
+.eyebrow { font-size: .8rem; line-height: 1.3; color: var(--soft); display: flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ""; width: 32px; height: 1px; background: currentColor; }
 .lede { font-size: 1.15rem; font-weight: 400; max-width: 34em; }
 #start-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 #start-status { font-weight: 700; }
 #start-status:empty { display: none; }
 #start .row { gap: 8px 24px; }
 .fine { font-size: .9rem; color: var(--soft); }
-.frame { aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 1px solid var(--yonder); background: var(--deep); }
+/* The picture of the base sits inside a ring of broken arcs, like a sight. */
+.scope { position: relative; padding: 16px; }
+.scope-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: #fff; pointer-events: none; }
+.scope-ring circle { vector-effect: non-scaling-stroke; }
+.scope-ring .arc { stroke-width: 1.5; stroke-dasharray: 64 22 10 26 96 18 34 90; }
+.scope-ring .ticks { stroke: var(--yonder); stroke-width: 6; stroke-dasharray: .6 5.4; opacity: .8; }
+.frame { aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--deep); }
 #start-picture { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Mission menu */
 #missions .inner { position: relative; max-width: 1080px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 24px; }
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
-.score { background: var(--deep); border: 1px solid var(--line); border-radius: var(--r2); padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.score b { color: var(--yellow); font: 900 1.3rem var(--head); }
+.score { --fill: rgba(5, 14, 40, .5); --fl: 8px; padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
 #mode-choice { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg {
-  font: 700 .98rem var(--body); color: var(--text); background: var(--deep); border: 2px solid var(--yonder); border-radius: 999px;
-  padding: 0 16px; min-height: 44px; cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease);
+  font: 700 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
+  --fill: rgba(255, 255, 255, .07); --fl: 8px; padding: 0 16px; min-height: 44px; cursor: pointer;
+  transition: color .15s var(--ease);
 }
-.seg:hover { border-color: var(--yellow); }
-.seg[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--deep); }
+.seg:hover { --fr: var(--yellow); color: var(--yellow); }
+.seg[aria-pressed="true"] { --fr: var(--yellow); --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
 #mode-about { min-height: 1.5em; margin-top: 8px; }
 #mission-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; }
-.mission { background: var(--deep); border: 1px solid var(--line); border-radius: var(--r3); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
-.mission.locked { border-style: dashed; border-color: rgba(201, 216, 242, .4); }
-.mission .num { font: 900 2.8rem/1 var(--head); color: var(--yonder); font-variant-numeric: tabular-nums; }
+.mission { --fill: rgba(5, 14, 40, .55); --fl: 16px; padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
+.mission.locked { --fr: rgba(201, 216, 242, .45); --fill: rgba(5, 14, 40, .3); }
+.mission .num { font: 400 2.6rem/1 var(--mono); color: var(--yonder); font-variant-numeric: tabular-nums; }
+.mission .num::before { content: "0"; opacity: .45; }
 .mission .btn { width: 100%; }
 .stars { font-weight: 700; }
 .stars span[aria-hidden] { color: var(--yellow); letter-spacing: .08em; }
 .stars .off { color: rgba(255, 255, 255, .3); }
 .need { color: var(--soft); }
-.need svg { vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.need svg { vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .footnotes { display: grid; gap: 0; }
 #erase { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
@@ -107,9 +163,7 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   #03040C; }
 #research-stars { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #research .inner { position: relative; max-width: 1200px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 16px; }
-#research .btn:not(.primary) { background: rgba(3, 4, 12, .7); border-color: rgba(255, 255, 255, .7); }
-#research .btn:not(.primary):hover:not(:disabled) { border-color: #fff; }
-#research .score { background: rgba(3, 4, 12, .7); border-color: rgba(255, 255, 255, .35); }
+#research .score { --fill: rgba(3, 4, 12, .6); }
 #research-note { max-width: 44em; }
 .rt-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
 #research-view { overflow-x: auto; display: grid; justify-content: safe center; }
@@ -124,7 +178,7 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .rt-dot { position: absolute; left: -28px; top: -28px; width: 56px; height: 56px; border-radius: 50%; box-sizing: border-box; display: grid; place-items: center; background: #000; border: 1.5px solid rgba(255, 255, 255, .8); color: #fff; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
 /* Thin, square-ended strokes give the glyphs their instrument look. */
 .rt-dot .ico { stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; vertical-align: 0; }
-.rt-name { position: absolute; top: 32px; left: 0; transform: translateX(-50%); width: max-content; max-width: 112px; text-align: center; font: 700 .85rem/1.2 var(--body); background: rgba(0, 0, 0, .62); border-radius: var(--r1); padding: 2px 8px; }
+.rt-name { position: absolute; top: 32px; left: 0; transform: translateX(-50%); width: max-content; max-width: 112px; text-align: center; font: 700 .85rem/1.2 var(--body); background: rgba(0, 0, 0, .62); padding: 2px 8px; }
 .rt-hub .rt-dot { left: -36px; top: -36px; width: 72px; height: 72px; background: #fff; border-color: #fff; color: #000; outline: 1px solid rgba(255, 255, 255, .5); outline-offset: 6px; }
 .rt-hub .rt-name { top: 48px; }
 .rt-branch .rt-dot { left: -24px; top: -24px; width: 48px; height: 48px; border-color: #fff; outline: 1px solid rgba(255, 255, 255, .4); outline-offset: 4px; }
@@ -140,13 +194,13 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .rt-node:focus-visible .rt-dot { outline: 3px solid var(--yellow); outline-offset: 4px; }
 .rt-badge { position: absolute; right: -6px; top: -6px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; background: #000; border: 1.5px solid #fff; color: #fff; display: grid; place-items: center; }
 .rt-badge .ico { stroke-width: 2; }
-#research-panel { position: sticky; top: 16px; background: rgba(3, 4, 12, .82); border: 1px solid rgba(255, 255, 255, .35); border-radius: var(--r2); padding: 16px; display: grid; gap: 12px; justify-items: start; }
+#research-panel { position: sticky; top: 16px; --fill: rgba(3, 4, 12, .7); --fl: 16px; padding: 16px; display: grid; gap: 12px; justify-items: start; }
 .n-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
-.n-cost { font: 400 .85rem "Fira Code", monospace; color: var(--soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.n-cost { font: 400 .85rem var(--mono); color: var(--soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .n-opens { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; }
 .n-science { font-size: .95rem; color: var(--soft); }
 .n-change { background: rgba(255, 255, 255, .08); border-left: 2px solid #fff; padding: 8px 12px; width: 100%; box-sizing: border-box; font-size: .95rem; }
-.n-change b { display: block; font: 400 .85rem "Fira Code", monospace; }
+.n-change b { display: block; font-size: .8rem; color: var(--soft); }
 .n-status { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; color: var(--soft); }
 .n-status.done { color: #fff; }
 @media (max-width: 1100px) {
@@ -154,20 +208,19 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   #research-panel { position: sticky; top: auto; bottom: 8px; max-height: 46vh; overflow-y: auto; }
 }
 
-/* Pause, briefing, debrief, how to play, credits: a solid panel in the middle */
-/* Above everything in the mission screen, the guided tour included. */
-#pause { background: rgba(7, 23, 63, .82); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
+/* Game paused sits above everything in the mission screen, the guided tour included. */
+#pause { background: rgba(4, 12, 34, .62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
 #debrief, #brief, #how, #credits { display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
-.dialog { position: relative; background: var(--deep); border: 1px solid var(--line); border-radius: var(--r3); padding: 24px; display: grid; gap: 16px; width: min(520px, 100%); box-sizing: border-box; justify-items: start; }
+.dialog { position: relative; --fill: rgba(5, 14, 40, .72); --fl: 20px; padding: 28px; display: grid; gap: 16px; width: min(520px, 100%); justify-items: start; }
 .dialog.wide { width: min(760px, 100%); }
 #brief .dialog, #debrief .dialog, #how .dialog, #credits .dialog { margin: auto; }
-.lesson, .goal { background: var(--electric); border-radius: var(--r2); padding: 12px 16px; width: 100%; box-sizing: border-box; }
+.lesson, .goal { background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 12px 16px; width: 100%; box-sizing: border-box; }
 .sitefacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
-.sitefacts div { border: 1px solid var(--line); border-radius: var(--r2); padding: 12px; display: grid; gap: 4px; }
+.sitefacts div { --fl: 8px; --fr: rgba(201, 216, 242, .7); --fill: rgba(255, 255, 255, .04); padding: 12px; display: grid; gap: 4px; }
 .sitefacts .ico { stroke: var(--soft); }
-.sitefacts b { font: 900 1.6rem var(--head); font-variant-numeric: tabular-nums; }
+.sitefacts b { font: 500 1.5rem var(--mono); font-variant-numeric: tabular-nums; }
 .sitefacts span { font-size: .9rem; color: var(--soft); }
-.card { border: 1px solid var(--line); border-radius: var(--r2); padding: 16px; display: grid; gap: 8px; background: var(--deep); }
+.card { --fl: 12px; --fr: rgba(201, 216, 242, .7); --fill: rgba(255, 255, 255, .04); padding: 16px; display: grid; gap: 8px; }
 .card h3 { font-size: 1.1rem; }
 .cards { display: grid; gap: 12px; width: 100%; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0; font-variant-numeric: tabular-nums; }
@@ -179,50 +232,60 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .sources { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
 .sources a, .dialog a { color: var(--yellow); word-break: break-all; }
 #credits h3 { margin-top: 8px; }
+/* Game paused: the settings, one per row, then what to do next. */
+.settings { display: grid; gap: 8px; width: 100%; }
+.setting { --fl: 8px; --fr: rgba(201, 216, 242, .6); --fill: rgba(255, 255, 255, .04); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 8px 8px 16px; font-size: .85rem; }
+.setting .btn { min-width: 140px; white-space: nowrap; }
+#speed[aria-pressed="true"], #sound[aria-pressed="true"] { --fr: var(--yellow); color: var(--yellow); }
 
 /* ---- In-mission screen ----
-   Corners: messages top left, sun clock top middle, Missions top right, meters bottom left,
-   supplies and research points bottom right. The middle is kept clear for the base. */
+   Corners: messages top left, sun clock top middle, the mission and settings buttons top right
+   with the mission box under them, meters bottom left, supplies and research points bottom right.
+   The middle is kept clear for the base. */
 #hud .fine, #station .fine { font-size: 14px; color: var(--soft); margin: 0; }
-#station :focus-visible, #hud :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+#station :focus-visible, #hud :focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 
-#meters { left: 12px; bottom: 12px; width: 300px; display: grid; gap: 12px; }
+#meters { left: 12px; bottom: 12px; width: 300px; display: grid; gap: 12px; padding: 16px; }
 .meter { display: grid; gap: 4px; }
 .m-top { display: flex; gap: 8px; align-items: center; }
 .m-top .ico { stroke: var(--soft); vertical-align: 0; }
-.m-label { font: 700 14px var(--head); }
-.m-val { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
-.bar { position: relative; height: 12px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; background: var(--yonder); border-radius: 6px; }
+.m-label { font-size: 14px; }
+.m-label { white-space: nowrap; }
+.m-val { margin-left: auto; font: 400 14px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.m-note { font-size: 14px; color: var(--soft); }
+/* Bars are a row of short segments. The track and the fill are cut the same way so they line up. */
+.bar { position: relative; height: 8px; }
+.bar::before { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .2); -webkit-mask: var(--segments); mask: var(--segments); }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--yonder); -webkit-mask: var(--segments); mask: var(--segments); }
 .meter.warn .bar i { background: var(--yellow); }
 .meter.bad .bar i { background: var(--red); }
 .meter[data-m="dose"] .bar i { background: var(--soft); }
 .meter[data-m="dose"].warn .bar i { background: var(--yellow); }
 .meter[data-m="dose"].bad .bar i { background: var(--red); }
-.goal-mark { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; }
-.m-state { font: 700 14px var(--body); color: var(--yellow); display: flex; align-items: center; gap: 4px; }
+.goal-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; }
+.m-state { font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); display: flex; align-items: center; gap: 4px; }
 .m-state .ico { vertical-align: 0; }
-.meter.bad .m-state { color: #fff; background: var(--martian); border-radius: var(--r1); padding: 0 8px; justify-self: start; }
+.meter.bad .m-state { color: #fff; background: var(--martian); padding: 0 8px; justify-self: start; }
 
 #corner { position: fixed; right: 12px; bottom: 64px; /* leaves room for the fullscreen icon */ width: 300px; display: flex; flex-direction: column; gap: 8px; }
 #corner .panel { position: static; }
 /* Airlock progress: one bar per step, stacked with the other bottom-right boxes */
-#airlock-panel { display: grid; gap: 8px; border-color: var(--yellow); }
-#airlock-panel h3 { font: 900 18px var(--head); margin: 0; display: flex; gap: 8px; align-items: center; }
-#airlock-panel h3 .ico { stroke: var(--soft); }
+#airlock-panel { display: grid; gap: 8px; --fr: var(--yellow); }
+#airlock-panel h3 { font: 700 16px var(--head); text-transform: uppercase; letter-spacing: .1em; margin: 0; display: flex; gap: 8px; align-items: center; }
+#airlock-panel h3 .ico { stroke: var(--soft); vertical-align: 0; }
 #airlock-panel p { margin: 0; }
 #lock-text { font-weight: 700; }
 #lock-skip { justify-self: start; }
 #back-in { align-self: flex-end; }
 #supplies { display: grid; gap: 4px; }
-.supply { display: flex; align-items: center; gap: 8px; font: 700 14px var(--head); }
+.supply { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .supply .ico { stroke: var(--soft); vertical-align: 0; }
-.supply b { margin-left: auto; font-size: 16px; font-variant-numeric: tabular-nums; }
-.supply small { font: 400 14px var(--body); color: var(--soft); }
-#rp-bar { display: grid; gap: 4px; }
-.rp-top { display: flex; align-items: center; gap: 8px; font: 700 14px var(--head); }
+.supply b { margin-left: auto; font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
+.supply small { font: 400 14px var(--body); color: var(--soft); text-transform: none; letter-spacing: 0; }
+#rp-bar { display: grid; gap: 8px; }
+.rp-top { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .rp-top .ico { stroke: var(--soft); vertical-align: 0; }
-.rp-top b { margin-left: auto; font-size: 16px; color: var(--yellow); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rp-top b { margin-left: auto; font: 500 16px var(--mono); color: var(--yellow); font-variant-numeric: tabular-nums; white-space: nowrap; }
 #rp-bar .bar i { background: var(--yellow); }
 .rp-next { font-size: 14px; color: var(--soft); }
 
@@ -230,91 +293,139 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .c-row { display: flex; gap: 4px 16px; flex-wrap: wrap; font-weight: 700; font-size: 14px; }
 .c-row .ico { vertical-align: -4px; }
 .c-row .dim { color: var(--soft); font-weight: 400; }
-.c-row .hot { color: #fff; background: var(--martian); border-radius: var(--r1); padding: 0 8px; }
-.track { position: relative; height: 12px; border-radius: 6px; background: var(--yellow); overflow: hidden; }
+.c-row .hot { color: #fff; background: var(--martian); padding: 0 8px; }
+.track { position: relative; height: 8px; background: var(--yellow); }
 .track .night { position: absolute; top: 0; bottom: 0; right: 0; background: var(--electric); }
-.track .earth-gap { position: absolute; bottom: 0; height: 4px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }
-.track .storm-mark { position: absolute; top: 0; height: 8px; background: var(--red); }
-.track i { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: #fff; box-shadow: 0 0 0 2px var(--deep); }
+.track .earth-gap { position: absolute; bottom: -4px; height: 2px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }
+.track .storm-mark { position: absolute; top: 0; bottom: 0; background: var(--red); }
+.track i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(5, 14, 40, .8); }
+#clock { padding-bottom: 16px; }
 
-/* The Missions box is the one yellow-edged panel: it says what to do next. It starts in the
-   middle of the screen so you see it, then settles into its corner. */
-#mission-card { top: 12px; right: 12px; width: 300px; display: grid; gap: 8px; border-color: var(--yellow); }
-#mission-card.intro { animation: mc-intro 4.5s var(--ease); z-index: 5; }
-#mission-card h2 { font: 900 20px/1.2 var(--head); margin: 0; }
-.mc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-/* A round button that is only an icon (the gear). */
-.icon-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; border-radius: 50%; color: var(--text); background: var(--deep); border: 2px solid var(--yonder); cursor: pointer; transition: border-color .15s var(--ease), color .15s var(--ease); }
-.icon-btn .ico { vertical-align: 0; }
-.icon-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+/* Two separate buttons in the top right corner: the target shows or hides the mission box, the
+   gear pauses the game and opens the settings. */
+.hud-icons { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 6; }
+.icon-btn, .fs-btn {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; color: var(--text); cursor: pointer;
+  --fl: 8px; --fill: var(--glass);
+  -webkit-backdrop-filter: blur(10px) brightness(.6); backdrop-filter: blur(10px) brightness(.6);
+  transition: color .15s var(--ease);
+}
+.low .icon-btn, .low .fs-btn { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: var(--glass-solid); }
+.icon-btn .ico, .fs-btn .ico { vertical-align: 0; }
+.icon-btn:hover, .fs-btn:hover, .icon-btn[aria-pressed="true"] { --fr: var(--yellow); color: var(--yellow); }
 .icon-btn:active { transform: scale(.96); }
+
+/* The mission box says what to do next, so its brackets are yellow. It starts in the middle of the
+   screen so you see it, then settles under its button. */
+#mission-card { top: 64px; right: 12px; width: 300px; display: grid; gap: 8px; --fr: var(--yellow); }
+#mission-card.intro { animation: mc-intro 4.5s var(--ease); z-index: 5; }
+#mission-card h2 { font-size: 14px; line-height: 1.2; margin: 0; }
 .mc-head { display: flex; align-items: center; gap: 8px; color: var(--yellow); }
 .mc-head .ico { vertical-align: 0; }
+/* A rule that starts after the title and fades out before it reaches the corner. */
+.mc-head::after, .st-head h3::after { content: ""; flex: 1; height: 1px; margin-left: 4px; background: linear-gradient(90deg, currentColor, transparent 85%); opacity: .6; }
 .mc-name { margin: 0; font-size: 14px; }
-#hint { margin: 0; background: var(--electric); border-left: 4px solid var(--yellow); padding: 8px 12px; border-radius: var(--r1); font-weight: 700; font-size: 16px; }
-@keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 90px)) scale(1.4); } 100% { transform: none; } }
-/* Game paused: the settings, one per row, then what to do next. */
-.settings { display: grid; gap: 8px; width: 100%; }
-.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 8px 8px 16px; border: 1px solid var(--line); border-radius: var(--r2); font-weight: 700; }
-.setting .btn { min-width: 132px; white-space: nowrap; }
-#speed[aria-pressed="true"] { border-color: var(--yellow); color: var(--yellow); }
-#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; border-radius: var(--r2); font: 700 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
-#air-toast.warn { background: var(--glass); border: 2px solid var(--yellow); color: var(--yellow); }
-#air-toast.bad { background: rgba(142, 17, 0, .94); border: 2px solid #fff; color: #fff; }
+#hint { margin: 0; background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 8px 12px; font-weight: 700; font-size: 16px; }
+@keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 142px)) scale(1.4); } 100% { transform: none; } }
+#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; font: 700 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
+#air-toast.warn { background: var(--glass-solid); border: 1.5px solid var(--yellow); color: var(--yellow); }
+#air-toast.bad { background: rgba(142, 17, 0, .94); border: 1.5px solid #fff; color: #fff; }
 @keyframes air-fade { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Messages: newest at the bottom. Older ones scroll up and fade out at the top edge; scroll the
-   list (wheel or drag) to read back. The coloured edge says what kind of message it is. */
+   list (wheel or drag) to read back. Each has a line down its left side in the colour of its
+   kind, a short stroke along the top and a bracket in the far corner. */
 #feed { position: fixed; left: 12px; top: 12px; width: 340px; max-height: min(42vh, 360px); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 4px 0 0; box-sizing: border-box; list-style: none; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; scrollbar-color: rgba(201, 216, 242, .5) transparent; }
 #feed.faded { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 76px); mask-image: linear-gradient(to bottom, transparent 0, #000 76px); }
 #feed:focus-visible { outline-offset: -3px; }
 .typed.typing::after { content: ""; display: inline-block; width: .5em; height: 1em; margin-left: 2px; background: currentColor; vertical-align: -2px; }
-.msg { flex: none; background: var(--glass); border: 1px solid var(--line); border-left: 4px solid rgba(201, 216, 242, .55); border-radius: var(--r2); padding: 8px 12px; font-size: 14px; animation: pop .3s var(--ease); }
-.msg .from { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font: 700 14px var(--head); color: var(--soft); }
+.msg {
+  --k: rgba(201, 216, 242, .7); --c: rgba(255, 255, 255, .55);
+  flex: none; padding: 8px 12px 8px 16px; font-size: 14px; animation: pop .3s var(--ease);
+  background:
+    linear-gradient(var(--k), var(--k)) 0 0 / 2px 100% no-repeat,
+    linear-gradient(var(--k), var(--k)) 0 0 / 28px 1.5px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 10px 1.5px no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / 1.5px 10px no-repeat,
+    rgba(5, 14, 40, .58);
+}
+.msg .from { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
 .msg .from .ico { vertical-align: 0; }
 /* The game's signature: every word from Earth carries its light delay. */
-.msg .from em { font: 400 14px var(--body); color: var(--yellow); }
-.msg.good { border-left-color: var(--yonder); }
-.msg.warn { border-left-color: var(--yellow); }
-.msg.bad { border-left-color: var(--red); }
+.msg .from em { font: 400 14px var(--body); text-transform: none; letter-spacing: 0; color: var(--yellow); }
+.msg.good { --k: var(--yonder); }
+.msg.warn { --k: var(--yellow); }
+.msg.bad { --k: var(--red); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
-#keys { left: 50%; bottom: 12px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 648px); padding: 4px 12px; text-align: center; line-height: 1.7; }
-#prompt { left: 50%; bottom: 120px; transform: translateX(-50%); font-weight: 700; margin: 0; }
+#keys { left: 50%; bottom: 12px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 648px); padding: 4px 12px; text-align: center; line-height: 1.7; --fr: rgba(255, 255, 255, .5); --fl: 8px; }
+#prompt { left: 50%; bottom: 120px; transform: translateX(-50%); font-weight: 700; margin: 0; --fr: var(--yellow); --fl: 8px; }
 
 /* A solar storm is live danger, so this is the one thing on screen that pulses. */
 #storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 6px var(--red), inset 0 0 120px rgba(228, 55, 0, .45); animation: throb 1.2s ease-in-out infinite alternate; }
 #storm-frame.safe { box-shadow: inset 0 0 0 4px var(--yonder), inset 0 0 80px rgba(46, 150, 245, .3); animation: none; }
-#storm-frame p { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--martian); padding: 8px 16px; border-radius: var(--r2); font: 900 18px var(--head); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+#storm-frame p { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--martian); padding: 8px 16px; font: 700 16px var(--head); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
 #storm-frame.safe p { background: var(--electric); }
 @keyframes throb { to { box-shadow: inset 0 0 0 6px var(--red), inset 0 0 40px rgba(228, 55, 0, .25); } }
 
-/* The station panel is solid, so the floating labels behind it don't show through its text. */
-#station { left: 50%; top: 50%; transform: translate(-50%, -46%); width: min(540px, calc(100vw - 648px)); max-height: calc(100vh - 160px); overflow-y: auto; display: grid; gap: 12px; padding: 16px 20px; background: var(--deep); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
+/* The station panel is the darkest glass, with the view behind it heavily blurred, so you read
+   the panel and not the labels floating behind it. */
+#station {
+  left: 50%; top: 50%; transform: translate(-50%, -46%); width: min(540px, calc(100vw - 648px)); max-height: calc(100vh - 160px); overflow-y: auto;
+  display: grid; gap: 12px; padding: 20px 24px; --fl: 20px; --fill: rgba(5, 14, 40, .7);
+  -webkit-backdrop-filter: blur(18px) brightness(.5); backdrop-filter: blur(18px) brightness(.5);
+}
+.low #station { --fill: rgba(5, 14, 40, .95); }
 .st-head { display: flex; align-items: center; gap: 12px; }
-.st-head h3 { font: 900 20px var(--head); margin: 0; display: flex; gap: 8px; align-items: center; }
+.st-head h3 { flex: 1; font-size: 16px; margin: 0; display: flex; gap: 8px; align-items: center; }
 .st-head .ico { vertical-align: 0; }
-.st-head .btn { margin-left: auto; }
 #station-body { display: grid; gap: 12px; }
 #station-body p { margin: 0; }
-#station-body h4 { margin: 4px 0 0; font: 700 16px var(--head); }
-#station .big { font: 900 24px/1.2 var(--head); }
+#station-body h4 { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
+#station .big { font: 700 24px/1.2 var(--head); }
 .opts { display: grid; gap: 8px; }
 .opt {
-  text-align: left; font: 400 14px var(--body); color: var(--text); background: var(--deep); border: 2px solid var(--yonder); border-radius: var(--r2);
-  padding: 8px 12px; min-height: 44px; cursor: pointer; display: grid; gap: 4px;
-  transition: border-color .15s var(--ease), background-color .15s var(--ease);
+  text-align: left; font: 400 14px var(--body); color: var(--text); --fill: rgba(255, 255, 255, .06); --fr: rgba(255, 255, 255, .75); --fl: 10px;
+  padding: 8px 16px; min-height: 44px; cursor: pointer; display: grid; gap: 4px;
 }
-.opt:hover:not(:disabled) { border-color: var(--yellow); }
-.opt.on { background: var(--electric); border-color: var(--yellow); }
+.opt:hover:not(:disabled) { --fr: var(--yellow); --fill: rgba(234, 254, 7, .08); }
+.opt.on { --fill: rgba(0, 66, 166, .6); --fr: var(--yellow); }
 .opt-label { font: 700 16px var(--head); }
-.opt-label small { font: 700 14px var(--body); color: var(--yellow); }
+.opt-label small { font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); }
 .opt-note { color: var(--soft); font-size: 14px; }
-.opt:disabled { opacity: .55; cursor: default; }
+.opt:disabled { opacity: .5; cursor: default; }
 .maprow { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; }
-#robot-map { border: 1px solid var(--line); border-radius: var(--r1); image-rendering: pixelated; width: 200px; height: 200px; }
+#robot-map { border: 1px solid var(--line); image-rendering: pixelated; width: 200px; height: 200px; }
 .legend { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; }
 .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--deep); vertical-align: -2px; }
 .dot.base { background: var(--yellow); } .dot.ice { background: #fff; } .dot.bot { background: var(--red); }
+/* Power panel: what is using power */
+.uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.uses li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; border-left: 2px solid var(--yonder); padding: 2px 8px; }
+.uses .u-val { font: 400 14px var(--mono); font-variant-numeric: tabular-nums; }
+.uses .u-where { grid-column: 1 / -1; font-size: 14px; color: var(--soft); }
+
+/* Full screen button, bottom right, with a hover label */
+.fs-btn { position: fixed; right: 12px; bottom: 12px; z-index: 6; }
+.fs-btn::after { content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 8px); background: var(--glass-solid); color: #fff; font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; padding: 4px 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.fs-btn:hover::after, .fs-btn:focus-visible::after { opacity: 1; }
+
+/* Guided tour (First Night). It has to grab attention, so it keeps a solid red edge. */
+#tour { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+#tour-card { width: 330px; display: grid; gap: 8px; --fr: transparent; --fill: rgba(5, 14, 40, .88); border: 2px solid var(--red); pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
+#tour-card.at-right { right: 12px; top: 230px; }
+#tour-card.at-bottom { left: 50%; bottom: 96px; transform: translateX(-50%); }
+#tour-card.at-center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); }
+#tour-card.at-left { left: 12px; top: 300px; }
+#tour-title { margin: 0; font: 900 18px var(--head); color: var(--yellow); }
+#tour-text { display: grid; gap: 8px; font-size: 15px; }
+#tour-text p { margin: 0; }
+#tour-text b { color: #fff; }
+#tour-card .row { display: flex; gap: 8px; flex-wrap: wrap; }
+#tour-ring { position: fixed; border: 3px solid var(--red); border-radius: 8px; box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 14px rgba(228,55,0,.7); animation: tour-pulse 1.2s ease-in-out infinite; }
+#tour-arrow { position: fixed; width: 40px; height: 52px; }
+#tour-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+@keyframes tour-bob { to { transform: translateY(-10px); } }
+@keyframes tour-pulse { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 4px rgba(228,55,0,.4); } }
 
 @media (max-width: 1100px) {
   #feed, #meters, #mission-card, #corner { width: 276px; }
@@ -325,18 +436,19 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
    panels stack in reading order down the screen and the base shows through the gap in the middle. */
 @media (max-width: 900px) and (orientation: portrait) {
   #hud { position: fixed; inset: 0; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-  #hud > :not(#air-toast) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
+  #hud > :not(#air-toast, #tour, .fs-btn) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
+  .hud-icons { order: 0; align-self: flex-end; }
   #clock { order: 1; }
   #mission-card { order: 2; }
   #mission-card.intro { animation: none; }
   .mc-name { display: none; }
   #feed { order: 3; max-height: 18vh; }
   #prompt { order: 4; align-self: center; margin-top: auto; }
-  #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; }
+  #corner { order: 5; margin-top: auto; margin-right: 52px; flex-direction: row; flex-wrap: wrap; }
   #corner > * { flex: 1 1 160px; }
   .rp-next { display: none; }
   #back-in { flex-basis: 100%; }
-  #meters { order: 6; gap: 8px; }
+  #meters { order: 6; gap: 8px; margin-right: 52px; }
   #keys { display: none; }
   #station { left: 8px; right: 8px; top: auto; bottom: 8px; transform: none; width: auto; max-height: 72vh; }
 }
@@ -344,38 +456,7 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   .sitefacts { grid-template-columns: 1fr; }
   .maprow { grid-template-columns: 1fr; }
   #start .inner { grid-template-columns: 1fr; align-content: center; gap: 24px; padding: 24px 16px; }
-  #start .frame { order: -1; width: min(52vw, 240px); }
+  #start .scope { order: -1; width: min(52vw, 240px); }
   #missions .inner, #research .inner { padding: 16px 16px 32px; }
   .orbits { width: 420px; }
 }
-
-/* Full screen button, bottom right, with a hover label */
-.fs-btn { position: fixed; right: 12px; bottom: 12px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: rgba(7,23,63,.92); color: #fff; border: 1px solid #2E96F5; border-radius: 6px; cursor: pointer; z-index: 6; }
-.fs-btn:hover { border-color: #EAFE07; color: #EAFE07; }
-.fs-btn .ico { vertical-align: 0; }
-.fs-btn::after { content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 6px); background: #07173F; border: 1px solid #2E96F5; color: #fff; font: 700 13px "Fira Sans", system-ui, sans-serif; padding: 3px 8px; border-radius: 4px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
-.fs-btn:hover::after, .fs-btn:focus-visible::after { opacity: 1; }
-
-/* Guided tour (First Night) */
-#tour { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
-#tour-card { width: 330px; display: grid; gap: 8px; border: 2px solid #E43700; pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
-#tour-card.at-right { right: 12px; top: 230px; }
-#tour-card.at-bottom { left: 50%; bottom: 96px; transform: translateX(-50%); }
-#tour-card.at-center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); }
-#tour-card.at-left { left: 12px; top: 300px; }
-#tour-title { margin: 0; font: 900 18px "Fira Sans", system-ui, sans-serif; color: #EAFE07; }
-#tour-text { display: grid; gap: 6px; font-size: 15px; }
-#tour-text p { margin: 0; }
-#tour-text b { color: #fff; }
-#tour-card .row { display: flex; gap: 8px; flex-wrap: wrap; }
-#tour-ring { position: fixed; border: 3px solid #E43700; border-radius: 8px; box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 14px rgba(228,55,0,.7); animation: tour-pulse 1.2s ease-in-out infinite; }
-#tour-arrow { position: fixed; width: 40px; height: 52px; }
-#tour-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
-@keyframes tour-bob { to { transform: translateY(-10px); } }
-@keyframes tour-pulse { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 4px rgba(228,55,0,.4); } }
-
-/* Power panel: what is using power */
-.uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.uses li { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; border-left: 3px solid #2E96F5; padding: 2px 8px; }
-.uses .u-val { font-variant-numeric: tabular-nums; font-weight: 700; }
-.uses .u-where { grid-column: 1 / -1; font-size: .85rem; color: #C9D8F2; }

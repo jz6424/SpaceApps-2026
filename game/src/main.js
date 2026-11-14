@@ -886,6 +886,7 @@ let low = false, frames = 0, slowSince = performance.now();
 function lowGraphics() {
   if (low) return;
   low = true;
+  document.documentElement.classList.add('low'); // the panels drop their blur too (see ui.css)
   renderer.shadowMap.enabled = false;
   scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
   renderer.setPixelRatio(1);

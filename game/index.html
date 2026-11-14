@@ -15,11 +15,12 @@
 <div id="hud" hidden>
   <ul id="feed" aria-live="polite" aria-label="Messages" tabindex="0"></ul>
   <section id="clock" class="panel" aria-label="Sun clock"></section>
+  <div class="hud-icons">
+    <button class="icon-btn" id="missions-toggle" aria-pressed="true" aria-label="Show or hide your mission" title="Your mission"></button>
+    <button class="icon-btn" id="settings" data-do="menu" aria-label="Settings and pause" title="Settings and pause"></button>
+  </div>
   <aside id="mission-card" class="panel" aria-label="Current mission">
-    <div class="mc-top">
-      <h2 class="mc-head"><span id="mc-pin"></span> Missions</h2>
-      <button class="icon-btn" id="settings" data-do="menu" aria-label="Settings and pause" title="Settings and pause"></button>
-    </div>
+    <h2 class="mc-head"><span id="mc-pin"></span> Mission</h2>
     <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
     <p id="hint" role="status"></p>
   </aside>
@@ -74,7 +75,10 @@
       </div>
       <p class="fine">Plays in your browser with no download or account.<br>Made for NASA Space Apps 2026. Not affiliated with or endorsed by NASA.</p>
     </div>
-    <div class="frame"><img id="start-picture" alt="The moon base: a white habitat on legs, solar panels and a robot on grey ground under a black sky" hidden></div>
+    <div class="scope">
+      <svg class="scope-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="arc" cx="50" cy="50" r="49.4" pathLength="360"/><circle class="ticks" cx="50" cy="50" r="46.6" pathLength="360"/></svg>
+      <div class="frame"><img id="start-picture" alt="The moon base: a white habitat on legs, solar panels and a robot on grey ground under a black sky" hidden></div>
+    </div>
   </div>
 </main>
 
@@ -188,7 +192,7 @@
       <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back. Every storm is sized from a real solar flare, and they change each time you play.</li>
       <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
     </ol>
-    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the speed, sound and full screen settings.</p>
+    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the speed, sound and full screen settings. The target button next to it shows or hides your mission.</p>
     <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
   </div>
 </main>

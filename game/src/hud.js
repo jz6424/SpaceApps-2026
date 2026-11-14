@@ -24,6 +24,7 @@ export const ICONS = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
+  target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
@@ -48,8 +49,17 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   // Fixed parts of the HUD.
   $('hud-title').textContent = sim.mission.name;
   $('hud-mode').textContent = `· ${sim.modeName} mode`;
-  $('mc-pin').innerHTML = icon('pin', 20);
+  $('mc-pin').innerHTML = icon('target', 18);
   $('settings').innerHTML = icon('gear', 22);
+  // The target button shows or hides the mission box. Every mission starts with it showing.
+  $('missions-toggle').innerHTML = icon('target', 22);
+  const showMission = on => { $('mission-card').hidden = !on; $('missions-toggle').setAttribute('aria-pressed', on); };
+  // The fly-in belongs to the start of the mission only, so it must not play again when the box is shown.
+  const settle = () => $('mission-card').classList.remove('intro');
+  $('mission-card').addEventListener('animationend', settle);
+  const missionBtn = () => { settle(); showMission($('mission-card').hidden); };
+  $('missions-toggle').addEventListener('click', missionBtn);
+  showMission(true);
   // The Missions box grows in the middle of the screen, then settles into its corner.
   const card = $('mission-card');
   card.classList.remove('intro');
@@ -95,12 +105,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('feed').innerHTML = '';
 
   // --- Meters ---
-  function meter(name, ico, label, value, max, text, state, extra = '') {
+  function meter(name, ico, label, value, max, text, state, extra = '', note = '') {
     const pct = Math.max(0, Math.min(100, value / max * 100));
     return `<div class="meter ${state}" data-m="${name}">
       <div class="m-top">${icon(ico, 20)}<span class="m-label">${label}</span><span class="m-val">${text}</span></div>
       <div class="bar" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.round(value)}"><i style="width:${pct}%"></i>${extra}</div>
       ${state !== 'ok' ? `<div class="m-state">${icon('alert', 14)} ${state === 'bad' ? 'Danger' : 'Low'}</div>` : ''}
+      ${note ? `<div class="m-note">${note}</div>` : ''}
     </div>`;
   }
   function renderMeters() {
@@ -113,7 +124,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const goalMark = sim.mission.goalType === 'dose' ? `<b class="goal-mark" style="left:${sim.goalValue}%" title="Goal"></b>` : '';
     let html = meter('power', 'bolt', 'Power', sim.power, 100, `${Math.round(sim.power)}% · ${trend(net)}`, pState)
       + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}%`, aState)
-      + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} of 100${sim.mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`, dState, goalMark);
+      + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} / 100`, dState, goalMark, sim.mission.goalType === 'dose' ? `Goal: finish at ${sim.goalValue} or less (the white mark)` : '');
     if (sim.where === 'outside') html += meter('suit', 'wind', 'Suit air', sim.suit, C.suit.seconds, `${Math.ceil(sim.suit)} s`, sim.suit < 20 ? 'bad' : sim.suit < 40 ? 'warn' : 'ok');
     $('meters').innerHTML = html;
   }
@@ -511,6 +522,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
       $('fullscreen-setting').removeEventListener('click', fsBtn);
+      $('missions-toggle').removeEventListener('click', missionBtn);
+      $('mission-card').removeEventListener('animationend', settle);
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;

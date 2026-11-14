@@ -86,7 +86,7 @@ const SHORT = {
   'Moon dirt': ['Building material the robot digs up.', 'Spend it on repairs, Boost and shielding.'],
   'Research points': ['Rewards for science: +2 per rock sample, +1 per data upload.', 'Spend them in the Research Tree.'],
   'The Sun clock': ['The whole day. The white marker is now.', 'Yellow is sunlight. Blue is night, with no solar power.', 'Red is a solar storm. Dashes mean no Earth signal.'],
-  'Your missions box': ['Your next step is in the blue hint.', 'The gear pauses the game and holds the settings. F fast-forwards.'],
+  'Your missions box': ['Your next step is in the blue hint.', 'Above it: the target hides this box, the gear pauses and holds the settings.'],
   'Research bar': ['Your points toward the next unlock.', 'Collect rock samples and send data to fill it.'],
   'Now the stations': ['7 stations, each with a floating label.', 'Click a label to walk there, or press E when close.'],
   'Power station': ['Your battery, and what charges or drains it.', 'See "What is using power right now" below.'],
@@ -161,7 +161,7 @@ function buildSteps() {
       title: 'Your missions box', target: '#mission-card', side: 'left', at: 'bottom', freeze: true,
       text: [
         '<b>This box tells you what to do next.</b> The blue hint changes as the situation changes.',
-        'The <b>gear button</b> pauses the game and opens the settings: game speed, sound and full screen. The <b>F</b> key fast-forwards time. The square icon at the bottom right is also <b>Fullscreen</b>.',
+        'Above it are two buttons. The <b>target</b> hides or shows this box. The <b>gear</b> pauses the game and opens the settings: game speed, sound and full screen. The <b>F</b> key fast-forwards time.',
       ],
     },
     {
