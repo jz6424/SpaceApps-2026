@@ -1,6 +1,7 @@
 // Progress lives in this browser's localStorage. Storage can be blocked or cleared, so the game
 // keeps working from memory and the menu says when saving isn't possible.
 import { MISSIONS, MODES } from './config.js';
+import { NODES } from './research.js';
 
 const KEY = 'moonbase.save.v2';
 
@@ -15,8 +16,9 @@ function clean(raw) {
   if (MODES[raw.mode]) save.mode = raw.mode;
   if (Number.isFinite(raw.points) && raw.points >= 0) save.points = Math.floor(raw.points);
   if (Array.isArray(raw.unlocks)) {
-    const known = MISSIONS.map(m => m.requires?.id);
-    save.unlocks = raw.unlocks.filter(id => known.includes(id));
+    // Research Tree nodes the player owns, including the two that open missions.
+    const known = NODES.map(node => node.id);
+    save.unlocks = [...new Set(raw.unlocks.filter(id => known.includes(id)))];
   }
   for (const mission of MISSIONS) {
     for (const mode of Object.keys(MODES)) {

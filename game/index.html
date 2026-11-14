@@ -62,7 +62,10 @@
   <div class="inner">
     <div class="topbar">
       <button class="btn small" data-do="home">Back</button>
-      <p class="score">Research points: <b id="points">0</b></p>
+      <div class="row">
+        <button class="btn small" data-do="research">Research Tree</button>
+        <p class="score">Research points: <b id="points">0</b></p>
+      </div>
     </div>
     <h2>Choose your mission</h2>
     <section aria-label="Difficulty">
@@ -74,6 +77,20 @@
       <p id="save-note" class="fine"></p>
       <div id="erase" class="fine"></div>
     </div>
+  </div>
+</main>
+
+<!-- Research Tree: spend research points between missions -->
+<main id="research" class="screen" hidden>
+  <svg class="orbits" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
+  <div class="inner">
+    <div class="topbar">
+      <button class="btn small" data-do="open-missions">Back to missions</button>
+      <p class="score">Research points: <b id="research-points">0</b></p>
+    </div>
+    <h2>Research Tree</h2>
+    <p id="research-note"></p>
+    <div id="research-tree"></div>
   </div>
 </main>
 

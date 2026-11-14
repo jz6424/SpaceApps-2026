@@ -1,0 +1,181 @@
+// The Research Tree: what research points buy between missions.
+//
+// Two kinds of node:
+//   - mission nodes (`mission`) open a later mission. Their id is the mission's `requires.id` in
+//     config.js, and the cost comes from there too. These work today: the HUD already checks
+//     save.unlocks for 'Shielding' and 'Greenhouse'.
+//   - upgrade nodes change one number in CONFIG, listed in `effects`.
+//
+// Upgrades are NOT wired into the mission rules yet, because sim.js is being reworked. Until
+// they are, UPGRADES_LIVE stays false and the menu shows them as "Coming soon" so nobody spends
+// points on something that does nothing. To switch them on:
+//   1. in sim.js, read numbers from researchConfig(CONFIG, save.unlocks) instead of CONFIG
+//      (ui.js would pass save.unlocks, or the finished config, into `new Sim(...)`)
+//   2. set UPGRADES_LIVE = true
+//   3. run `npm run balance`
+//
+// Every owned node id lives in save.unlocks, next to the two mission unlocks.
+import { MISSIONS } from './config.js';
+
+export const UPGRADES_LIVE = false;
+
+// effects: { path, times } multiplies CONFIG[path]; { path, add } adds to it. A path that points
+// at a group of numbers (like air.make) changes every number in the group.
+// `science` says how the real thing works. `change` says what it does in the game, with numbers
+// that must match `effects`.
+export const BRANCHES = [
+  {
+    id: 'power', name: 'Power', icon: 'bolt',
+    about: 'Make more electricity and waste less of it.',
+    nodes: [
+      {
+        id: 'HeatBlankets', name: 'Heat blankets', cost: 10,
+        science: 'The lunar night is colder than -170 C. Spacecraft are wrapped in many thin, shiny layers called multi-layer insulation. Each layer reflects heat back inside.',
+        change: 'Night heaters use 20% less power.',
+        effects: [{ path: 'power.heaters', times: 0.8 }],
+      },
+      {
+        id: 'SunTracking', name: 'Sun-tracking panels', cost: 15, needs: 'HeatBlankets',
+        science: 'At the south pole the Sun never climbs high. It circles low around the horizon, so panels that stand upright and turn to face it catch more light. NASA is developing tall solar towers like this, called VSAT.',
+        change: 'Solar panels make 10% more power.',
+        effects: [{ path: 'solar.perPanel', times: 1.1 }],
+      },
+      {
+        id: 'DishAntenna', name: 'Dish antenna', cost: 8,
+        science: 'A dish squeezes the radio signal into a narrow beam aimed at Earth. Less of the signal is lost into empty space, so the radio needs less power.',
+        change: 'The antenna uses 25% less power.',
+        effects: [{ path: 'power.comms', times: 0.75 }],
+      },
+    ],
+  },
+  {
+    id: 'air', name: 'Life Support', icon: 'wind',
+    about: 'Keep your air and water going for longer.',
+    nodes: [
+      {
+        id: 'Scrubber', name: 'Better CO2 scrubber', cost: 10,
+        science: 'You breathe out carbon dioxide, and too much of it is dangerous. A scrubber pulls it out of the air. The Space Station traps it in a mineral called zeolite, so the crew can breathe the same air again.',
+        change: 'Life Support drains 5% slower.',
+        effects: [{ path: 'air.crewUse', times: 0.95 }],
+      },
+      {
+        id: 'Sabatier', name: 'Sabatier reactor', cost: 18, needs: 'Scrubber',
+        science: 'A Sabatier reactor mixes the carbon dioxide you breathe out with hydrogen. The two react and become water and methane. The Space Station has used one to get water back.',
+        change: 'The Life Support machine refills 10% faster on every setting.',
+        effects: [{ path: 'air.make', times: 1.1 }],
+      },
+      {
+        id: 'RegolithOxygen', name: 'Oxygen from moon dirt', cost: 15, needs: 'Scrubber',
+        science: 'Moon dirt is about 45% oxygen by weight, locked inside the rock. Melting the dirt and passing electricity through it sets the oxygen free. This is called molten regolith electrolysis.',
+        change: 'Boost uses 30% less moon dirt.',
+        effects: [{ path: 'air.boostRegolith', times: 0.7 }],
+      },
+    ],
+  },
+  {
+    id: 'radiation', name: 'Radiation', icon: 'radiation',
+    about: 'Take a smaller dose when the Sun throws a storm at you.',
+    nodes: [
+      {
+        id: 'Shielding', name: 'Regolith Shielding', mission: 'SolarStorm',
+        science: 'Solar storm particles lose energy as they pass through matter. A thick layer of moon dirt piled on the Habitat stops many of them before they reach you.',
+        change: 'You can pile moon dirt on the Storm Shelter to cut your storm dose.',
+      },
+      {
+        id: 'ParticleDetector', name: 'Particle detector', cost: 12, needs: 'Shielding',
+        science: 'The fastest particles from a solar flare arrive before the main storm. A detector on the Habitat spots them, so you get a warning even when Earth can\'t reach you.',
+        change: 'Your own storm warning comes 10 seconds early, up from 5.',
+        effects: [{ path: 'ownSensorWarning', add: 5 }],
+      },
+      {
+        id: 'WaterWall', name: 'Water wall', cost: 20, needs: 'Shielding',
+        science: 'Hydrogen is very good at stopping space radiation, and water is full of hydrogen. Lining the shelter walls with water tanks adds shielding without hauling extra metal from Earth.',
+        change: 'Your storm dose inside the Storm Shelter is 25% lower.',
+        effects: [{ path: 'dose.storm.shelter', times: 0.75 }],
+      },
+    ],
+  },
+  {
+    id: 'food', name: 'Food and water', icon: 'leaf',
+    about: 'Grow meals on the Moon and stop wasting water.',
+    nodes: [
+      {
+        id: 'Greenhouse', name: 'Greenhouse', mission: 'IceAndGreens',
+        science: 'Plants turn light, water and the carbon dioxide you breathe out into food, and they give back oxygen. Astronauts have grown lettuce on the Space Station in a garden called Veggie.',
+        change: 'Adds grow lights to the Galley, so you can grow meals.',
+      },
+      {
+        id: 'GrowLights', name: 'Red and blue grow lights', cost: 12, needs: 'Greenhouse',
+        science: 'Plants use mostly red and blue light to grow. LED lamps that make mainly those two colours waste less electricity than white lamps.',
+        change: 'Grow lights use 20% less power.',
+        effects: [{ path: 'power.greenhouse', times: 0.8 }],
+      },
+      {
+        id: 'WaterRecycling', name: 'Water recycling', cost: 15, needs: 'Greenhouse',
+        science: 'Plants breathe most of the water they drink back into the air as vapour. Catching that vapour and cleaning it lets you use the same water again. The Space Station recycles about 98% of its water.',
+        change: 'The greenhouse uses 25% less water.',
+        effects: [{ path: 'food.water', times: 0.75 }],
+      },
+    ],
+  },
+  {
+    id: 'outside', name: 'Robots and moonwalks', icon: 'map',
+    about: 'Get more done outside the Habitat.',
+    nodes: [
+      {
+        id: 'DrumDigger', name: 'Bucket-drum digger', cost: 10,
+        science: 'In low gravity a light robot gets pushed backwards when it digs. NASA\'s RASSOR robot has two digging drums that spin in opposite directions, so the two pushes cancel out.',
+        change: 'The robot digs moon dirt 25% faster.',
+        effects: [{ path: 'robot.dig', times: 1.25 }],
+      },
+      {
+        id: 'IceDrill', name: 'Ice drill', cost: 15, needs: 'DrumDigger',
+        science: 'Ice in the shadowed craters is mixed into ground colder than -200 C, frozen as hard as rock. NASA built a drill called TRIDENT that hammers while it turns to cut through ground like that.',
+        change: 'The robot brings back ice 25% faster.',
+        effects: [{ path: 'robot.ice', times: 1.25 }],
+      },
+      {
+        id: 'SuitTank', name: 'Bigger suit tank', cost: 12,
+        science: 'The backpack on a spacesuit carries your oxygen and scrubs out the carbon dioxide you breathe out. A bigger oxygen tank gives you more time outside.',
+        change: 'Suit air lasts 110 seconds, up from 90.',
+        effects: [{ path: 'suit.seconds', add: 20 }],
+      },
+    ],
+  },
+];
+
+export const NODES = BRANCHES.flatMap(branch => branch.nodes);
+// A mission node costs whatever its mission says in config.js, so the price lives in one place.
+for (const node of NODES) {
+  if (node.mission) node.cost = MISSIONS.find(m => m.id === node.mission).requires.cost;
+}
+export const nodeById = id => NODES.find(node => node.id === id);
+
+// 'owned', 'soon' (upgrades not switched on yet), 'locked' (needs another node first),
+// 'short' (not enough points) or 'ready'.
+export function nodeState(node, owned, points) {
+  if (owned.includes(node.id)) return 'owned';
+  if (!node.mission && !UPGRADES_LIVE) return 'soon';
+  if (node.needs && !owned.includes(node.needs)) return 'locked';
+  return points >= node.cost ? 'ready' : 'short';
+}
+
+// CONFIG with every owned upgrade applied. Returns a copy; the base is left alone.
+export function researchConfig(base, owned) {
+  const config = structuredClone(base);
+  for (const node of NODES) {
+    if (!owned.includes(node.id)) continue;
+    for (const { path, times, add } of node.effects ?? []) {
+      const keys = path.split('.');
+      const last = keys.pop();
+      const parent = keys.reduce((group, key) => group[key], config);
+      const apply = value => (times !== undefined ? value * times : value + add);
+      if (typeof parent[last] === 'object') {
+        for (const key of Object.keys(parent[last])) parent[last][key] = apply(parent[last][key]);
+      } else {
+        parent[last] = apply(parent[last]);
+      }
+    }
+  }
+  return config;
+}

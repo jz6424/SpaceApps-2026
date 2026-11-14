@@ -38,6 +38,10 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
   limit, ends the mission. Stars, research points, unlocks, then a debrief with a NASA data card.
 * **Missions:** First Night (tutorial), Solar Storm (needs Regolith Shielding), Ice and Greens (needs
   Greenhouse). Modes: Cadet, Explorer, Commander.
+* **Research Tree:** spend research points between missions. Regolith Shielding and Greenhouse open
+  missions 2 and 3. Thirteen upgrades (each with the real science and the exact change) are listed in
+  `game/src/research.js` but not switched on yet; the steps to wire them into the rules are at the top
+  of that file.
 
 ## Real NASA data
 

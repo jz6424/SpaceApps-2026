@@ -1,4 +1,4 @@
-// Menus around the game: start, mission choice, briefing, pause, debrief and credits.
+// Menus around the game: start, mission choice, Research Tree, briefing, pause, debrief and credits.
 // Also runs a mission: makes the Sim, hands it to the 3D world and the HUD, and ends it.
 import './ui.css';
 import { MISSIONS, MODES, missionById, pointsFor } from './config.js';
@@ -6,9 +6,10 @@ import { Sim } from './sim.js';
 import { createHud, icon } from './hud.js';
 import { getFlares, dataCard, SOURCES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
+import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['start', 'missions', 'brief', 'pause', 'debrief', 'how', 'credits'];
+const SCREENS = ['start', 'missions', 'research', 'brief', 'pause', 'debrief', 'how', 'credits'];
 
 let save = loadSave();
 let saveWorks = writeSave(save);
@@ -47,8 +48,7 @@ function missionCard(mission, index) {
   const need = mission.requires;
   let action;
   if (open) action = `<button class="btn primary" data-do="brief" data-id="${mission.id}">Start mission</button>`;
-  else if (save.points >= need.cost) action = `<button class="btn primary" data-do="unlock" data-id="${mission.id}">Unlock for ${need.cost} points</button>`;
-  else action = `<button class="btn" disabled>Unlock for ${need.cost} points</button>`;
+  else action = '<button class="btn" data-do="research">Open Research Tree</button>';
   return `
     <article class="mission ${open ? '' : 'locked'}">
       <div class="num" aria-hidden="true">${index + 1}</div>
@@ -79,6 +79,59 @@ function openMissions() {
   confirmErase = false;
   renderMissions();
   show('missions');
+}
+
+// --- Research Tree ---
+function nodeHtml(node, branch) {
+  const state = nodeState(node, save.unlocks, save.points);
+  const mission = node.mission && missionById(node.mission);
+  const status = {
+    owned: '<p class="n-status done">Researched</p>',
+    soon: '<p class="n-status">Coming soon</p>',
+    locked: `<p class="n-status">Research ${nodeById(node.needs)?.name} first</p>`,
+    short: `<button class="btn small" disabled>Need ${node.cost - save.points} more points</button>`,
+    ready: `<button class="btn primary small" data-do="buy" data-id="${node.id}">Research for ${node.cost} points</button>`,
+  }[state];
+  const children = branch.nodes.filter(child => child.needs === node.id);
+  return `
+    <li>
+      <article class="node is-${state}" id="node-${node.id}" tabindex="-1">
+        <div class="n-head"><h4>${node.name}</h4><span class="n-cost">${state === 'owned' ? 'Owned' : `${node.cost} points`}</span></div>
+        ${mission ? `<p class="n-opens">${icon('star', 16)} Opens mission ${MISSIONS.indexOf(mission) + 1}, ${mission.name}</p>` : ''}
+        <p class="n-science">${node.science}</p>
+        <p class="n-change"><b>In the game</b> ${node.change}</p>
+        ${status}
+      </article>
+      ${children.length ? `<ul>${children.map(child => nodeHtml(child, branch)).join('')}</ul>` : ''}
+    </li>`;
+}
+
+function renderResearch() {
+  $('research-points').textContent = save.points;
+  $('research-note').textContent = UPGRADES_LIVE
+    ? 'Spend research points on new equipment. Some items need another one first.'
+    : 'Spend research points to open new missions. The upgrades are still being built, so you can read about them now and buy them in a later update.';
+  $('research-tree').innerHTML = BRANCHES.map(branch => `
+    <section class="branch" aria-labelledby="branch-${branch.id}">
+      <h3 id="branch-${branch.id}">${icon(branch.icon, 24)} ${branch.name}</h3>
+      <p class="fine">${branch.about}</p>
+      <ul class="tree">${branch.nodes.filter(node => !node.needs).map(node => nodeHtml(node, branch)).join('')}</ul>
+    </section>`).join('');
+}
+
+function openResearch() {
+  renderResearch();
+  show('research');
+}
+
+function buy(id) {
+  const node = nodeById(id);
+  if (!node || nodeState(node, save.unlocks, save.points) !== 'ready') return;
+  save.points -= node.cost;
+  save.unlocks.push(node.id);
+  commit();
+  renderResearch();
+  $(`node-${id}`).focus();
 }
 
 // --- Briefing ---
@@ -205,14 +258,8 @@ const actions = {
   launch: () => launch(),
   again: id => launch(id),
   restart: () => launch(sim.mission.id),
-  unlock: id => {
-    const need = missionById(id).requires;
-    if (save.points < need.cost) return;
-    save.points -= need.cost;
-    save.unlocks.push(need.id);
-    commit();
-    renderMissions();
-  },
+  research: openResearch,
+  buy,
   resume,
   leave: openMissions,
   menu: pause,

@@ -65,6 +65,32 @@ kbd { font: 400 12px "Fira Code", monospace; color: #EAFE07; border: 1px solid r
 .footnotes { display: grid; gap: 6px; }
 #erase { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
+/* Research Tree: one section per branch, with lines joining a node to the ones it unlocks */
+#research .inner { position: relative; max-width: 1080px; margin: 0 auto; padding: 24px 16px 40px; display: grid; gap: 16px; }
+#research-note { max-width: 44em; }
+#research-tree { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: 32px 24px; align-items: start; margin-top: 8px; }
+.branch { display: grid; gap: 8px; align-content: start; }
+.branch h3 { display: flex; align-items: center; gap: 8px; }
+.branch h3 .ico { stroke: #2E96F5; }
+.tree, .tree ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.tree { margin-top: 4px; }
+.tree ul { margin: 12px 0 0 16px; padding-left: 20px; border-left: 2px solid #2E96F5; }
+.tree ul > li { position: relative; }
+.tree ul > li::before { content: ""; position: absolute; left: -20px; top: 28px; width: 20px; border-top: 2px solid #2E96F5; }
+.node { background: #07173F; border: 1px solid #2E96F5; border-radius: 6px; padding: 16px; display: grid; gap: 8px; justify-items: start; }
+.node.is-locked, .node.is-soon { border-style: dashed; }
+.node.is-owned { border-color: #EAFE07; }
+.n-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
+.node h4 { font: 700 1.15rem/1.2 "Fira Sans", system-ui, sans-serif; margin: 0; }
+.n-cost { font: 400 .8rem "Fira Code", monospace; color: #C9D8F2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.n-opens { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: .95rem; }
+.n-opens .ico { stroke: #EAFE07; }
+.n-science { font-size: .95rem; color: #C9D8F2; }
+.n-change { background: #0042A6; border-radius: 6px; padding: 8px 12px; width: 100%; box-sizing: border-box; font-size: .95rem; }
+.n-change b { display: block; font: 400 .75rem "Fira Code", monospace; }
+.n-status { font-weight: 700; font-size: .95rem; color: #C9D8F2; }
+.n-status.done { color: #EAFE07; }
+
 /* Pause and debrief: a solid panel in the middle */
 #pause { background: rgba(7, 23, 63, .82); display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
 #debrief { display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
