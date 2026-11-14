@@ -225,13 +225,71 @@ function panelHtml(node) {
 
 // The map is laid out at one size and shrunk to fit narrower screens. Below 3/4 size the
 // circles get too small to tap, so it scrolls sideways instead.
-function fitMap() {
-  const view = $('research-view'), map = $('research-map');
-  const scale = Math.min(1, Math.max(0.75, view.clientWidth / MAP.size));
-  map.style.transform = `scale(${scale})`;
-  $('research-fit').style.width = $('research-fit').style.height = `${MAP.size * scale}px`;
-  view.scrollLeft = (view.scrollWidth - view.clientWidth) / 2;
+// The window onto the map has no scroll bars: you drag the map around inside it instead.
+const pan = { x: 0, y: 0, scale: 1, placed: false };
+function placeMap() {
+  const view = $('research-view'), size = MAP.size * pan.scale;
+  // An axis that fits is centred. One that doesn't can be dragged until either edge shows.
+  const hold = (at, room) => (size <= room ? (room - size) / 2 : Math.min(0, Math.max(room - size, at)));
+  pan.x = hold(pan.x, view.clientWidth);
+  pan.y = hold(pan.y, view.clientHeight);
+  $('research-fit').style.transform = `translate(${pan.x}px, ${pan.y}px)`;
 }
+function fitMap() {
+  const view = $('research-view');
+  // The window takes whatever height is left on the screen, so the page itself never scrolls.
+  // On narrow screens the details panel sits under it and needs its share.
+  const narrow = matchMedia('(max-width: 1100px)').matches;
+  const top = view.getBoundingClientRect().top + $('research').scrollTop;
+  const room = innerHeight - top - 44 - (narrow ? $('research-panel').offsetHeight + 16 : 0);
+  view.style.height = `${Math.max(narrow ? 220 : 320, room)}px`;
+  pan.scale = Math.min(1, Math.max(0.75, view.clientWidth / MAP.size));
+  $('research-map').style.transform = `scale(${pan.scale})`;
+  $('research-fit').style.width = $('research-fit').style.height = `${MAP.size * pan.scale}px`;
+  if (!pan.placed) {
+    // Start with the base in the middle of the window.
+    pan.x = (view.clientWidth - MAP.size * pan.scale) / 2;
+    pan.y = (view.clientHeight - MAP.size * pan.scale) / 2;
+    pan.placed = true;
+  }
+  placeMap();
+}
+(function dragMap() {
+  const view = $('research-view');
+  let from = null, dragged = false;
+  view.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    from = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+    dragged = false;
+  });
+  view.addEventListener('pointermove', e => {
+    if (!from) return;
+    const dx = e.clientX - from.x, dy = e.clientY - from.y;
+    // A small wobble is still a click on a circle. Past that it is a drag.
+    if (!dragged && Math.hypot(dx, dy) < 6) return;
+    if (!dragged) { dragged = true; view.setPointerCapture(e.pointerId); view.classList.add('dragging'); }
+    pan.x = from.panX + dx;
+    pan.y = from.panY + dy;
+    placeMap();
+  });
+  const drop = () => { from = null; view.classList.remove('dragging'); };
+  view.addEventListener('pointerup', drop);
+  view.addEventListener('pointercancel', drop);
+  // The click that ends a drag must not pick the circle under the pointer.
+  view.addEventListener('click', e => { if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; } }, true);
+  view.addEventListener('wheel', e => { e.preventDefault(); pan.x -= e.deltaX; pan.y -= e.deltaY; placeMap(); }, { passive: false });
+  // Tabbing to a circle outside the window brings it into view.
+  view.addEventListener('focusin', e => {
+    const node = e.target.closest('.rt-node');
+    if (!node) return;
+    const dot = node.querySelector('.rt-dot').getBoundingClientRect(), box = view.getBoundingClientRect(), edge = 72;
+    if (dot.left < box.left + edge) pan.x += box.left + edge - dot.left;
+    if (dot.right > box.right - edge) pan.x -= dot.right - (box.right - edge);
+    if (dot.top < box.top + edge) pan.y += box.top + edge - dot.top;
+    if (dot.bottom > box.bottom - edge) pan.y -= dot.bottom - (box.bottom - edge);
+    placeMap();
+  });
+})();
 
 // The sky behind the tree: a field of stars, the same every time, redrawn to fit the window.
 function drawStars() {
@@ -264,10 +322,11 @@ function renderResearch() {
   picked ??= (all.find(node => nodeState(node, unlocksNow(), save.points) === 'ready') ?? all[0]).id;
   $('research-points').textContent = save.points;
   $('research-note').textContent = UPGRADES_LIVE
-    ? 'Pick a circle to see what it does. Spend research points to add it to your base.'
-    : 'Pick a circle to see what it does. Spend research points to open new missions. We are still building the upgrades, so they stay locked until a later update.';
+    ? 'Pick a circle to see what it does. Drag the map to move around. Spend research points to add it to your base.'
+    : 'Pick a circle to see what it does. Drag the map to move around. Spend research points to open new missions. We are still building the upgrades, so they stay locked until a later update.';
   $('research-map').innerHTML = mapHtml();
   $('research-panel').innerHTML = panelHtml(nodeById(picked));
+  if (!$('research').hidden) fitMap();
 }
 
 function openResearch() {

@@ -236,21 +236,23 @@ export class Sim {
     return cy ? { ...cy.steps[cy.i], dir: cy.dir, progress: Math.min(1, cy.t / cy.steps[cy.i].length), waiting: !!cy.waiting } : null;
   }
   // 'out' ends with the outer door open, 'in' with the inner door open.
-  airlockStart(dir) {
+  // fromOutside: someone on the Moon side asks for the hatch, so the chamber empties with nobody
+  // in it (no prebreathe to wait for) and a storm is no reason to keep them out.
+  airlockStart(dir, fromOutside = false) {
     const lock = this.airlock, A = C.airlock;
     if (lock.cycle) return 'The airlock is busy. Hang on!';
-    if (dir === 'out' && this.stormNow) return 'Not during a solar storm!';
+    if (dir === 'out' && this.stormNow && !fromOutside) return 'Not during a solar storm!';
     const [shut, open, goal] = dir === 'out' ? ['inner', 'outer', 'vacuum'] : ['outer', 'inner', 'pressurized'];
     const steps = [];
     if (lock[shut]) steps.push({ kind: 'close', door: shut, length: A.doorSeconds });
     if (lock.pressure !== goal) {
-      if (dir === 'out') steps.push({ kind: 'prebreathe', length: A.prebreathe });
+      if (dir === 'out' && !fromOutside) steps.push({ kind: 'prebreathe', length: A.prebreathe });
       steps.push({ kind: 'pump', length: A.pump });
     }
     if (!lock[open]) steps.push({ kind: 'open', door: open, length: A.doorSeconds });
     if (!steps.length) return `The ${open} door is already open.`;
     // A full cycle needs the astronaut between the doors, or they would be shut out.
-    lock.cycle = { dir, steps, i: 0, t: 0, crew: steps.some(s => s.kind === 'pump') };
+    lock.cycle = { dir, steps, i: 0, t: 0, crew: !fromOutside && steps.some(s => s.kind === 'pump') };
     return null;
   }
   // Using one door by hand. The interlock keeps the other one shut.

@@ -67,4 +67,12 @@ for (const [mode, skips] of [['Explorer', false], ['Cadet', true]]) {
   s.airlockTick(0.05);
   if ((s.airlockStep.kind !== 'prebreathe') !== skips) fail(`prebreathe skip wrong for ${mode}`, s);
 }
+// Someone outside can always get the hatch open, even with the cabin door open and a storm on.
+{
+  const s = new Sim(MISSIONS[0], 'Explorer');
+  s.storms.forEach(st => { st.started = true; });
+  if (s.airlockStart('out', true)) fail('hatch refused from outside', s);
+  settle(s);
+  if (!s.airlock.outer || s.airlock.inner) fail('hatch did not open from outside', s);
+}
 console.log(`Airlock OK: ${checks} random states checked, doors never open together, always a way out and back in.`);

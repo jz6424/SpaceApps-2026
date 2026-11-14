@@ -416,8 +416,9 @@ function block(x0, x1, y0, y1, z0, z1, mat) {
 }
 
 const DOOR_HALF = 2.2;                    // half the doorway width: each door is two leaves this wide
-const INNER_X = 13.2, OUTER_X = 18.45;    // where the two doors stand along the tube
+const INNER_X = 13.2, OUTER_X = 19.8;     // where the two doors stand: a wall inside the tube, the hatch on its end
 const INNER_TALL = 8.4, OUTER_TALL = 8.95;
+const HATCH_WIDE = 5.2, HATCH_SLIDE = 5.9; // the hatch is one slab that slides along the hull to open
 const LOCK_LOOK = {                       // light colour and label for each state. Never colour alone.
   pressurized: { text: 'Pressurized', color: 0x2e96f5 },
   cycling: { text: 'Cycling...', color: 0xeafe07 },
@@ -453,7 +454,8 @@ for (const look of Object.values(LOCK_LOOK)) {
   solid(INNER_X - 0.2, INNER_X + 0.6, -DOOR_HALF, DOOR_HALF, DECK + INNER_TALL, DECK + 10);
 })();
 
-// Each door is two leaves that slide apart into the wall. Closed, it is solid.
+// The inner door is two leaves that slide apart into the wall. Closed, it is solid.
+// Every moving piece is { leaf, travel }: how far it slides north (design units) when open.
 function makeDoor(which, x, tall, lamps) {
   const leaves = [1, -1].map(side => {
     const leaf = new THREE.Group();
@@ -465,8 +467,35 @@ function makeDoor(which, x, tall, lamps) {
       block(x - 0.2, x + 0.2, Math.min(side * 0.5, side * 1.7), Math.max(side * 0.5, side * 1.7), DECK + 4.8, DECK + 6.6, PAINT.glass),
       block(x - 0.3, x + 0.3, Math.min(side * 0.15, side * 0.4), Math.max(side * 0.15, side * 0.4), DECK + 3.5, DECK + 4.5, PAINT.grey),
     ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
-    return { leaf, side };
+    return { leaf, travel: side * DOOR_HALF };
   });
+  return finishDoor(which, x, tall, lamps, leaves, DOOR_HALF, 0.15);
+}
+
+// The outer door is the big white hatch on the end of the airlock: a round window, a red hub and
+// a handle. Shut, it covers the doorway. Open, it sits against the hull beside it.
+function makeHatch(which, x, tall, lamps) {
+  const leaf = new THREE.Group();
+  scene.add(leaf);
+  const round = (radius, depth, mat, at) => {
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(radius * U, radius * U, depth * U, 16).rotateZ(Math.PI / 2), mat);
+    disc.position.copy(hab(...at));
+    disc.castShadow = true;
+    scene.add(disc);
+    return disc;
+  };
+  [
+    block(x - 0.25, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.1, DECK + 8.5, PAINT.white),
+    round(1.1, 0.15, PAINT.glass, [x + 0.28, 0, DECK + 6]),
+    round(1.1, 0.15, PAINT.glass, [x - 0.28, 0, DECK + 6]),
+    round(0.65, 0.5, PAINT.red, [x + 0.45, 0, DECK + 3]),
+    block(x + 0.6, x + 0.9, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
+    block(x - 0.55, x - 0.25, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
+  ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
+  return finishDoor(which, x, tall, lamps, [{ leaf, travel: HATCH_SLIDE }], HATCH_WIDE / 2, 0.25);
+}
+
+function finishDoor(which, x, tall, lamps, leaves, half, thick) {
   // One lamp on each face of the door, and a label over it that says the same thing in words.
   const lampMat = paint(0x2e96f5, { emissive: 0x2e96f5, emissiveIntensity: 1.6 });
   for (const at of lamps) {
@@ -481,14 +510,14 @@ function makeDoor(which, x, tall, lamps) {
   scene.add(label);
   // Seen from the cabin or the Moon the label hangs over the door. Seen from the chamber's ceiling
   // camera it sits beside the lamp instead.
-  const labelSpots = { over: label.position.clone(), beside: hab(x + (which === 'inner' ? 1 : -1), 0.9, DECK + 6.4) };
-  return { which, leaves, lampMat, label, labelSpots, slide: 0, collider: solid(x - 0.15, x + 0.15, -DOOR_HALF, DOOR_HALF, DECK, DECK + tall), at: hab(x, 0, DECK) };
+  const labelSpots = { over: label.position.clone(), beside: hab(which === 'inner' ? x + 1 : 17.6, 0.9, DECK + 6.4) };
+  return { which, leaves, lampMat, label, labelSpots, slide: 0, collider: solid(x - thick, x + thick, -half, half, DECK, DECK + tall), at: hab(x, 0, DECK) };
 }
 const doors = {
   // Lamps: above the door on the cabin and Moon sides, beside it inside the chamber (where the
   // camera looks down from the ceiling).
   inner: makeDoor('inner', INNER_X, INNER_TALL, [[INNER_X - 0.5, 0, DECK + INNER_TALL + 0.75], [INNER_X + 0.75, 2.45, DECK + 5.6]]),
-  outer: makeDoor('outer', OUTER_X, OUTER_TALL, [[19.75, 0, DECK + OUTER_TALL + 0.75], [OUTER_X - 0.5, 2.6, DECK + 5.6]]),
+  outer: makeHatch('outer', OUTER_X, OUTER_TALL, [[19.75, 0, DECK + OUTER_TALL + 0.75], [18.0, 2.6, DECK + 5.6]]),
 };
 
 // A bench for pulling boots on, and a rack with a spare helmet and suit.
@@ -534,7 +563,7 @@ function syncAirlock(dt, snap = false) {
     const goal = lock[door.which] ? 1 : 0;
     door.slide = snap ? goal : THREE.MathUtils.clamp(door.slide + Math.sign(goal - door.slide) * dt / 0.6, 0, 1);
     const eased = THREE.MathUtils.smootherstep(door.slide, 0, 1);
-    for (const { leaf, side } of door.leaves) leaf.position.z = -side * eased * DOOR_HALF * U;
+    for (const { leaf, travel } of door.leaves) leaf.position.z = -eased * travel * U;
     door.collider.setEnabled(!(goal === 1 && door.slide > 0.7));
     door.lampMat.color.setHex(look.color);
     door.lampMat.emissive.setHex(look.color);
@@ -550,7 +579,11 @@ function useDoor(which) {
   if (!sim) return;
   const p = crewBody.translation(), at = doors[which].at;
   if (Math.hypot(p.x - at.x, p.z - at.z) > 3.5 || Math.abs(p.y - at.y) > 3) return hooks?.notice('Walk up to the door first.');
-  Object.assign(sim, airlockZone(p));
+  const zone = airlockZone(p);
+  Object.assign(sim, zone);
+  // From the Moon side the hatch always answers: if the cabin door is open, the airlock shuts it
+  // and empties itself first, so nobody is left outside.
+  if (which === 'outer' && !zone.inAirlock && !isInside(p) && !sim.airlock.cycle && sim.airlock.inner) return hooks?.notice(sim.airlockStart('out', true));
   hooks?.notice(sim.airlockDoor(which));
 }
 
@@ -724,7 +757,7 @@ function nearestUsable() {
   }
   for (const door of Object.values(doors)) {
     // The open door is not offered: walking through it is the point.
-    if (sim && !sim.airlock[door.which]) consider(here.distanceTo(door.at) + 0.6, { kind: 'door', id: door.which, label: `use the ${door.which} door` });
+    if (sim && !sim.airlock[door.which]) consider(here.distanceTo(door.at) + 0.6, { kind: 'door', id: door.which, label: door.which === 'outer' ? 'open the hatch' : 'open the inner door' });
   }
   return best;
 }
@@ -914,6 +947,7 @@ renderer.setAnimationLoop(t => {
       sim.where = whereIs(p);
       Object.assign(sim, airlockZone(p));
       if (!frozen) sim.tick(dt * speed);
+      else sim.airlockTick(dt); // the airlock keeps working while the tour holds the clock, so nobody is shut in
       // Out of suit air: the base computer guides you back in, and it costs you.
       if (sim.where === 'outside' && sim.suit <= 0) {
         teleport(insideSpot());

@@ -213,14 +213,11 @@ def build_exterior():
     ring("AirlockBand", 15, 16.4, 6.9, 7.4, "Blue", (0, 0, AZ))
     ring("AirlockBand", 16.7, 17, 6.9, 7.2, "Red", (0, 0, AZ))
 
-    # Door frame, and the outer hatch standing open against the airlock.
+    # Door frame. The outer hatch is not part of this model: the game builds it (game/src/main.js)
+    # so it can slide shut over the doorway and open again as the airlock's outer door.
     for y in (-3.1, 3.1):
         box("DoorJamb", (.5, .5, 9), (19.4, y, FLOOR + 4.4), "Grey", .08)
     box("DoorHead", (.5, 6.7, .5), (19.4, 0, FLOOR + 9), "Grey", .08)
-    box("Hatch", (.5, 5.2, 8.4), (19.8, 5.9, FLOOR + 4.3), "White", .25)
-    lathe("HatchWindow", [(0, 0), (0, 1.1), (.15, 1.1), (.15, 0)], "Glass", (20, 5.9, FLOOR + 6), (1, 0, 0), 14)
-    lathe("HatchHub", [(0, 0), (0, .7), (.45, .55), (.5, 0)], "Red", (20, 5.9, FLOOR + 3), (1, 0, 0), 12)
-    box("HatchHandle", (.3, 2.4, .4), (20.5, 5.9, FLOOR + 3), "Red", .05)
 
     # Landing and shallow steps down the side: rise 1.5, tread 2.4, easy for Roblox characters.
     box("Landing", (4, 6.4, FLOOR), (21.5, 0, FLOOR / 2), "Grey", .15)
