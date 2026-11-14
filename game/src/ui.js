@@ -82,46 +82,127 @@ function openMissions() {
 }
 
 // --- Research Tree ---
-function nodeHtml(node, branch) {
+// Drawn as a map: the Habitat in the middle, one arm per branch, round nodes joined by lines.
+// Picking a node shows what it is in the panel next to the map.
+const MAP = { size: 840, radius: [0, 115, 230, 345] };
+const EXTRA_ICONS = {
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+};
+const glyph = (name, size) => `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${EXTRA_ICONS[name]}</svg>`;
+let picked = null;    // node id shown in the panel
+
+// Where every circle goes. Each branch owns an equal slice of the circle. Its end nodes are spread
+// across the slice, and a node with children sits in the middle of them, one ring further in.
+function mapLayout() {
+  const slice = 360 / BRANCHES.length;
+  const spots = { hub: { angle: 0, ring: 0 } };
+  BRANCHES.forEach((branch, i) => {
+    const middle = -90 + i * slice;
+    const kids = node => branch.nodes.filter(child => child.needs === node.id);
+    const roots = branch.nodes.filter(node => !node.needs);
+    const ends = [];
+    const findEnds = node => (kids(node).length ? kids(node).forEach(findEnds) : ends.push(node));
+    roots.forEach(findEnds);
+    const place = (node, ring) => {
+      const children = kids(node);
+      children.forEach(child => place(child, ring + 1));
+      const angle = children.length
+        ? children.reduce((sum, child) => sum + spots[child.id].angle, 0) / children.length
+        : middle + (ends.indexOf(node) - (ends.length - 1) / 2) * (slice / ends.length);
+      spots[node.id] = { angle, ring, parent: node.needs ?? `branch-${branch.id}` };
+    };
+    roots.forEach(root => place(root, 2));
+    spots[`branch-${branch.id}`] = { angle: middle, ring: 1, parent: 'hub' };
+  });
+  for (const spot of Object.values(spots)) {
+    const turn = spot.angle * Math.PI / 180, r = MAP.radius[spot.ring];
+    spot.x = Math.round(MAP.size / 2 + r * Math.cos(turn));
+    spot.y = Math.round(MAP.size / 2 + r * Math.sin(turn));
+  }
+  return spots;
+}
+const SPOTS = mapLayout();
+const STATE_WORDS = { owned: 'researched', ready: 'ready to research', short: 'not enough points yet', locked: 'locked', soon: 'locked, coming soon' };
+const isShut = state => state === 'locked' || state === 'soon';
+
+function mapHtml() {
+  const state = node => nodeState(node, save.unlocks, save.points);
+  const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px`;
+  const line = (id, kind) => {
+    const a = SPOTS[SPOTS[id].parent], b = SPOTS[id];
+    return `<line class="${kind}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+  };
+  const lines = BRANCHES.flatMap(branch => [
+    line(`branch-${branch.id}`, 'on'),
+    ...branch.nodes.map(node => line(node.id, state(node) === 'owned' ? 'on' : isShut(state(node)) ? 'shut' : 'open')),
+  ]);
+  const nodes = BRANCHES.flatMap(branch => [
+    `<div class="rt-branch" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${icon(branch.icon, 24)}</span><span class="rt-name">${branch.name}</span></div>`,
+    ...branch.nodes.map(node => {
+      const st = state(node);
+      return `<button class="rt-node is-${st}" id="node-${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
+          aria-pressed="${picked === node.id}" aria-label="${node.name}, ${STATE_WORDS[st]}">
+        <span class="rt-dot">${isShut(st) ? glyph('lock', 24) : icon(node.icon, 24)}${st === 'owned' ? `<span class="rt-badge">${glyph('check', 12)}</span>` : ''}</span>
+        <span class="rt-name">${node.name}</span>
+      </button>`;
+    }),
+  ]);
+  return `
+    <svg class="rt-lines" viewBox="0 0 ${MAP.size} ${MAP.size}" aria-hidden="true">${lines.join('')}</svg>
+    <div class="rt-hub" style="${at('hub')}"><span class="rt-dot">${icon('star', 32)}</span><span class="rt-name">Your base</span></div>
+    ${nodes.join('')}`;
+}
+
+function panelHtml(node) {
   const state = nodeState(node, save.unlocks, save.points);
   const mission = node.mission && missionById(node.mission);
   const status = {
-    owned: '<p class="n-status done">Researched</p>',
-    soon: '<p class="n-status">Coming soon</p>',
-    locked: `<p class="n-status">Research ${nodeById(node.needs)?.name} first</p>`,
+    owned: `<p class="n-status done">${glyph('check', 16)} Researched</p>`,
+    soon: `<p class="n-status">${glyph('lock', 16)} Locked. This upgrade is coming in a later update.</p>`,
+    locked: `<p class="n-status">${glyph('lock', 16)} Locked. Research ${nodeById(node.needs)?.name} first.</p>`,
     short: `<button class="btn small" disabled>Need ${node.cost - save.points} more points</button>`,
     ready: `<button class="btn primary small" data-do="buy" data-id="${node.id}">Research for ${node.cost} points</button>`,
   }[state];
-  const children = branch.nodes.filter(child => child.needs === node.id);
   return `
-    <li>
-      <article class="node is-${state}" id="node-${node.id}" tabindex="-1">
-        <div class="n-head"><h4>${node.name}</h4><span class="n-cost">${state === 'owned' ? 'Owned' : `${node.cost} points`}</span></div>
-        ${mission ? `<p class="n-opens">${icon('star', 16)} Opens mission ${MISSIONS.indexOf(mission) + 1}, ${mission.name}</p>` : ''}
-        <p class="n-science">${node.science}</p>
-        <p class="n-change"><b>In the game</b> ${node.change}</p>
-        ${status}
-      </article>
-      ${children.length ? `<ul>${children.map(child => nodeHtml(child, branch)).join('')}</ul>` : ''}
-    </li>`;
+    <div class="n-head"><h3>${node.name}</h3><span class="n-cost">${state === 'owned' ? 'Owned' : `${node.cost} points`}</span></div>
+    ${mission ? `<p class="n-opens">${icon('star', 16)} Opens mission ${MISSIONS.indexOf(mission) + 1}, ${mission.name}</p>` : ''}
+    <p class="n-science">${node.science}</p>
+    <p class="n-change"><b>In the game</b> ${node.change}</p>
+    ${status}`;
+}
+
+// The map is laid out at one size and shrunk to fit narrower screens. Below 3/4 size the
+// circles get too small to tap, so it scrolls sideways instead.
+function fitMap() {
+  const view = $('research-view'), map = $('research-map');
+  const scale = Math.min(1, Math.max(0.75, view.clientWidth / MAP.size));
+  map.style.transform = `scale(${scale})`;
+  $('research-fit').style.width = $('research-fit').style.height = `${MAP.size * scale}px`;
+  view.scrollLeft = (view.scrollWidth - view.clientWidth) / 2;
 }
 
 function renderResearch() {
+  const all = BRANCHES.flatMap(branch => branch.nodes);
+  picked ??= (all.find(node => nodeState(node, save.unlocks, save.points) === 'ready') ?? all[0]).id;
   $('research-points').textContent = save.points;
   $('research-note').textContent = UPGRADES_LIVE
-    ? 'Spend research points on new equipment. Some items need another one first.'
-    : 'Spend research points to open new missions. The upgrades are still being built, so you can read about them now and buy them in a later update.';
-  $('research-tree').innerHTML = BRANCHES.map(branch => `
-    <section class="branch" aria-labelledby="branch-${branch.id}">
-      <h3 id="branch-${branch.id}">${icon(branch.icon, 24)} ${branch.name}</h3>
-      <p class="fine">${branch.about}</p>
-      <ul class="tree">${branch.nodes.filter(node => !node.needs).map(node => nodeHtml(node, branch)).join('')}</ul>
-    </section>`).join('');
+    ? 'Pick a circle to see what it does. Spend research points to add it to your base.'
+    : 'Pick a circle to see what it does. Spend research points to open new missions. The upgrades are still being built, so they stay locked until a later update.';
+  $('research-map').innerHTML = mapHtml();
+  $('research-panel').innerHTML = panelHtml(nodeById(picked));
 }
 
 function openResearch() {
   renderResearch();
   show('research');
+  fitMap();
+}
+
+function pick(id) {
+  picked = id;
+  renderResearch();
+  $(`node-${id}`).focus();
 }
 
 function buy(id) {
@@ -130,8 +211,7 @@ function buy(id) {
   save.points -= node.cost;
   save.unlocks.push(node.id);
   commit();
-  renderResearch();
-  $(`node-${id}`).focus();
+  pick(id);
 }
 
 // --- Briefing ---
@@ -259,6 +339,7 @@ const actions = {
   again: id => launch(id),
   restart: () => launch(sim.mission.id),
   research: openResearch,
+  pick,
   buy,
   resume,
   leave: openMissions,
@@ -285,6 +366,8 @@ addEventListener('keydown', e => {
   if (hud && $('pause').hidden) pause();
   else if (!$('pause').hidden) resume();
 });
+
+addEventListener('resize', () => { if (!$('research').hidden) fitMap(); });
 
 addEventListener('unhandledrejection', () => {
   if (!game) $('start-status').textContent = 'The Moon didn\'t load. Please refresh the page.';
