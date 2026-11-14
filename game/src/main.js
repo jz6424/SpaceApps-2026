@@ -23,10 +23,11 @@ const world = new RAPIER.World({ x: 0, y: 0, z: 0 }); // gravity is applied by h
 const loader = new GLTFLoader();
 
 const MODULE_FILES = ['Solar', 'Battery', 'Digger', 'OxygenMaker', 'IceDrill', 'Antenna', 'CargoLander'];
-const [heightBuf, habGltf, maps, ...moduleGltfs] = await Promise.all([
+const [heightBuf, habGltf, maps, crewGltf, ...moduleGltfs] = await Promise.all([
   fetch('terrain/ridge_heights.f32').then(r => { if (!r.ok) throw new Error('terrain'); return r.arrayBuffer(); }),
   loader.loadAsync('models/Habitat.glb'),
   readSiteMaps(),
+  loader.loadAsync('models/Astronaut.glb'),
   ...MODULE_FILES.map(f => loader.loadAsync(`models/${f}.glb`)),
 ]);
 const models = Object.fromEntries(MODULE_FILES.map((f, i) => [f, moduleGltfs[i].scene]));
@@ -351,16 +352,30 @@ const samples = [[24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
 });
 
 // --- Astronaut ---
+// `crew` sits at the middle of the physics capsule. The model (assets/blender/build_astronaut.py)
+// has its pivot at the feet and faces +Z, so it hangs half a body height below.
 const crew = new THREE.Group();
-const suit = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 });
-const body = new THREE.Mesh(new THREE.CapsuleGeometry(CREW_RADIUS, CREW_HEIGHT - 2 * CREW_RADIUS, 6, 16), suit);
-const visor = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.12), new THREE.MeshStandardMaterial({ color: 0xe43700, roughness: 0.3 }));
-visor.position.set(0, 0.58, 0.25);
-const pack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.65, 0.2), new THREE.MeshStandardMaterial({ color: 0x0042a6, roughness: 0.6 }));
-pack.position.set(0, 0.2, -0.33);
-crew.add(body, visor, pack);
-crew.traverse(o => { o.castShadow = true; });
+const crewModel = crewGltf.scene;
+crewModel.position.y = -CREW_HEIGHT / 2;
+crew.add(crewModel);
+// The limbs move, so three.js can't tell from the rest pose when the mesh is off screen.
+crew.traverse(o => { o.castShadow = true; o.frustumCulled = false; });
 scene.add(crew);
+
+// Idle, Walk and Run loop in place; tick() picks one from how the astronaut is moving. The clips
+// play a little fast because the game's speeds are quicker than a real moonwalk.
+const crewMixer = new THREE.AnimationMixer(crewModel);
+const MOVE_RATE = { Idle: 1, Walk: 1.5, Run: 1.15 };
+const moves = Object.fromEntries(crewGltf.animations.map(clip => [clip.name, crewMixer.clipAction(clip)]));
+let move = 'Idle';
+moves.Idle.play();
+crewMixer.update(0);
+function setMove(name) {
+  if (name === move) return;
+  moves[move].fadeOut(0.2);
+  moves[name].reset().setEffectiveTimeScale(MOVE_RATE[name]).fadeIn(0.2).play();
+  move = name;
+}
 
 const outsideSpot = () => new THREE.Vector3(site.x + 11, site.y + CREW_HEIGHT / 2 + 0.1, site.z + 6);
 const standSpot = id => stations[id].stand.clone().add(new THREE.Vector3(0, CREW_HEIGHT / 2 + 0.1, 0));
@@ -551,6 +566,8 @@ function tick(dt) {
   if (now.y < groundAt(now.x, now.z) - 3) teleport(outsideSpot()); // fell through a seam in the ground
   crew.position.set(now.x, now.y, now.z);
   if (len > 0) crew.rotation.y = Math.atan2(mx, mz);
+  setMove(len > 0 ? (speedWalk === RUN ? 'Run' : 'Walk') : 'Idle');
+  crewMixer.update(dt);
 
   const inside = isInside(now);
   const inHull = inside && now.x < airlockX; // the airlock tube has its own roof, so it uses the normal camera

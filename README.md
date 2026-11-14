@@ -87,7 +87,7 @@ Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_hei
 | `game/tools/simulate.mjs` | `npm run balance`: plays every mission x mode with careful, careless and idle bots. |
 | `nasa-data/` | NASA LOLA rasters, cut-outs for Connecting Ridge and Nobile Rim, and the conversion scripts. |
 | `balancing/` | Original Roblox `BalanceConfig.lua` and `simulate.py` (the JS config was ported from these). |
-| `assets/blender/` | `modules.blend`, build scripts, glTF exports (copied into `game/public/models/`), previews. |
+| `assets/blender/` | `modules.blend`, build scripts, glTF exports (copied into `game/public/models/`), previews. `build_astronaut.py` makes the rigged astronaut with Idle, Walk and Run loops (`Astronaut.glb`). |
 | `docs/` | Design hub, mission planner, Space Apps brand style. |
 | `reference/` | The paused Roblox prototype, for reference only. |
 

@@ -94,13 +94,16 @@ let picked = null;    // node id shown in the panel
 
 // Where every circle goes. Each branch owns an equal slice of the circle. Its end nodes are spread
 // across the slice, and a node with children sits in the middle of them, one ring further in.
+// A node that needs one from another branch stays on its own arm and gets a second line (`dep`)
+// from the node it needs.
 function mapLayout() {
   const slice = 360 / BRANCHES.length;
   const spots = { hub: { angle: 0, ring: 0 } };
   BRANCHES.forEach((branch, i) => {
     const middle = -90 + i * slice;
+    const inBranch = id => branch.nodes.some(node => node.id === id);
     const kids = node => branch.nodes.filter(child => child.needs === node.id);
-    const roots = branch.nodes.filter(node => !node.needs);
+    const roots = branch.nodes.filter(node => !inBranch(node.needs));
     const ends = [];
     const findEnds = node => (kids(node).length ? kids(node).forEach(findEnds) : ends.push(node));
     roots.forEach(findEnds);
@@ -110,7 +113,9 @@ function mapLayout() {
       const angle = children.length
         ? children.reduce((sum, child) => sum + spots[child.id].angle, 0) / children.length
         : middle + (ends.indexOf(node) - (ends.length - 1) / 2) * (slice / ends.length);
-      spots[node.id] = { angle, ring, parent: node.needs ?? `branch-${branch.id}` };
+      spots[node.id] = inBranch(node.needs)
+        ? { angle, ring, parent: node.needs }
+        : { angle, ring, parent: `branch-${branch.id}`, dep: node.needs };
     };
     roots.forEach(root => place(root, 2));
     spots[`branch-${branch.id}`] = { angle: middle, ring: 1, parent: 'hub' };
@@ -129,13 +134,15 @@ const isShut = state => state === 'locked' || state === 'soon';
 function mapHtml() {
   const state = node => nodeState(node, save.unlocks, save.points);
   const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px`;
-  const line = (id, kind) => {
-    const a = SPOTS[SPOTS[id].parent], b = SPOTS[id];
+  const line = (id, kind, from = SPOTS[id].parent) => {
+    const a = SPOTS[from], b = SPOTS[id];
     return `<line class="${kind}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
   };
+  const kindOf = node => (state(node) === 'owned' ? 'on' : isShut(state(node)) ? 'shut' : 'open');
   const lines = BRANCHES.flatMap(branch => [
     line(`branch-${branch.id}`, 'on'),
-    ...branch.nodes.map(node => line(node.id, state(node) === 'owned' ? 'on' : isShut(state(node)) ? 'shut' : 'open')),
+    ...branch.nodes.map(node => line(node.id, kindOf(node))),
+    ...branch.nodes.filter(node => SPOTS[node.id].dep).map(node => line(node.id, kindOf(node), SPOTS[node.id].dep)),
   ]);
   const nodes = BRANCHES.flatMap(branch => [
     `<div class="rt-branch" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${icon(branch.icon, 24)}</span><span class="rt-name">${branch.name}</span></div>`,

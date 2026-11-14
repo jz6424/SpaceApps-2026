@@ -14,6 +14,9 @@
 //   2. set UPGRADES_LIVE = true
 //   3. run `npm run balance`
 //
+// `needs` names the node that must be researched first. It can sit in another branch: the
+// Greenhouse needs Regolith Shielding, so the missions open in order.
+//
 // Every owned node id lives in save.unlocks, next to the two mission unlocks.
 import { MISSIONS } from './config.js';
 
@@ -101,7 +104,7 @@ export const BRANCHES = [
     about: 'Grow food on the Moon and reuse your water.',
     nodes: [
       {
-        id: 'Greenhouse', icon: 'leaf', name: 'Greenhouse', mission: 'IceAndGreens',
+        id: 'Greenhouse', icon: 'leaf', name: 'Greenhouse', mission: 'IceAndGreens', needs: 'Shielding',
         science: 'Plants turn light, water and the carbon dioxide you breathe out into food, and they release oxygen. Astronauts have grown lettuce on the Space Station in a garden called Veggie.',
         change: 'The Galley gets grow lights, so you can grow your own food.',
       },
