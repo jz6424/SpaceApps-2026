@@ -46,7 +46,7 @@
       <a href="#how">How to play</a>
       <a href="#about">About</a>
     </nav>
-    <button class="btn primary small" data-do="fullscreen">
+    <button class="btn small" data-do="fullscreen">
       <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
       Play full screen
     </button>
@@ -58,19 +58,15 @@
 <section class="hero">
   <svg class="orbits" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
   <div class="wrap">
-    <p class="eyebrow">NASA Space Apps Challenge 2026 · Junior Astronaut Mission Trainer</p>
+    <p class="kicker">NASA Space Apps Challenge 2026</p>
     <h1>Moon Base Trainer</h1>
-    <p class="lede">Keep a base alive at the real lunar south pole. Share your power, watch your air, and hide from solar storms. The Moon you walk on is built from NASA data.</p>
-    <ul class="facts">
-      <li>For ages 7 to 12</li>
-      <li>About 5 minutes a mission</li>
-      <li>No download, no account</li>
-    </ul>
+    <p class="lede">Keep a moon base running at the real lunar south pole. Share your power, watch your air, and hide from solar storms. The ground you walk on comes from NASA elevation data.</p>
+    <ul class="facts"><li>For ages 7 to 12</li><li>About 5 minutes a mission</li><li>No download, no account</li></ul>
 
     <!-- The game. It loads into the frame when you press Start, and this whole box can go full screen. -->
     <div id="play" class="stage" tabindex="-1">
       <div class="stage-bar">
-        <p class="stage-name"><span class="dot" aria-hidden="true"></span><span id="stage-status">Ready to launch</span></p>
+        <p class="stage-name"><span class="dot" aria-hidden="true"></span><span id="stage-status">Ready to play</span></p>
         <div class="stage-tools">
           <a class="tool" href="play/" target="_blank" rel="noopener" title="Open the game in its own tab">
             <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg>
@@ -84,73 +80,64 @@
       </div>
       <div class="stage-body">
         <div id="poster" class="poster">
-          <svg class="rings" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
-          <div class="poster-inner">
-            <h2>Ready, Commander?</h2>
-            <p>Your base at Connecting Ridge is waiting. Sunset is coming.</p>
-            <div class="row center">
-              <button class="btn primary" data-do="play">
-                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
-                Start the game
-              </button>
-              <button class="btn" data-do="fullscreen">
-                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
-                Start in full screen
-              </button>
-            </div>
-            <p class="fine">Best with a keyboard and mouse.</p>
+          <img src="img/14-warning.png" width="1280" height="800" fetchpriority="high" alt="A cutaway view of the Habitat in the game. Labels mark the Galley, Robot Map, Comms, Life Support and Power stations, and Mission Control warns that a solar storm is coming.">
+          <div class="poster-bar">
+            <button class="btn primary" data-do="play">
+              <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
+              Start the game
+            </button>
+            <button class="btn" data-do="fullscreen">
+              <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
+              Start in full screen
+            </button>
+            <p class="fine">Works best with a keyboard and mouse</p>
           </div>
         </div>
         <iframe id="game" title="Moon Base Trainer game" data-src="play/" allow="fullscreen" allowfullscreen hidden></iframe>
       </div>
     </div>
-    <p class="fine under-stage">Slow computer? <button class="link" data-do="low">Start with simple graphics</button>. Your progress is saved in this browser.</p>
+    <p class="fine under-stage">On a slow computer, <button class="link" data-do="low">start with simple graphics</button>. This browser saves your progress.</p>
   </div>
 </section>
 
 <section id="mission" class="band">
   <div class="wrap">
-    <p class="eyebrow">Your mission</p>
     <h2>You are the whole crew</h2>
-    <p class="intro">Walk around the Habitat, use its stations, send a robot outside and go on moonwalks. Three meters tell you how the base is doing. Keep them healthy until sunrise.</p>
-    <div class="cards three">
-      <article class="card">
-        <svg class="ico big" width="32" height="32" aria-hidden="true"><use href="#i-zap"/></svg>
-        <h3>Power</h3>
-        <p>Solar panels only work while the Sun is up. Charge the battery by day and make it last through the lunar night.</p>
-      </article>
-      <article class="card">
-        <svg class="ico big" width="32" height="32" aria-hidden="true"><use href="#i-wind"/></svg>
-        <h3>Life Support</h3>
-        <p>Your air and water. Run it on Eco to save power, or on Boost when you need air fast.</p>
-      </article>
-      <article class="card">
-        <svg class="ico big" width="32" height="32" aria-hidden="true"><use href="#i-shield"/></svg>
-        <h3>Radiation dose</h3>
-        <p>It rises a little all the time and a lot in solar storms. Pile moon dirt on the Storm Shelter and hide inside.</p>
-      </article>
+    <p class="intro">Walk around the Habitat, use its stations, send a robot outside and go on moonwalks. Three meters tell you how the base is doing. Until sunrise, don't let Power or Life Support run out, and keep your radiation dose low.</p>
+    <div class="split">
+      <dl class="meters" aria-label="The three meters, with example readings from the game">
+        <div class="meter">
+          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-zap"/></svg>Power <span class="val">95% · draining</span></dt>
+          <dd><span class="bar" aria-hidden="true"><i style="width:95%"></i></span>Solar panels only work while the Sun is up. Charge the battery by day and make it last through the lunar night.</dd>
+        </div>
+        <div class="meter">
+          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-wind"/></svg>Life Support <span class="val">89%</span></dt>
+          <dd><span class="bar" aria-hidden="true"><i style="width:89%"></i></span>This is your air and water. Run it on Eco to save power, or on Boost when you need air fast.</dd>
+        </div>
+        <div class="meter">
+          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-shield"/></svg>Radiation dose <span class="val">6 of 100</span></dt>
+          <dd><span class="bar" aria-hidden="true"><i style="width:6%"></i></span>It rises a little all the time and a lot in solar storms. Pile moon dirt on the Storm Shelter and hide inside.</dd>
+        </div>
+      </dl>
+      <p class="callout"><b>Nothing is free.</b> Everything that helps costs power, moon dirt, suit air or radiation dose, so you have to choose what to spend.</p>
     </div>
-    <p class="callout"><b>Nothing is free.</b> Everything that helps costs power, moon dirt, suit air or radiation dose. Choosing what to spend is the game.</p>
 
     <h2 class="gap">Three missions</h2>
-    <ol class="cards three missions">
-      <li class="card">
-        <span class="num" aria-hidden="true">01</span>
-        <h3>First Night</h3>
-        <p>You just landed. Charge the battery while the Sun is up, then make it last through the dark.</p>
-        <p class="goal"><b>Goal:</b> keep the Habitat running until the Sun comes back.</p>
+    <ol class="missions">
+      <li>
+        <span class="num" aria-hidden="true">1</span>
+        <div><h3>First Night</h3><p>You just landed. Charge the battery while the Sun is up, then make it last through the dark.</p></div>
+        <p class="goal"><b>Goal</b> Keep the Habitat running until the Sun comes back</p>
       </li>
-      <li class="card">
-        <span class="num" aria-hidden="true">02</span>
-        <h3>Solar Storm</h3>
-        <p>The Sun is busy. Keep the antenna on for warnings from Earth and hide when the storm hits.</p>
-        <p class="goal"><b>Goal:</b> keep your radiation dose low through two solar storms.</p>
+      <li>
+        <span class="num" aria-hidden="true">2</span>
+        <div><h3>Solar Storm</h3><p>Two solar storms are coming. Keep the antenna on for warnings from Earth and hide when the storm hits.</p></div>
+        <p class="goal"><b>Goal</b> Keep your radiation dose low through two solar storms</p>
       </li>
-      <li class="card">
-        <span class="num" aria-hidden="true">03</span>
-        <h3>Ice and Greens</h3>
-        <p>Food is low and the cargo lander is late. Send the robot for crater ice and water the greenhouse.</p>
-        <p class="goal"><b>Goal:</b> grow enough food to have meals left at sunrise.</p>
+      <li>
+        <span class="num" aria-hidden="true">3</span>
+        <div><h3>Ice and Greens</h3><p>Food is low and the cargo lander is late. Send the robot for crater ice and water the greenhouse.</p></div>
+        <p class="goal"><b>Goal</b> Grow enough food to have meals left at sunrise</p>
       </li>
     </ol>
     <p class="fine">Play each mission as a Cadet, Explorer or Commander. Earn stars and research points to unlock the next one.</p>
@@ -159,20 +146,19 @@
 
 <section class="band shots-band" aria-labelledby="shots-title">
   <div class="wrap">
-    <p class="eyebrow">Inside the game</p>
     <h2 id="shots-title">A look around the base</h2>
     <div class="shots">
       <figure>
-        <img src="img/14-warning.png" width="1280" height="800" loading="lazy" alt="Cutaway view of the Habitat with labelled stations: Galley, Robot Map, Comms, Life Support and Power. Mission Control warns that a solar storm is coming.">
-        <figcaption>The Habitat and its stations. Mission Control warns you before a storm.</figcaption>
+        <img src="img/11-power.png" width="1280" height="800" loading="lazy" alt="The Power station open over the Habitat. It shows 56% battery, solar panels making 1.58 per second, the base using 0.42, and a switch for the antenna.">
+        <figcaption>The Power station shows what the base makes and what it uses</figcaption>
       </figure>
       <figure>
         <img src="img/12-map.png" width="1280" height="800" loading="lazy" alt="The Robot Map station showing a grey sunlight map with blue shadowed patches, the base, the robot and choices to park, dig moon dirt or fix a panel.">
-        <figcaption>The Robot Map is drawn from NASA's sunlight and shadow maps.</figcaption>
+        <figcaption>The Robot Map, drawn from NASA's sunlight and shadow maps</figcaption>
       </figure>
       <figure>
         <img src="img/16-outside.png" width="1280" height="800" loading="lazy" alt="An astronaut on a moonwalk next to the Habitat stairs under a black sky, with a suit air meter counting down.">
-        <figcaption>On a moonwalk your suit air is counting down.</figcaption>
+        <figcaption>A moonwalk, with suit air counting down</figcaption>
       </figure>
     </div>
   </div>
@@ -180,29 +166,27 @@
 
 <section id="data" class="band electric">
   <div class="wrap">
-    <p class="eyebrow">Real NASA data</p>
-    <h2>The Moon in this game is the real one</h2>
-    <p class="intro">Your base sits on Connecting Ridge, one of the Artemis III candidate landing regions NASA named in 2022. The ground, the sunlight and the storms all come from NASA.</p>
+    <h2>The game's Moon comes from NASA data</h2>
+    <p class="intro">Your base is on Connecting Ridge, one of the Artemis III candidate landing regions NASA named in 2022. The ground, the sunlight and the storms all come from NASA.</p>
     <dl class="sources">
       <div><dt>The ground you walk on</dt><dd>Lunar Reconnaissance Orbiter LOLA elevation model, 5 metres per pixel. <a href="https://pgda.gsfc.nasa.gov/products/78" target="_blank" rel="noopener">NASA PGDA product 78</a></dd></div>
       <div><dt>Sunlight, Earth view and permanent shadow</dt><dd>LOLA south pole illumination maps. They set your solar power, your comms gaps and where the ice is. <a href="https://pgda.gsfc.nasa.gov/products/69" target="_blank" rel="noopener">NASA PGDA product 69</a></dd></div>
-      <div><dt>Solar storms</dt><dd>Real solar flares, live from the space weather database when your browser can reach it. <a href="https://kauai.ccmc.gsfc.nasa.gov/DONKI/" target="_blank" rel="noopener">NASA DONKI</a></dd></div>
-      <div><dt>Radiation limit</dt><dd>The crew health standard astronauts follow. <a href="https://www.nasa.gov/ochmo/human-spaceflight-standards/" target="_blank" rel="noopener">NASA-STD-3001</a></dd></div>
-      <div><dt>Air and water numbers</dt><dd>Ewert and Stromgren (2019). <a href="https://ntrs.nasa.gov/citations/20190027563" target="_blank" rel="noopener">NASA Technical Reports Server</a></dd></div>
-      <div><dt>Ice in craters</dt><dd>Water ice found in a permanently shadowed crater in 2009. <a href="https://www.nasa.gov/mission/lcross/" target="_blank" rel="noopener">NASA LCROSS</a></dd></div>
+      <div><dt>Solar storms</dt><dd>The game loads real solar flares from NASA's space weather database. If your browser can't reach it, the game uses a list of real past flares. <a href="https://kauai.ccmc.gsfc.nasa.gov/DONKI/" target="_blank" rel="noopener">NASA DONKI</a></dd></div>
+      <div><dt>Radiation limit</dt><dd>Astronauts follow this crew health standard. <a href="https://www.nasa.gov/ochmo/human-spaceflight-standards/" target="_blank" rel="noopener">NASA-STD-3001</a></dd></div>
+      <div><dt>Air and water numbers</dt><dd>These come from Ewert and Stromgren's 2019 NASA report. <a href="https://ntrs.nasa.gov/citations/20190027563" target="_blank" rel="noopener">NASA Technical Reports Server</a></dd></div>
+      <div><dt>Ice in craters</dt><dd>In 2009 the LCROSS mission found water ice in a permanently shadowed crater. <a href="https://www.nasa.gov/mission/lcross/" target="_blank" rel="noopener">NASA LCROSS</a></dd></div>
     </dl>
-    <p class="fine">Game rates are made simple and sped up so a lunar night fits in a few minutes. The data card after each mission gives the real numbers.</p>
+    <p class="fine">We simplified the game's rates and sped them up so a lunar night fits in a few minutes. The data card after each mission gives the real numbers.</p>
   </div>
 </section>
 
 <section id="how" class="band">
   <div class="wrap two-col">
     <div>
-      <p class="eyebrow">How to play</p>
-      <h2>Make it to sunrise</h2>
+        <h2>Make it to sunrise</h2>
       <ol class="steps">
         <li><b>Use the stations.</b> Click a station's label in the Habitat and you'll walk there.</li>
-        <li><b>Watch the three meters.</b> Power, Life Support and Radiation dose.</li>
+        <li><b>Watch the three meters:</b> Power, Life Support and Radiation dose.</li>
         <li><b>Spend with care.</b> The antenna, grow lights, robot and Boost all use power. Moon dirt can buy shielding, repairs or extra oxygen, but not all three.</li>
         <li><b>Hide from storms.</b> Keep the antenna on and Mission Control warns you early. Park the robot and go to the Storm Shelter.</li>
         <li><b>Reach sunrise</b> with life support left and your mission goal met.</li>
@@ -230,16 +214,15 @@
 <section id="about" class="band about">
   <div class="wrap two-col">
     <div>
-      <p class="eyebrow">About</p>
-      <h2>Made for Space Apps 2026</h2>
-      <p>Team BaseRace built Moon Base Trainer for the NASA Space Apps Challenge 2026 challenge "Build a Junior Astronaut Mission Trainer". The 3D models are our own designs, made in Blender and inspired by real NASA hardware like the Foundation Surface Habitat and VSAT solar towers.</p>
+        <h2>Made for Space Apps 2026</h2>
+      <p>Team BaseRace built Moon Base Trainer for the NASA Space Apps Challenge 2026. The challenge was "Build a Junior Astronaut Mission Trainer". We designed the 3D models ourselves in Blender and based them on real NASA hardware like the Foundation Surface Habitat and VSAT solar towers.</p>
       <p><a href="https://github.com/jz6424/SpaceApps-2026" target="_blank" rel="noopener">Source code on GitHub</a></p>
     </div>
     <div>
       <h3>Use of AI</h3>
       <p>We used Claude, an AI assistant made by Anthropic, to help write code, balance the game numbers, script the Blender models, check science facts and write text. Our team chose the design, directed the work and reviewed and tested the results.</p>
       <h3>Open-source tools</h3>
-      <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Fira Sans, Overpass and Fira Code (SIL Open Font License). Icons drawn in the style of Feather (MIT).</p>
+      <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Fira Sans, Overpass and Fira Code (SIL Open Font License). We drew the icons in the style of Feather (MIT).</p>
     </div>
   </div>
 </section>

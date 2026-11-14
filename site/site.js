@@ -16,7 +16,7 @@
   function start(low) {
     if (!frame.getAttribute('src')) {
       frame.src = frame.dataset.src + (low ? '?low' : '');
-      status.textContent = 'Loading the base…';
+      status.textContent = 'Loading the game…';
       frame.addEventListener('load', () => { status.textContent = 'Moon Base Trainer'; frame.focus(); }, { once: true });
     }
     poster.hidden = true;
