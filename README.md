@@ -14,6 +14,9 @@ npm run dev        # then open http://localhost:5174
 ```
 
 `npm run build` writes a static site to `game/dist/` (works from any folder, e.g. GitHub Pages).
+**Online:** every push to `main` builds the game and publishes it to https://jz6424.github.io/SpaceApps-2026/ (`.github/workflows/pages.yml`; one-time setup: repo Settings > Pages > Source = GitHub Actions).
+Opening `game/dist/index.html` straight from Finder (a `file://` address) won't work, because browsers block loading the terrain and models that way; use `npm run preview` or the online link.
+
 Add `?low` to the address for simple graphics on slow computers (the game also switches by itself).
 
 ## The game loop
