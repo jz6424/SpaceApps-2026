@@ -55,7 +55,7 @@ function missionCard(mission, index) {
       <h3>${mission.name}</h3>
       <p>${mission.goal}</p>
       ${open ? starsHtml(best)
-        : `<p class="need">${icon('shield', 16)} Locked. Needs ${need.name} (${need.cost} points). You have ${save.points}.</p>`}
+        : `<p class="need">${icon('shield', 16)} Unlock ${need.name} in Research Tree</p>`}
       ${action}
     </article>`;
 }
