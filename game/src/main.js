@@ -247,6 +247,26 @@ for (const [id, node] of Object.entries(stationNodes)) {
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
 }
 
+// --- Storm Shelter zone: a soft blue floor glow showing where the protection applies.
+// Same rule as whereIs(): from the back wall up to 1.7 m past the shelter's stand point.
+const shelterZone = (() => {
+  const x0 = hull.min.x, x1 = stations.Shelter.stand.x + 1.7, z0 = hull.min.z, z1 = hull.max.z;
+  const group = new THREE.Group();
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(x1 - x0, z1 - z0),
+    new THREE.MeshBasicMaterial({ color: 0x2E96F5, transparent: true, opacity: 0.3, depthWrite: false }));
+  fill.rotation.x = -Math.PI / 2;
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(x1 - x0, z1 - z0)),
+    new THREE.LineBasicMaterial({ color: 0x2E96F5, transparent: true, opacity: 0.9 }));
+  edge.rotation.x = -Math.PI / 2;
+  group.add(fill, edge);
+  group.position.set((x0 + x1) / 2, deckY + 0.05, (z0 + z1) / 2);
+  group.renderOrder = 5;
+  scene.add(group);
+  return { group, fill, edge };
+})();
+
 // --- Labels drawn on a canvas: a line icon plus text ---
 function iconPath(ctx, name, x, y, s, width = 2) {
   ctx.save();
@@ -628,6 +648,11 @@ function syncWorld(dt) {
   sun.intensity = SUN_FULL * light;
   hemi.intensity = 0.25 + 0.45 * light;
   earth.visible = sim.earthUp;
+  // Shelter glow: soft all the time, brighter and pulsing when a storm is coming or here.
+  const stormOn = sim.stormNow || (sim.nextStorm?.warnedBy && !sim.nextStorm.started);
+  const pulse = stormOn ? 0.5 + 0.5 * Math.sin(performance.now() / 250) : 0;
+  shelterZone.fill.material.opacity = 0.3 + 0.25 * pulse;
+  shelterZone.edge.material.opacity = 0.7 + 0.3 * pulse;
   inLights.forEach(l => { l.intensity = sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1; });
   panels.forEach((pn, i) => {
     const broken = !sim.panels[i];
@@ -666,6 +691,7 @@ function lowGraphics() {
 }
 if (new URLSearchParams(location.search).has('low')) lowGraphics();
 
+let frozen = false; // the guided tour can stop the clock while it explains things
 let last = performance.now();
 renderer.setAnimationLoop(t => {
   const dt = Math.min((t - last) / 1000, 1 / 15);
@@ -683,7 +709,7 @@ renderer.setAnimationLoop(t => {
     if (sim && !sim.over) {
       const p = crewBody.translation();
       sim.where = whereIs(p);
-      sim.tick(dt * speed);
+      if (!frozen) sim.tick(dt * speed);
       // Out of suit air: the base computer guides you back in, and it costs you.
       if (sim.where === 'outside' && sim.suit <= 0) {
         teleport(insideSpot());
@@ -716,9 +742,19 @@ gameReady({
     camDist = 9;
     grounded = false;
     walkTo = null;
+    frozen = false;
     state = 'play';
   },
   setSpeed(s) { speed = s; },
+  freeze(on) { frozen = on; },
+  // Where a station's floating label is on the screen (null if it is behind the camera).
+  stationScreen(id) {
+    const s = stations[id];
+    if (!s) return null;
+    const v = s.marker.position.clone().project(camera);
+    if (v.z > 1) return null;
+    return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+  },
   goOutside() { teleport(outsideSpot()); yaw = Math.PI / 2; pitch = 0.25; camDist = 7; state = 'play'; },
   goInside() { teleport(insideSpot()); pitch = 1; state = 'play'; },
   goToStation,

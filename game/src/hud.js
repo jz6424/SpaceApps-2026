@@ -15,6 +15,7 @@ export const ICONS = {
   globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
   radio: '<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.5M7.8 16.2a6 6 0 0 1 0-8.5M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/>',
   leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10ZM2 21c0-3 1.9-5.4 5.2-6"/>',
+  expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
   map: '<path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   door: '<path d="M3 21h18M5 21V3h14v18M14 12h.01"/>',
@@ -50,14 +51,14 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   // The Missions box grows in the middle of the screen, then settles into its corner.
   const card = $('mission-card');
   card.classList.remove('intro');
-  void card.offsetWidth;
-  card.classList.add('intro');
+  if (!sim.mission.tutorial) { void card.offsetWidth; card.classList.add('intro'); } // First Night uses the centre for the tour
 
   // Full screen button (F11 works too).
   const fsBtn = () => {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
+  $('fullscreen').innerHTML = icon('expand', 26);
   $('fullscreen').addEventListener('click', fsBtn);
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
@@ -192,11 +193,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (sim.air < 20) return 'Life support is low. Set it to Normal or Boost.';
     if (sim.power > 0 && sim.sunlight === 0 && sim.batteryForecast < sim.timeToSunrise) return 'At this rate the battery runs out before sunrise. Open Power and switch something off, or set Life Support to Eco.';
     if (sim.panels.includes(false)) return 'A solar panel is broken. Fix it outside (Airlock) or send the robot (Robot Map).';
-    if (sim.mission.tutorial) {
-      if (!f.open_Power) return 'Click the Power label (or walk up and press E) to see your battery.';
-      if (!f.comms) return 'Open Comms and turn the antenna on, so Mission Control can warn you about storms.';
-      if (!f.robot) return 'Open the Robot Map and send the robot to dig moon dirt.';
-    }
+    if (f.tourHint) return f.tourHint; // the guided tour in First Night
     if (sim.food !== null) {
       if (!sim.greenhouse) return 'Open the Galley and turn on the grow lights.';
       if ((sim.water ?? 0) < 3 && sim.robot.task !== 'ice') return 'The plants need water. Send the robot for crater ice.';
@@ -213,7 +210,17 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   const btn = (act, label, { arg = '', on = false, disabled = false, note = '' } = {}) =>
     `<button class="opt ${on ? 'on' : ''}" data-act="${act}" data-arg="${arg}" aria-pressed="${on}" ${disabled ? 'disabled' : ''}>
       <span class="opt-label">${label}${on ? ' <small>(on)</small>' : ''}</span>${note ? `<span class="opt-note">${note}</span>` : ''}</button>`;
-  const P = C.power;
+  // First Night drains power and air more gently, so the panels show the real, eased numbers.
+  const ease = sim.mission.ease ?? 1;
+  const r2 = v => Math.round(v * 100) / 100;
+  const P = {
+    ...C.power,
+    lifeSupport: Object.fromEntries(Object.entries(C.power.lifeSupport).map(([k, v]) => [k, r2(v * ease)])),
+    heaters: r2(C.power.heaters * ease), comms: r2(C.power.comms * ease),
+    greenhouse: r2(C.power.greenhouse * ease), robot: r2(C.power.robot * ease),
+  };
+  const breathe = C.air.crewUse * sim.mode.crewDrain * ease;
+  const vs = made => made < breathe - 0.005 ? 'less than' : 'more than';
 
   const STATIONS = {
     Power: () => {
@@ -232,16 +239,23 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
           ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${per(P.comms, 'power')}. Hears storm warnings from Earth.` })}
           ${sim.food !== null || unlocks.includes('Greenhouse') ? btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')}. Grows food, adds a little air.` }) : ''}
         </div>
-        <p class="fine">Always on: Life Support on ${sim.ls} (${per(P.lifeSupport[sim.ls], 'power')}), heaters at night (${per(P.heaters, 'power')})${sim.robotWorking ? `, robot (${per(P.robot, 'power')})` : ''}.</p>`,
+        <h4>What is using power right now</h4>
+        <ul class="uses">${[
+          { name: 'Life Support', use: P.lifeSupport[sim.ls], where: 'Life Support station', note: `${sim.ls} setting, always on` },
+          sim.isNight && { name: 'Heaters', use: P.heaters, where: 'automatic, there is no station for it', note: 'switch on at night' },
+          sim.comms && { name: 'Antenna', use: P.comms, where: 'Comms station', note: 'on' },
+          sim.greenhouse && { name: 'Grow lights', use: P.greenhouse, where: 'Galley', note: 'on' },
+          sim.robotWorking && { name: 'Robot', use: P.robot, where: 'Robot Map station', note: 'working outside' },
+        ].filter(Boolean).map(u => `<li><b>${u.name}</b> <span class="u-val">${per(u.use, 'power')}</span><span class="u-where">${u.note}. Find it at: ${u.where}.</span></li>`).join('')}</ul>`,
       };
     },
     LifeSupport: () => ({
       title: 'Life Support', icon: 'wind',
       body: `<p class="big">${Math.round(sim.air)}% air and water</p>
-      <p>You use about ${per(C.air.crewUse * sim.mode.crewDrain, 'air')}. Pick how hard the machine works:</p>
+      <p>You use about ${per(breathe, 'air')} while you are inside. Pick how hard the machine works:</p>
       <div class="opts">
-        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${per(P.lifeSupport.eco, 'power')}. Makes ${per(C.air.make.eco, 'air')}, a bit less than you breathe.` })}
-        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${per(P.lifeSupport.normal, 'power')}. Makes ${per(C.air.make.normal, 'air')}, a little more than you breathe.` })}
+        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${per(P.lifeSupport.eco, 'power')}. Makes ${per(C.air.make.eco, 'air')}, ${vs(C.air.make.eco)} you breathe.` })}
+        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${per(P.lifeSupport.normal, 'power')}. Makes ${per(C.air.make.normal, 'air')}, ${vs(C.air.make.normal)} you breathe.` })}
         ${btn('ls', 'Boost', { arg: 'boost', on: sim.ls === 'boost', note: `Uses ${per(P.lifeSupport.boost, 'power')} and moon dirt. Makes ${per(C.air.make.boost, 'air')}.` })}
       </div>
       <p class="fine">If the battery runs empty, everything runs slowly, the base gets cold and the air goes stale faster.</p>`,

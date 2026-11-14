@@ -270,8 +270,9 @@ export class Sim {
     // Power.
     const P = C_.power;
     this.gen = this.panelsWorking * C_.solar.perPanel * this.sunlight * this.siteSun * mode.solar;
-    this.demand = P.lifeSupport[this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
-      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0);
+    const ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
+    this.demand = (P.lifeSupport[this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
+      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
     const net = this.gen - this.demand;
     this.power = Math.min(C_.meters.powerMax, this.power + net * dt);
     if (this.power <= 0) {
@@ -292,7 +293,7 @@ export class Sim {
       else make = A.make.normal;
     }
     make = make * this.share + (this.greenhouse ? A.greenhouse * this.share : 0);
-    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * (1 + A.coldPenalty * (1 - this.share));
+    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * ease * (1 + A.coldPenalty * (1 - this.share));
     this.air = Math.min(C_.meters.airMax, this.air + (make - use) * dt);
     if (this.air <= 0) {
       this.air = 0;

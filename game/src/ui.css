@@ -203,7 +203,7 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 .m-state .ico { vertical-align: 0; }
 .meter.bad .m-state { color: #fff; background: var(--martian); border-radius: var(--r1); padding: 0 8px; justify-self: start; }
 
-#corner { position: fixed; right: 12px; bottom: 12px; width: 300px; display: flex; flex-direction: column; gap: 8px; }
+#corner { position: fixed; right: 12px; bottom: 64px; /* leaves room for the fullscreen icon */ width: 300px; display: flex; flex-direction: column; gap: 8px; }
 #corner .panel { position: static; }
 #back-in { align-self: flex-end; }
 #supplies { display: grid; gap: 4px; }
@@ -331,3 +331,34 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
   #missions .inner, #research .inner { padding: 16px 16px 32px; }
   .orbits { width: 420px; }
 }
+
+/* Full screen button, bottom right, with a hover label */
+.fs-btn { position: fixed; right: 12px; bottom: 12px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: rgba(7,23,63,.92); color: #fff; border: 1px solid #2E96F5; border-radius: 6px; cursor: pointer; z-index: 6; }
+.fs-btn:hover { border-color: #EAFE07; color: #EAFE07; }
+.fs-btn .ico { vertical-align: 0; }
+.fs-btn::after { content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 6px); background: #07173F; border: 1px solid #2E96F5; color: #fff; font: 700 13px "Fira Sans", system-ui, sans-serif; padding: 3px 8px; border-radius: 4px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.fs-btn:hover::after, .fs-btn:focus-visible::after { opacity: 1; }
+
+/* Guided tour (First Night) */
+#tour { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+#tour-card { width: 330px; display: grid; gap: 8px; border: 2px solid #E43700; pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
+#tour-card.at-right { right: 12px; top: 230px; }
+#tour-card.at-bottom { left: 50%; bottom: 96px; transform: translateX(-50%); }
+#tour-card.at-center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); }
+#tour-card.at-left { left: 12px; top: 300px; }
+#tour-title { margin: 0; font: 900 18px "Fira Sans", system-ui, sans-serif; color: #EAFE07; }
+#tour-text { display: grid; gap: 6px; font-size: 15px; }
+#tour-text p { margin: 0; }
+#tour-text b { color: #fff; }
+#tour-card .row { display: flex; gap: 8px; flex-wrap: wrap; }
+#tour-ring { position: fixed; border: 3px solid #E43700; border-radius: 8px; box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 14px rgba(228,55,0,.7); animation: tour-pulse 1.2s ease-in-out infinite; }
+#tour-arrow { position: fixed; width: 40px; height: 52px; }
+#tour-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+@keyframes tour-bob { to { transform: translateY(-10px); } }
+@keyframes tour-pulse { 50% { box-shadow: 0 0 0 2px rgba(255,255,255,.7), 0 0 4px rgba(228,55,0,.4); } }
+
+/* Power panel: what is using power */
+.uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.uses li { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; border-left: 3px solid #2E96F5; padding: 2px 8px; }
+.uses .u-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.uses .u-where { grid-column: 1 / -1; font-size: .85rem; color: #C9D8F2; }

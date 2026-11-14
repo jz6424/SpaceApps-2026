@@ -4,6 +4,7 @@ import './ui.css';
 import { MISSIONS, MODES, missionById, pointsFor } from './config.js';
 import { Sim, planRun, flareLabel, flareSize } from './sim.js';
 import { createHud, icon } from './hud.js';
+import { createTour } from './tour.js';
 import { getFlares, dataCard, SOURCES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
 import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
@@ -324,6 +325,7 @@ async function brief(id) {
 }
 
 // --- Playing ---
+let tour = null;
 function launch(id = chosen) {
   const mission = missionById(id);
   chosen = id;
@@ -332,9 +334,12 @@ function launch(id = chosen) {
   sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? []));
   sim.say(mission.brief, 'info');
   hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false, points: save.points });
+  tour?.destroy();
+  tour = null;
   game.enter(sim, {
     frame(near) {
       hud.frame(near);
+      tour?.frame();
       if (sim.over) finish();
     },
     openStation: id => hud.openStation(id),
@@ -342,10 +347,13 @@ function launch(id = chosen) {
     busy: () => hud.busy(),
     toggleSpeed: () => hud.toggleSpeed(),
   });
+  if (mission.tutorial) tour = createTour({ sim, game, hud });
   show(null);
 }
 
 function endMission() {
+  tour?.destroy();
+  tour = null;
   hud?.destroy();
   hud = null;
   game.stop();
