@@ -49,6 +49,14 @@ export const CONFIG = {
   // The suit's own air tank for moonwalks. Refills inside.
   suit: { seconds: 90, refill: 6 },
 
+  // The airlock between the cabin and the surface. Times are game seconds.
+  airlock: {
+    doorSeconds: 0.6, // a door sliding open or shut
+    prebreathe: 6,    // breathing pure oxygen before going out (Cadets may skip it)
+    pump: 4,          // pumping the air out, or letting it back in
+    cycleAir: 1.5,    // Life Support lost each time the air is pumped out: the pump can't save it all
+  },
+
   robot: {
     dig: 0.4,        // regolith per second (day or night, never in a storm)
     ice: 0.12,       // water per second, hauled from the shadowed crater

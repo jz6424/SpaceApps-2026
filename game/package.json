@@ -6,7 +6,8 @@
     "dev": "vite --port 5174 --strictPort",
     "build": "vite build",
     "preview": "vite preview --port 5174",
-    "balance": "node tools/simulate.mjs"
+    "balance": "node tools/simulate.mjs",
+    "airlock": "node tools/check-airlock.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

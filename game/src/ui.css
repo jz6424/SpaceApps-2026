@@ -205,6 +205,13 @@ kbd { font: 400 14px "Fira Code", monospace; color: var(--text); background: var
 
 #corner { position: fixed; right: 12px; bottom: 12px; width: 300px; display: flex; flex-direction: column; gap: 8px; }
 #corner .panel { position: static; }
+/* Airlock progress: one bar per step, stacked with the other bottom-right boxes */
+#airlock-panel { display: grid; gap: 8px; border-color: var(--yellow); }
+#airlock-panel h3 { font: 900 18px var(--head); margin: 0; display: flex; gap: 8px; align-items: center; }
+#airlock-panel h3 .ico { stroke: var(--soft); }
+#airlock-panel p { margin: 0; }
+#lock-text { font-weight: 700; }
+#lock-skip { justify-self: start; }
 #back-in { align-self: flex-end; }
 #supplies { display: grid; gap: 4px; }
 .supply { display: flex; align-items: center; gap: 8px; font: 700 14px var(--head); }

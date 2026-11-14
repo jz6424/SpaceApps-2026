@@ -33,6 +33,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Stations in the Habitat:** Power, Life Support (Eco / Normal / Boost), Comms (antenna, forecast,
   science uploads, 1.3 s light delay), Galley and greenhouse, Robot Map (dig regolith, haul crater ice,
   fix panels), Storm Shelter (regolith shielding), Airlock (moonwalks).
+* **Airlock:** two sliding doors that never open together. Going out: the inner door closes, you
+  prebreathe pure oxygen (Cadets can skip it), pumps take the air out, then the outer door opens. Each
+  trip out costs 1.5% Life Support (`airlock` in `src/config.js`). `npm run airlock` checks the rules.
 * **No free choices:** everything that helps costs power, moon dirt, suit air or radiation dose.
 * **Events:** sunset and a lunar night, solar storms, micrometeoroid hits on solar panels, Earth
   setting below the horizon (no comms).
@@ -59,7 +62,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 | Base spot, solar output, comms gaps | LOLA sunlight and Earth-visibility maps (PGDA product 69) -> `sun.png`, `earth.png` |
 | Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
 | Solar storms | NASA DONKI flares of the past 12 months, live from `ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR` (no key; 60 days per request, so six requests), then `api.nasa.gov/DONKI/FLR` as a second try, then a list of real past flares. The game says which one it used |
-| Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS |
+| Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS, ISS Quest airlock and oxygen prebreathe |
 
 Raw downloads and the scripts that cut them are in `nasa-data/` (big TIFFs, ~160 MB).
 

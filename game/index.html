@@ -29,6 +29,13 @@
   <section id="meters" class="panel" aria-label="Base meters"></section>
   <div id="corner">
     <button id="back-in" class="btn primary" hidden>Back to the airlock</button>
+    <section id="airlock-panel" class="panel" aria-label="Airlock" aria-live="polite" hidden>
+      <h3 id="lock-title"></h3>
+      <p id="lock-text"></p>
+      <div class="bar" id="lock-bar" role="progressbar" aria-labelledby="lock-title" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+      <p id="lock-fact" class="fine"></p>
+      <button class="btn small primary" id="lock-skip" hidden>Skip</button>
+    </section>
     <div id="supplies" class="panel" aria-label="Supplies"></div>
     <div id="rp-bar" class="panel" aria-label="Research points"></div>
   </div>

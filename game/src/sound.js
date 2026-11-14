@@ -36,6 +36,36 @@ function blip(at, freq, length, wave, level) {
   osc.stop(at + length + 0.02);
 }
 
+// A burst of filtered noise, for air and for the thud of a door.
+function rush(at, length, level, type, freq) {
+  const size = Math.ceil(ctx.sampleRate * length), buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+  src.buffer = buffer;
+  filter.type = type;
+  filter.frequency.value = freq;
+  const fade = Math.min(0.25, length / 3);
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(level, at + fade);
+  gain.gain.setValueAtTime(level, at + length - fade);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  src.connect(filter).connect(gain).connect(ctx.destination);
+  src.start(at);
+}
+
+// The airlock: a clunk when a door shuts or opens, a hiss for as long as the air is moving.
+export function airlockSound(kind, seconds = 1) {
+  if (muted || !ctx || ctx.state !== 'running') return;
+  const at = ctx.currentTime + 0.02;
+  if (kind === 'clunk') {
+    blip(at, 92, 0.22, 'sine', 0.3);
+    rush(at, 0.09, 0.12, 'lowpass', 900);
+  } else {
+    rush(at, Math.max(0.3, seconds), 0.045, 'highpass', 2600);
+  }
+}
+
 // The incoming-message cue, in the rhythm "doop, do, dodo, doop": long, short, two quick, long.
 // [start, length] of each note in seconds.
 const RHYTHM = [[0, 0.15], [0.19, 0.08], [0.31, 0.07], [0.39, 0.07], [0.5, 0.2]];
