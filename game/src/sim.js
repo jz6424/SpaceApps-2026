@@ -189,7 +189,7 @@ export class Sim {
     this.regolith -= C.evaRepairRegolith;
     this.panels[i] = true;
     if (this.robot.task === 'repair' && this.robot.target === i) this.robot.task = 'idle';
-    this.say('Panel fixed! Power is flowing again.', 'good');
+    this.say('Panel fixed. Power is flowing again.', 'good');
     return null;
   }
   collectSample(id) {
@@ -206,7 +206,7 @@ export class Sim {
     this.power -= C.power.sendData;
     this.uploadReady = this.t + C.science.uploadCooldown;
     this.rp += C.science.uploadRP;
-    this.fromEarth(`Science data received! +${C.science.uploadRP} research point. (It took ${C.commsRoundTrip / 2} s to reach us.)`, 'good', C.commsRoundTrip);
+    this.fromEarth(`Science data received. +${C.science.uploadRP} research point. (It took ${C.commsRoundTrip / 2} s to reach us.)`, 'good', C.commsRoundTrip);
     return null;
   }
   askForecast() {
@@ -362,7 +362,7 @@ export class Sim {
         if (this.growTimer >= C_.food.growEvery) {
           this.growTimer -= C_.food.growEvery;
           this.food++;
-          this.say('Fresh greens are ready! +1 meal.', 'good');
+          this.say('Fresh greens are ready. +1 meal.', 'good');
         }
       } else if (this.greenhouse && !this.flags.dry) {
         this.flags.dry = true;

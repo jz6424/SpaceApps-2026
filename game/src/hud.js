@@ -31,6 +31,8 @@ export const icon = (name, size = 24) => `<svg class="ico" width="${size}" heigh
 
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const fixed = v => (Math.round(v * 100) / 100).toFixed(2);
+// Every rate in the game is written the same way: "0.42 power per second".
+const per = (v, what) => `${fixed(v)} ${what} per second`;
 
 export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   const hud = $('hud');
@@ -220,27 +222,27 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         title: 'Power', icon: 'bolt',
         body: `<p class="big">${Math.round(sim.power)}% battery</p>
         <dl class="facts">
-          <dt>Solar panels make</dt><dd>${fixed(sim.gen)} per second (${sim.panelsWorking} of 3 working)</dd>
-          <dt>Base is using</dt><dd>${fixed(sim.demand)} per second</dd>
+          <dt>Solar panels make</dt><dd>${per(sim.gen, 'power')} (${sim.panelsWorking} of 3 working)</dd>
+          <dt>Base is using</dt><dd>${per(sim.demand, 'power')}</dd>
           <dt>Battery</dt><dd>${net >= 0 ? 'charging' : `lasts about ${clock(fc)} at this rate`}</dd>
           <dt>Next sunrise</dt><dd>${sim.t < sim.day ? `${clock(sim.timeToSunrise)} away (sunset first)` : `in ${clock(sim.timeToSunrise)}`}</dd>
         </dl>
         <h4>Switch things on or off</h4>
         <div class="opts">
-          ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${P.comms}/s. Hears storm warnings from Earth.` })}
-          ${sim.food !== null || unlocks.includes('Greenhouse') ? btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${P.greenhouse}/s. Grows food, adds a little air.` }) : ''}
+          ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${per(P.comms, 'power')}. Hears storm warnings from Earth.` })}
+          ${sim.food !== null || unlocks.includes('Greenhouse') ? btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')}. Grows food, adds a little air.` }) : ''}
         </div>
-        <p class="fine">Always on: Life Support (${P.lifeSupport[sim.ls]}/s on ${sim.ls}), heaters at night (${P.heaters}/s)${sim.robotWorking ? `, robot (${P.robot}/s)` : ''}.</p>`,
+        <p class="fine">Always on: Life Support on ${sim.ls} (${per(P.lifeSupport[sim.ls], 'power')}), heaters at night (${per(P.heaters, 'power')})${sim.robotWorking ? `, robot (${per(P.robot, 'power')})` : ''}.</p>`,
       };
     },
     LifeSupport: () => ({
       title: 'Life Support', icon: 'wind',
       body: `<p class="big">${Math.round(sim.air)}% air and water</p>
-      <p>You use about ${fixed(C.air.crewUse * sim.mode.crewDrain)} per second. Pick how hard the machine works:</p>
+      <p>You use about ${per(C.air.crewUse * sim.mode.crewDrain, 'air')}. Pick how hard the machine works:</p>
       <div class="opts">
-        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${P.lifeSupport.eco} power/s. Makes ${C.air.make.eco}/s, a bit less than you breathe.` })}
-        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${P.lifeSupport.normal} power/s. Makes ${C.air.make.normal}/s, a little more than you breathe.` })}
-        ${btn('ls', 'Boost', { arg: 'boost', on: sim.ls === 'boost', note: `Uses ${P.lifeSupport.boost} power/s and moon dirt. Makes ${C.air.make.boost}/s.` })}
+        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${per(P.lifeSupport.eco, 'power')}. Makes ${per(C.air.make.eco, 'air')}, a bit less than you breathe.` })}
+        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${per(P.lifeSupport.normal, 'power')}. Makes ${per(C.air.make.normal, 'air')}, a little more than you breathe.` })}
+        ${btn('ls', 'Boost', { arg: 'boost', on: sim.ls === 'boost', note: `Uses ${per(P.lifeSupport.boost, 'power')} and moon dirt. Makes ${per(C.air.make.boost, 'air')}.` })}
       </div>
       <p class="fine">If the battery runs empty, everything runs slowly, the base gets cold and the air goes stale faster.</p>`,
     }),
@@ -248,7 +250,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       title: 'Comms', icon: 'radio',
       body: `<p class="big">Earth is ${sim.earthUp ? 'above' : 'below'} the horizon</p>
       <div class="opts">
-        ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${P.comms} power/s. Mission Control warns you about storms ${sim.mode.warning} s early.` })}
+        ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${per(P.comms, 'power')}. Mission Control warns you about storms ${sim.mode.warning} s early.` })}
         ${btn('forecast', 'Ask for a space weather forecast', { disabled: !sim.comms, note: `Costs ${P.forecast} power. The answer takes ${C.commsRoundTrip} s, there and back at the speed of light, and puts the next storm on your sun clock.` })}
         ${btn('upload', 'Send science data', { disabled: !sim.comms, note: `Costs ${P.sendData} power. +${C.science.uploadRP} research point.` })}
       </div>
@@ -259,7 +261,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         return {
           title: 'Galley', icon: 'food',
           body: `<p class="big">Food: plenty</p><p>The cargo lander brought enough meals for this mission.</p>
-          ${unlocks.includes('Greenhouse') ? `<div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${P.greenhouse} power/s. Plants add a little air.` })}</div>` : '<p class="fine">Unlock the Greenhouse with research points to grow your own food.</p>'}`,
+          ${unlocks.includes('Greenhouse') ? `<div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')}. Plants add a little air.` })}</div>` : '<p class="fine">Unlock the Greenhouse with research points to grow your own food.</p>'}`,
         };
       }
       return {
@@ -268,7 +270,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         <dl class="facts"><dt>Water for plants</dt><dd>${Math.floor(sim.water)} of ${C.meters.waterMax}</dd>
         <dt>Next meal eaten</dt><dd>in ${Math.ceil((C.food.eatEvery - sim.foodTimer) / sim.mode.crewDrain)} s</dd>
         <dt>Greens ready</dt><dd>${sim.greenhouse && sim.water > 0 ? `in ${Math.ceil(C.food.growEvery - sim.growTimer)} s` : 'not growing'}</dd></dl>
-        <div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${P.greenhouse} power/s and water. One meal every ${C.food.growEvery} s.` })}</div>
+        <div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')} and water. One meal every ${C.food.growEvery} s.` })}</div>
         <p class="fine">Plants on the Space Station grow under LED lights in NASA's Veggie garden.</p>`,
       };
     },
@@ -284,8 +286,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         <p class="fine">Map: NASA LOLA sunlight (bright = sunny) and permanent shadow (blue).</p></div></div>
         <div class="opts">
           ${btn('robot', 'Park at base', { arg: 'idle', on: R.task === 'idle', note: 'Uses no power. Safe in storms.' })}
-          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${P.robot} power/s. +${C.robot.dig} dirt/s for shielding, repairs and Boost.` })}
-          ${sim.water !== null ? btn('robot', 'Haul crater ice', { arg: 'ice', on: R.task === 'ice', note: `Uses ${P.robot} power/s. +${C.robot.ice} water/s for the plants.` }) : ''}
+          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for shielding, repairs and Boost.` })}
+          ${sim.water !== null ? btn('robot', 'Haul crater ice', { arg: 'ice', on: R.task === 'ice', note: `Uses ${per(P.robot, 'power')}. Brings ${per(C.robot.ice, 'water')} for the plants.` }) : ''}
           ${btn('robot', `Fix panel ${broken >= 0 ? broken + 1 : ''}`, { arg: 'repair', on: R.task === 'repair', disabled: broken < 0 && R.task !== 'repair', note: `Costs ${C.robot.repairRegolith} moon dirt, takes ${C.robot.repairSeconds} s. No moonwalk needed.` })}
         </div>
         <p class="fine">Robots must be parked before a solar storm${sim.mode.robotAutoPark ? ' (in Cadet mode it parks itself)' : ', or the storm damages them'}.</p>`,
@@ -300,7 +302,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         title: 'Storm Shelter', icon: 'shield',
         body: `<p class="big">${sim.stormNow ? 'Storm now! Stay here.' : 'Hide here during solar storms'}</p>
         <p>The shelter is the back of the Habitat, behind the water tanks and supplies. Extra dose per second in a strong storm:</p>
-        <dl class="facts"><dt>Outside</dt><dd>${C.dose.storm.outside}</dd><dt>Rest of Habitat</dt><dd>${fixed(C.dose.storm.inside * k)}</dd><dt>Here in the shelter</dt><dd>${fixed(C.dose.storm.shelter * k)}</dd></dl>
+        <dl class="facts"><dt>Outside</dt><dd>${fixed(C.dose.storm.outside)}</dd><dt>Rest of Habitat</dt><dd>${fixed(C.dose.storm.inside * k)}</dd><dt>Here in the shelter</dt><dd>${fixed(C.dose.storm.shelter * k)}</dd></dl>
         ${has ? `<div class="opts">${btn('shield', `Pile on moon dirt (level ${sim.shielding + 1})`, { disabled: cost === undefined || sim.regolith < cost, note: cost === undefined ? 'Fully shielded.' : `Costs ${cost} moon dirt (you have ${Math.floor(sim.regolith)}). Cuts storm dose inside.` })}</div>`
           : '<p class="fine">Unlock Regolith Shielding with research points to pile moon dirt on the Habitat.</p>'}
         <p class="fine">Shielding level: ${sim.shielding} of 2.</p>`,
@@ -310,7 +312,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       title: 'Airlock', icon: 'door',
       body: `<p class="big">Go on a moonwalk?</p>
       <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside.</p>
-      <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm!' : `Suit air: ${Math.floor(sim.suit)} s.` })}</div>
+      <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm' : `Suit air: ${Math.floor(sim.suit)} s` })}</div>
       <p class="fine">Come back in through the door at the top of the yellow steps.</p>`,
     }),
   };
@@ -374,12 +376,14 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     open = id;
     sim.flags[`open_${id}`] = true;
     $('station').hidden = false;
+    $('keys').hidden = true; // the keys do nothing while a panel is open
     renderStation(true);
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
   function close() {
     open = null;
     $('station').hidden = true;
+    $('keys').hidden = false;
     document.activeElement?.blur?.();
   }
 
