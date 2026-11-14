@@ -247,12 +247,12 @@ for (const [id, node] of Object.entries(stationNodes)) {
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
 }
 
-// --- Labels drawn on a canvas: a line icon plus text, in the Space Apps colours ---
-function iconPath(ctx, name, x, y, s) {
+// --- Labels drawn on a canvas: a line icon plus text ---
+function iconPath(ctx, name, x, y, s, width = 2) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s / 24, s / 24);
-  ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = width; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
   const p = new Path2D({
     bolt: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z',
     wind: 'M9.6 4.6A2 2 0 1 1 11 8H2m10.6 11.4A2 2 0 1 0 14 16H2m15.7-8.3A2.5 2.5 0 1 1 19.5 12H2',
@@ -260,7 +260,7 @@ function iconPath(ctx, name, x, y, s) {
     leaf: 'M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10ZM2 21c0-3 1.9-5.4 5.2-6',
     map: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16',
     shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
-    door: 'M3 21h18M5 21V3h14v18M14 12h.01',
+    door: 'M3 21h18M5 21V3h14v18M14.5 11v2.5',
     rock: 'M3 17l4-9 5 2 4-5 5 12z',
     wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z',
   }[name] ?? '');
@@ -268,24 +268,44 @@ function iconPath(ctx, name, x, y, s) {
   ctx.restore();
 }
 
-function labelSprite(text, icon, color = '#2E96F5') {
+// A floating tag: no fill, a thin sharp-cornered outline with two clipped corners, a line icon and
+// spaced capitals. A dark edge under every white line keeps it readable over the pale Habitat walls
+// as well as the black sky. Station tags are white; a colour marks something special (red = broken).
+function labelSprite(text, icon, color = '#FFFFFF') {
+  const W = 512, H = 128, DARK = 'rgba(3, 8, 24, .7)';
   const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 128;
+  canvas.width = W * 2; canvas.height = H * 2; // drawn at twice the size so the lines stay crisp up close
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#07173F';
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 6;
-  ctx.beginPath(); ctx.roundRect(4, 4, 504, 120, 60); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = '#EAFE07';
-  iconPath(ctx, icon, 34, 32, 64);
-  ctx.fillStyle = '#fff';
-  ctx.font = '900 54px "Fira Sans", system-ui, sans-serif';
+  ctx.scale(2, 2);
+  const label = text.toUpperCase();
+  ctx.font = '700 40px "Fira Sans", system-ui, sans-serif';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 120, 68, 370);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+  const ICON = 52, GAP = 18, PAD = 26, textMax = W - 20 - 2 * PAD - ICON - GAP;
+  const textW = Math.min(textMax, ctx.measureText(label).width);
+  const boxW = PAD + ICON + GAP + textW + PAD, x0 = (W - boxW) / 2, y0 = 18, y1 = H - 18, cut = 20;
+  const outline = () => {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x0 + boxW - cut, y0); ctx.lineTo(x0 + boxW, y0 + cut);
+    ctx.lineTo(x0 + boxW, y1); ctx.lineTo(x0 + cut, y1); ctx.lineTo(x0, y1 - cut);
+    ctx.closePath();
+  };
+  ctx.lineJoin = 'miter';
+  outline(); ctx.strokeStyle = DARK; ctx.lineWidth = 7; ctx.stroke();
+  outline(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
+  const ix = x0 + PAD, iy = (H - ICON) / 2;
+  ctx.strokeStyle = DARK; iconPath(ctx, icon, ix, iy, ICON, 3.6);
+  ctx.strokeStyle = '#FFFFFF'; iconPath(ctx, icon, ix, iy, ICON, 1.75);
+  const tx = ix + ICON + GAP, ty = H / 2 + 3;
+  ctx.lineJoin = 'round'; ctx.lineWidth = 6; ctx.strokeStyle = DARK;
+  ctx.strokeText(label, tx, ty, textMax);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(label, tx, ty, textMax);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.scale.set(1.6, 0.4, 1);
+  sprite.scale.set(1.9, 0.475, 1);
   sprite.renderOrder = 10;
   return sprite;
 }

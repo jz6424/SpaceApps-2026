@@ -13,6 +13,8 @@ npm install
 npm run dev        # then open http://localhost:5174
 ```
 
+You need Node 20.19 or newer, or 22.12 or newer (Vite 8 won't start on older versions, including Node 21).
+
 `npm run build` writes the game as a static site to `game/dist/` (works from any folder).
 
 **Online:** https://jz6424.github.io/SpaceApps-2026/ is the project website (`site/`), with the game
@@ -32,16 +34,22 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
   science uploads, 1.3 s light delay), Galley and greenhouse, Robot Map (dig regolith, haul crater ice,
   fix panels), Storm Shelter (regolith shielding), Airlock (moonwalks).
 * **No free choices:** everything that helps costs power, moon dirt, suit air or radiation dose.
-* **Events:** sunset and a lunar night, solar storms (modelled on real DONKI flares), micrometeoroid hits
-  on solar panels, Earth setting below the horizon (no comms).
+* **Events:** sunset and a lunar night, solar storms, micrometeoroid hits on solar panels, Earth
+  setting below the horizon (no comms).
+* **Storms from real flares:** each storm is sized from a real flare in NASA DONKI. The flare's class
+  (M1 to M4.9 mild, M5 to M9.9 moderate, X strong) sets the storm's strength, and a bigger flare makes
+  it last longer. Every playthrough draws different flares and shifts the storm and space-rock times
+  (`planRun` in `src/sim.js`), so no two runs are the same.
 * **Win / lose:** reach sunrise with the mission goal met. Life support at 0 for 15 s, or the dose
-  limit, ends the mission. Stars, research points, unlocks, then a debrief with a NASA data card.
-* **Missions:** First Night (tutorial), Solar Storm (needs Regolith Shielding), Ice and Greens (needs
-  Greenhouse). Modes: Cadet, Explorer, Commander.
+  limit, ends the mission. Stars, research points, unlocks, then a debrief with NASA data cards.
+* **Missions:** First Night (tutorial; goal: charge left in the battery at sunrise), Solar Storm (needs
+  Regolith Shielding), Ice and Greens (needs Greenhouse). Modes: Cadet, Explorer, Commander.
 * **Research Tree:** spend research points between missions. Regolith Shielding and Greenhouse open
   missions 2 and 3. Thirteen upgrades (each with the real science and the exact change) are listed in
   `game/src/research.js` but not switched on yet; the steps to wire them into the rules are at the top
   of that file.
+* **For teachers and judges:** "Open every mission now" at the bottom of the mission menu, or add
+  `?all` to the game's address, opens every mission without earning points.
 
 ## Real NASA data
 
@@ -50,7 +58,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 | Terrain you walk on | LRO LOLA 5 m elevation model, Connecting Ridge (PGDA product 78) -> `game/public/terrain/ridge_heights.f32` |
 | Base spot, solar output, comms gaps | LOLA sunlight and Earth-visibility maps (PGDA product 69) -> `sun.png`, `earth.png` |
 | Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
-| Solar storms | NASA DONKI flares, live via api.nasa.gov, with real past flares as fallback |
+| Solar storms | NASA DONKI flares of the past 12 months, live from `ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR` (no key; 60 days per request, so six requests), then `api.nasa.gov/DONKI/FLR` as a second try, then a list of real past flares. The game says which one it used |
 | Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS |
 
 Raw downloads and the scripts that cut them are in `nasa-data/` (big TIFFs, ~160 MB).
@@ -84,7 +92,7 @@ Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_hei
 |---|---|
 | `game/` | The browser game (three.js, Rapier physics, Vite). Rules in `src/sim.js`, numbers in `src/config.js`. |
 | `site/` | The project website that hosts the game (plain HTML, CSS, JS). `build-site.sh` puts it and the built game into `_site/`. |
-| `game/tools/simulate.mjs` | `npm run balance`: plays every mission x mode with careful, careless and idle bots. |
+| `game/tools/simulate.mjs` | `npm run balance`: plays every mission x mode with careful, careless and idle bots, then 300 playthroughs each with storms drawn from the real flare feed. |
 | `nasa-data/` | NASA LOLA rasters, cut-outs for Connecting Ridge and Nobile Rim, and the conversion scripts. |
 | `balancing/` | Original Roblox `BalanceConfig.lua` and `simulate.py` (the JS config was ported from these). |
 | `assets/blender/` | `modules.blend`, build scripts, glTF exports (copied into `game/public/models/`), previews. `build_astronaut.py` makes the rigged astronaut with Idle, Walk and Run loops (`Astronaut.glb`). |

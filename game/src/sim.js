@@ -4,10 +4,56 @@
 import { CONFIG as C, MODES } from './config.js';
 
 const STRENGTH = { Mild: 0.5, Moderate: 0.75, Strong: 1 };
+const SIZES = ['Mild', 'Moderate', 'Strong'];
+
+// How big a real flare is, from its X-ray class. Each letter is ten times the one before
+// (C, M, X), and the number multiplies it: M5 is five times M1, and X1 is ten times M1.
+//   units: 1 = M1, 10 = X1.  strength: which storm size it gives in the game.
+//   place: 0 to 1, how far up its own size band it sits (used to stretch the storm).
+export function flareSize(classType) {
+  const tens = { C: 0.1, M: 1, X: 10 }[String(classType)[0]] ?? 0;
+  const units = tens * (parseFloat(String(classType).slice(1)) || 1);
+  if (units < 1) return null; // smaller than M1: too weak to trouble a moon base
+  const [strength, lo, hi] = units < 5 ? ['Mild', 1, 5] : units < 10 ? ['Moderate', 5, 10] : ['Strong', 10, 100];
+  const place = Math.min(1, Math.log(units / lo) / Math.log(hi / lo));
+  return { units, strength, place };
+}
+
+const niceDate = iso => new Date(`${iso}T00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+export const flareLabel = f => `${f.classType} flare of ${niceDate(f.date)}`;
+
+// Works out what happens in one playthrough, so no two are the same. Each storm in the mission
+// draws a real solar flare of the size the mission calls for (flares = [{ date, classType }]
+// from NASA DONKI). The flare's class sets the storm's strength, a bigger flare makes it last
+// longer, and storms and space rocks arrive a little earlier or later each time.
+// With no flares it keeps the mission's own sizes and only shifts the times.
+export function planRun(mission, flares = [], rnd = Math.random) {
+  const total = mission.day + mission.night;
+  const shift = spread => (rnd() * 2 - 1) * spread;
+  const sized = flares.map(f => ({ flare: f, size: flareSize(f.classType) })).filter(f => f.size);
+  const used = new Set();
+  let earliest = 40;
+  const storms = mission.storms.map(slot => {
+    // Flares of the size this mission wants; if there are none, the nearest size there is.
+    const want = SIZES.indexOf(slot.strength);
+    const free = sized.filter(f => !used.has(f.flare));
+    const gap = Math.min(...free.map(f => Math.abs(SIZES.indexOf(f.size.strength) - want)));
+    const pool = free.filter(f => Math.abs(SIZES.indexOf(f.size.strength) - want) === gap);
+    const pick = pool[Math.floor(rnd() * pool.length)];
+    if (pick) used.add(pick.flare);
+    const length = slot.length * (pick ? 0.9 + 0.25 * pick.size.place : 1);
+    const at = Math.round(Math.max(earliest, Math.min(total - length * 1.25 - 5, slot.at + shift(12))));
+    earliest = at + length * 1.25 + 20;
+    return { at, length, strength: pick ? pick.size.strength : slot.strength, flare: pick?.flare ?? null };
+  });
+  const meteoroids = mission.meteoroids.map(at => Math.round(at + shift(15)));
+  return { storms, meteoroids };
+}
 
 export class Sim {
   // site: { sun, earth } shares from NASA's maps at the base (0 to 1).
-  constructor(mission, modeName, site = { sun: 0.75, earth: 0.5 }) {
+  // plan: this playthrough's storms and space rocks from planRun(); without one, the mission's own.
+  constructor(mission, modeName, site = { sun: 0.75, earth: 0.5 }, plan = null) {
     const mode = MODES[modeName];
     this.mission = mission;
     this.modeName = modeName;
@@ -37,15 +83,17 @@ export class Sim {
     this.shielding = 0;
     this.where = 'inside';
 
-    this.storms = mission.storms.map(st => ({
+    this.storms = (plan?.storms ?? mission.storms).map(st => ({
+      flare: null,     // the real flare this storm is sized from, when there is one
       ...st,
       length: st.length * mode.stormLength,
       warnedBy: null,  // 'earth' or 'sensor'
+      forecastAt: null, // when Mission Control's forecast of it arrives
       started: false,
       done: false,
     }));
-    this.meteoroids = [...mission.meteoroids];
-    if (mode.extraMeteoroid) this.meteoroids.push(Math.min(this.total - 30, (mission.meteoroids[0] ?? 100) + 70));
+    this.meteoroids = [...(plan?.meteoroids ?? mission.meteoroids)];
+    if (mode.extraMeteoroid) this.meteoroids.push(Math.min(this.total - 30, (this.meteoroids[0] ?? 100) + 70));
     this.meteoroids.sort((a, b) => a - b);
 
     // Earth dips below the horizon for a while. How long comes from NASA's Earth-visibility map:
@@ -164,10 +212,13 @@ export class Sim {
   askForecast() {
     if (!this.comms) return 'Turn the antenna on first.';
     if (!this.earthUp) return 'Earth is below the horizon.';
+    if (this.power < C.power.forecast) return 'Not enough power to send the question.';
+    this.power -= C.power.forecast;
     const next = this.nextStorm;
     const text = next
-      ? `Our satellites see a ${next.strength.toLowerCase()} solar storm coming in about ${Math.max(0, Math.round(next.at - this.t - C.commsRoundTrip))} s.`
+      ? `${next.flare ? `Our satellites saw a flare like the real ${flareLabel(next.flare)}. ` : ''}A ${next.strength.toLowerCase()} solar storm will reach you in about ${Math.max(0, Math.round(next.at - this.t - C.commsRoundTrip))} s. It is on your sun clock now.`
       : 'The Sun looks calm for the rest of your mission.';
+    if (next) next.forecastAt ??= this.t + C.commsRoundTrip;
     this.fromEarth(text, next ? 'warn' : 'info', C.commsRoundTrip);
     return null;
   }
@@ -331,7 +382,7 @@ export class Sim {
         const toGo = s.at - this.t;
         if (toGo <= lead && this.comms && this.earthUp) {
           s.warnedBy = 'earth';
-          this.fromEarth(`Solar storm warning! A ${s.strength.toLowerCase()} storm of fast particles will reach you in about ${Math.round(toGo - C.commsRoundTrip / 2)} s. Get to the shelter and park the robot.`, 'bad');
+          this.fromEarth(`Solar storm warning! ${s.flare ? `A flare like the real ${flareLabel(s.flare)} just went off. ` : ''}A ${s.strength.toLowerCase()} storm of fast particles will reach you in about ${Math.round(toGo - C.commsRoundTrip / 2)} s. Get to the shelter and park the robot.`, 'bad');
         } else if (toGo <= C.ownSensorWarning) {
           s.warnedBy = 'sensor';
           this.say('Radiation sensor alarm! A solar storm is starting. Get to the shelter now!', 'bad');
@@ -361,14 +412,17 @@ export class Sim {
     const m = this.mission;
     if (m.goalType === 'dose') return this.dose <= this.goalValue;
     if (m.goalType === 'food') return (this.food ?? 0) >= this.goalValue;
+    if (m.goalType === 'battery') return this.power > 0;
     return true;
   }
 
   finish() {
     if (!this.goalMet()) {
-      const why = this.mission.goalType === 'dose'
-        ? `You made it to sunrise, but your dose was ${Math.round(this.dose)} and the goal was ${this.goalValue} or less.`
-        : `You made it to sunrise, but you had ${this.food} meals and the goal was ${this.goalValue}.`;
+      const why = {
+        dose: `You made it to sunrise, but your dose was ${Math.round(this.dose)} and the goal was ${this.goalValue} or less.`,
+        food: `You made it to sunrise, but you had ${this.food} meals and the goal was ${this.goalValue}.`,
+        battery: `You made it to sunrise, but the battery ran out ${Math.round(this.blackout)} s before the Sun came back.`,
+      }[this.mission.goalType];
       return this.end(false, why, true);
     }
     const S = C.stars;

@@ -24,6 +24,7 @@ export const CONFIG = {
     greenhouse: 0.3,  // grow lights on
     robot: 0.25,      // robot working outside
     sendData: 6,      // one burst per science upload
+    forecast: 2,      // one burst per question to Mission Control
   },
 
   // Life Support = the air and water loop. One astronaut uses it up; the machine refills it.
@@ -102,31 +103,33 @@ export const MODES = {
 };
 
 // Missions in order. Times are game seconds. Goal values can be per mode.
+// Each storm lists the usual time and length, and the size of real flare it draws (planRun in
+// sim.js picks the flare and shifts the time for every playthrough).
 export const MISSIONS = [
   {
     id: 'FirstNight',
     name: 'First Night',
     multiplier: 1,
-    goal: 'Keep the Habitat running until the Sun comes back.',
+    goal: 'Reach sunrise with charge still in the battery.',
     brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Charge the battery while the Sun is up, then make it last through the dark.',
     lesson: 'No sun means no solar power. Turning things down at night (like the Eco setting) makes the battery last until sunrise.',
-    dataCard: 'sunlight',
+    dataCards: ['sunlight', 'air'],
     day: 130, night: 150,
     start: { power: 55, air: 80, regolith: 20 },
     storms: [{ at: 95, length: 25, strength: 'Mild' }],
     meteoroids: [],
-    goalType: 'survive',
+    goalType: 'battery',
     tutorial: true,
   },
   {
     id: 'SolarStorm',
     name: 'Solar Storm',
     multiplier: 1.5,
-    requires: { id: 'Shielding', name: 'Regolith Shielding', cost: 10 },
+    requires: { id: 'Shielding', name: 'Regolith Shielding', about: 'Regolith is the science word for moon dirt.', cost: 10 },
     goal: 'Keep your radiation dose low through two solar storms.',
     brief: 'Mission Control is watching a busy Sun. Keep the antenna on to get warnings, pile moon dirt on the shelter, and hide when the storm hits.',
     lesson: 'Moon dirt is a great radiation shield, and warnings from Earth give you time to hide. The shelter is the most shielded spot in the Habitat.',
-    dataCard: 'storm',
+    dataCards: ['storm', 'comms'],
     day: 130, night: 140,
     start: { power: 60, air: 80, regolith: 25 },
     storms: [{ at: 80, length: 40, strength: 'Strong' }, { at: 205, length: 35, strength: 'Strong' }],
@@ -142,7 +145,7 @@ export const MISSIONS = [
     goal: 'Grow enough food to have meals left at sunrise.',
     brief: 'Your food supply is low and the next cargo lander is late. Send the robot for crater ice, water the greenhouse, and keep the lights on.',
     lesson: 'Plants need light (power) and water (from crater ice). Growing food on the Moon means sharing power between plants, air and heat.',
-    dataCard: 'ice',
+    dataCards: ['ice'],
     day: 150, night: 140,
     start: { power: 60, air: 80, regolith: 25, food: 5, water: 4 },
     storms: [{ at: 185, length: 30, strength: 'Moderate' }],

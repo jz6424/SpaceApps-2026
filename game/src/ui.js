@@ -2,11 +2,12 @@
 // Also runs a mission: makes the Sim, hands it to the 3D world and the HUD, and ends it.
 import './ui.css';
 import { MISSIONS, MODES, missionById, pointsFor } from './config.js';
-import { Sim } from './sim.js';
+import { Sim, planRun, flareLabel, flareSize } from './sim.js';
 import { createHud, icon } from './hud.js';
 import { getFlares, dataCard, SOURCES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
 import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
+import * as sound from './sound.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['start', 'missions', 'research', 'brief', 'pause', 'debrief', 'how', 'credits'];
@@ -19,6 +20,11 @@ let sim = null;
 let chosen = null;     // mission id picked in the menu
 let confirmErase = false;
 let flares = null;     // { live, flares[] } from DONKI, fetched once
+// Teachers and judges can open everything at once: a button in the mission menu, or ?all in the address.
+const openAllHere = new URLSearchParams(location.search).has('all');
+const allOpen = () => openAllHere || save.openAll;
+const unlockIds = MISSIONS.map(m => m.requires?.id).filter(Boolean);
+const unlocksNow = () => allOpen() ? [...new Set([...save.unlocks, ...unlockIds])] : save.unlocks;
 const flaresReady = getFlares().then(f => { flares = f; return f; });
 
 const commit = () => { saveWorks = writeSave(save); };
@@ -28,7 +34,7 @@ function show(name) {
   $(name ?? '')?.querySelector('button:not([disabled])')?.focus();
 }
 
-const isOpen = mission => !mission.requires || save.unlocks.includes(mission.requires.id);
+const isOpen = mission => !mission.requires || unlocksNow().includes(mission.requires.id);
 
 function starsHtml(count) {
   const text = count ? `${count} of 3 stars` : 'No stars yet';
@@ -55,7 +61,7 @@ function missionCard(mission, index) {
       <h3>${mission.name}</h3>
       <p>${mission.goal}</p>
       ${open ? starsHtml(best)
-        : `<p class="need">${icon('shield', 16)} Unlock ${need.name} in Research Tree</p>`}
+        : `<p class="need">${icon('shield', 16)} Unlock ${need.name} in Research Tree.${need.about ? ` ${need.about}` : ''}</p>`}
       ${action}
     </article>`;
 }
@@ -69,6 +75,9 @@ function renderMissions() {
   $('save-note').textContent = saveWorks
     ? 'Your stars and points save by themselves in this browser. No account needed.'
     : 'This browser is blocking saves, so your progress will be lost when you close the page.';
+  $('open-all').innerHTML = allOpen()
+    ? 'Every mission is open.'
+    : 'Teacher or judge? <button class="link" data-do="open-all">Open every mission now</button>';
   $('erase').innerHTML = confirmErase
     ? '<span>Erase all stars and points? This can\'t be undone.</span> <button class="btn small" data-do="erase-yes">Yes, erase</button> <button class="btn small" data-do="erase-no">Keep my save</button>'
     : '<button class="link" data-do="erase-ask">Erase my save</button>';
@@ -85,11 +94,43 @@ function openMissions() {
 // Drawn as a map: the Habitat in the middle, one arm per branch, round nodes joined by lines.
 // Picking a node shows what it is in the panel next to the map.
 const MAP = { size: 840, radius: [0, 115, 230, 345] };
-const EXTRA_ICONS = {
-  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+// The tree has its own glyphs: thin geometric line drawings, one per branch and per item, drawn
+// in white on black (the CSS gives them square stroke ends). Keys are branch ids and node ids from
+// research.js; anything missing falls back to the HUD icon the node names.
+const TREE_ICONS = {
+  hub: '<path d="M2 20h20"/><path d="M5 20v-6a7 7 0 0 1 14 0v6"/><path d="M10 20v-4h4v4"/>',
+  lock: '<path d="M6 11h12v10H6z"/><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  // Branches
+  power: '<path d="M13.5 2 5 13.5h6L9.5 22 19 10h-6l.5-8z"/>',
+  air: '<path d="M2 12h4.5l2-6 3.5 12 3-9 1.5 3H22"/>',
+  radiation: '<circle cx="12" cy="12" r="1.5" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>',
+  food: '<path d="M12 21v-9"/><path d="M12 13c0-4-2.5-6.5-7-6.5 0 4 2.5 6.5 7 6.5z"/><path d="M12 11c0-3.5 2.2-6 7-6 0 3.8-2.4 6-7 6z"/>',
+  outside: '<path d="M3 9h13l3 5H3z"/><path d="M7 9V5h4"/><circle cx="7" cy="17.5" r="2.5"/><circle cx="16" cy="17.5" r="2.5"/>',
+  // Power
+  HeatBlankets: '<path d="m12 3 9 4.5-9 4.5-9-4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/>',
+  SunTracking: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+  DishAntenna: '<path d="M4 6a11 11 0 0 0 14 14z"/><path d="m11 13 5.5-5.5"/><circle cx="17.8" cy="6.2" r="1.7"/>',
+  // Life Support
+  Scrubber: '<path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/>',
+  Sabatier: '<path d="M9 3h6M10 3v6l-5.2 9.6A1.6 1.6 0 0 0 6.2 21h11.6a1.6 1.6 0 0 0 1.4-2.4L14 9V3"/><path d="M7.6 15h8.8"/>',
+  RegolithOxygen: '<circle cx="8.5" cy="12" r="5.5"/><circle cx="15.5" cy="12" r="5.5"/>',
+  // Radiation
+  Shielding: '<path d="M12 2 4 5v6c0 5 3.2 9 8 11 4.8-2 8-6 8-11V5z"/>',
+  ParticleDetector: '<circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 6.5a5.5 5.5 0 0 1 5.5 5.5"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="m12 12-7 7"/>',
+  WaterWall: '<path d="M4 3h16v18H4z"/><path d="M7 9.5c1.7-1.6 3.3 1.6 5 0s3.3-1.6 5 0"/><path d="M7 14.5c1.7-1.6 3.3 1.6 5 0s3.3-1.6 5 0"/>',
+  // Food and water
+  Greenhouse: '<path d="M4 21V10l8-7 8 7v11z"/><path d="M12 21v-7"/><path d="M12 15.5c0-2.3 1.4-3.6 4-3.6 0 2.3-1.4 3.6-4 3.6z"/><path d="M12 17.5c0-1.9-1.1-3-3.3-3 0 1.9 1.1 3 3.3 3z"/>',
+  GrowLights: '<path d="M4 4h16v3H4z"/><path d="M8 10.5v3M12 10.5v6M16 10.5v3"/><path d="M6 21h12"/>',
+  WaterRecycling: '<path d="M20 11A8 8 0 0 0 5.5 7.5"/><path d="M5 3v5h5"/><path d="M4 13a8 8 0 0 0 14.5 3.5"/><path d="M19 21v-5h-5"/>',
+  // Robots and moonwalks
+  DrumDigger: '<circle cx="12" cy="12" r="4.5"/><path d="M12 3v3M12 18v3M4.2 7.5 6.8 9M17.2 15l2.6 1.5M4.2 16.5 6.8 15M17.2 9l2.6-1.5"/>',
+  IceDrill: '<path d="M12 2v5"/><path d="M8 7h8l-4 15z"/><path d="M9.3 12h5.4M10.6 17h2.8"/>',
+  SuitTank: '<path d="M8 7h8v13a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"/><path d="M10 7V3h4v4"/><path d="M8 12h8"/>',
 };
-const glyph = (name, size) => `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${EXTRA_ICONS[name]}</svg>`;
+const glyph = (name, size, fallback) => (TREE_ICONS[name]
+  ? `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${TREE_ICONS[name]}</svg>`
+  : icon(fallback, size));
 let picked = null;    // node id shown in the panel
 
 // Where every circle goes. Each branch owns an equal slice of the circle. Its end nodes are spread
@@ -132,7 +173,7 @@ const STATE_WORDS = { owned: 'researched', ready: 'ready to research', short: 'n
 const isShut = state => state === 'locked' || state === 'soon';
 
 function mapHtml() {
-  const state = node => nodeState(node, save.unlocks, save.points);
+  const state = node => nodeState(node, unlocksNow(), save.points);
   const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px`;
   const line = (id, kind, from = SPOTS[id].parent) => {
     const a = SPOTS[from], b = SPOTS[id];
@@ -145,24 +186,24 @@ function mapHtml() {
     ...branch.nodes.filter(node => SPOTS[node.id].dep).map(node => line(node.id, kindOf(node), SPOTS[node.id].dep)),
   ]);
   const nodes = BRANCHES.flatMap(branch => [
-    `<div class="rt-branch" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${icon(branch.icon, 24)}</span><span class="rt-name">${branch.name}</span></div>`,
+    `<div class="rt-branch" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${glyph(branch.id, 24, branch.icon)}</span><span class="rt-name">${branch.name}</span></div>`,
     ...branch.nodes.map(node => {
       const st = state(node);
       return `<button class="rt-node is-${st}" id="node-${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
           aria-pressed="${picked === node.id}" aria-label="${node.name}, ${STATE_WORDS[st]}">
-        <span class="rt-dot">${isShut(st) ? glyph('lock', 24) : icon(node.icon, 24)}${st === 'owned' ? `<span class="rt-badge">${glyph('check', 12)}</span>` : ''}</span>
+        <span class="rt-dot">${glyph(node.id, 24, node.icon)}${st === 'owned' ? `<span class="rt-badge">${glyph('check', 12)}</span>` : isShut(st) ? `<span class="rt-badge">${glyph('lock', 12)}</span>` : ''}</span>
         <span class="rt-name">${node.name}</span>
       </button>`;
     }),
   ]);
   return `
     <svg class="rt-lines" viewBox="0 0 ${MAP.size} ${MAP.size}" aria-hidden="true">${lines.join('')}</svg>
-    <div class="rt-hub" style="${at('hub')}"><span class="rt-dot">${icon('star', 32)}</span><span class="rt-name">Your base</span></div>
+    <div class="rt-hub" style="${at('hub')}"><span class="rt-dot">${glyph('hub', 32)}</span><span class="rt-name">Your base</span></div>
     ${nodes.join('')}`;
 }
 
 function panelHtml(node) {
-  const state = nodeState(node, save.unlocks, save.points);
+  const state = nodeState(node, unlocksNow(), save.points);
   const mission = node.mission && missionById(node.mission);
   const status = {
     owned: `<p class="n-status done">${glyph('check', 16)} Researched</p>`,
@@ -189,9 +230,35 @@ function fitMap() {
   view.scrollLeft = (view.scrollWidth - view.clientWidth) / 2;
 }
 
+// The sky behind the tree: a field of stars, the same every time, redrawn to fit the window.
+function drawStars() {
+  const cv = $('research-stars'), w = innerWidth, h = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr, dpr);
+  let seed = 20261114;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const TINTS = ['255, 255, 255', '255, 255, 255', '255, 255, 255', '196, 214, 255', '222, 204, 255'];
+  for (let i = Math.round(w * h / 650); i > 0; i--) {
+    const x = rnd() * w, y = rnd() * h, big = rnd() > 0.93;
+    const r = big ? 0.9 + rnd() * 0.7 : 0.35 + rnd() * 0.5;
+    const tint = TINTS[Math.floor(rnd() * TINTS.length)], alpha = big ? 0.8 + rnd() * 0.2 : 0.3 + rnd() * 0.6;
+    if (big) { // a soft halo around the few bright ones
+      const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+      halo.addColorStop(0, `rgba(${tint}, 0.28)`);
+      halo.addColorStop(1, `rgba(${tint}, 0)`);
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(x, y, r * 4, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = `rgba(${tint}, ${alpha})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+}
+
 function renderResearch() {
   const all = BRANCHES.flatMap(branch => branch.nodes);
-  picked ??= (all.find(node => nodeState(node, save.unlocks, save.points) === 'ready') ?? all[0]).id;
+  picked ??= (all.find(node => nodeState(node, unlocksNow(), save.points) === 'ready') ?? all[0]).id;
   $('research-points').textContent = save.points;
   $('research-note').textContent = UPGRADES_LIVE
     ? 'Pick a circle to see what it does. Spend research points to add it to your base.'
@@ -204,6 +271,7 @@ function openResearch() {
   renderResearch();
   show('research');
   fitMap();
+  drawStars();
 }
 
 function pick(id) {
@@ -214,7 +282,7 @@ function pick(id) {
 
 function buy(id) {
   const node = nodeById(id);
-  if (!node || nodeState(node, save.unlocks, save.points) !== 'ready') return;
+  if (!node || nodeState(node, unlocksNow(), save.points) !== 'ready') return;
   save.points -= node.cost;
   save.unlocks.push(node.id);
   commit();
@@ -222,10 +290,14 @@ function buy(id) {
 }
 
 // --- Briefing ---
-function flareFor(mission) {
-  if (!flares || !mission.storms.length) return null;
-  const i = MISSIONS.indexOf(mission) % flares.flares.length;
-  return { ...flares.flares[i], live: flares.live };
+// What the Sun has really been doing, from the flares the storms will be drawn from.
+function spaceWeatherReport() {
+  const list = flares.flares, count = letter => list.filter(f => f.classType[0] === letter).length;
+  const top = list.reduce((a, b) => flareSize(b.classType).units > flareSize(a.classType).units ? b : a);
+  const sizes = 'Flares are graded C, M or X, and X is the strongest.';
+  return flares.live
+    ? `Space weather report, live from NASA's DONKI database: in the past 12 months the Sun fired off ${count('X')} X-class flares and ${count('M')} M-class flares. The biggest was the ${flareLabel(top)}. ${sizes} Your storms are sized from these real flares, and they change every time you play.`
+    : `Space weather report: the live NASA feed could not be reached, so your storms are sized from ${list.length} real past flares in NASA's DONKI records. ${sizes} They change every time you play.`;
 }
 
 async function brief(id) {
@@ -237,7 +309,8 @@ async function brief(id) {
   const probe = new Sim(mission, save.mode, site);
   $('brief-goal').textContent = mission.goalType === 'dose'
     ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
-    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.` : mission.goal;
+    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
+    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.` : mission.goal;
   $('brief-site').innerHTML = `
     <div>${icon('sun', 24)}<b>${Math.round(site.sun * 100)}%</b><span>of the time in sunlight at your base</span></div>
     <div>${icon('globe', 24)}<b>${Math.round(site.earth * 100)}%</b><span>of the time Earth is above the horizon</span></div>
@@ -246,10 +319,7 @@ async function brief(id) {
   $('brief-flare').textContent = mission.storms.length ? 'Checking NASA DONKI for real solar flares…' : 'Real terrain: NASA LRO LOLA laser altimeter, 5 m per pixel.';
   if (mission.storms.length) {
     await flaresReady;
-    const f = flareFor(mission);
-    $('brief-flare').textContent = f
-      ? `This mission's storms are modelled on a real ${f.classType} solar flare from ${f.date}. ${f.note} (${f.live ? 'Live from NASA DONKI' : 'From NASA DONKI records, because the live feed could not be reached'}.)`
-      : '';
+    if (chosen === id) $('brief-flare').textContent = spaceWeatherReport();
   }
 }
 
@@ -258,11 +328,10 @@ function launch(id = chosen) {
   const mission = missionById(id);
   chosen = id;
   if (hud) endMission();
-  sim = new Sim(mission, save.mode, game.site);
-  const flare = flareFor(mission);
-  if (flare) sim.flare = flare;
+  // A new plan every time: different real flares, and storms at slightly different times.
+  sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? []));
   sim.say(mission.brief, 'info');
-  hud = createHud({ sim, site: game.site, unlocks: save.unlocks, api: game, flare, points: save.points });
+  hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false, points: save.points });
   game.enter(sim, {
     frame(near) {
       hud.frame(near);
@@ -306,13 +375,21 @@ function finish() {
   save.points += earned;
   if (stars) (save.best[mission.id] ??= {})[mode] = Math.max(best, stars);
   commit();
-  const card = dataCard(mission.dataCard, game.site);
+  const cards = mission.dataCards.map(kind => dataCard(kind, game.site));
+  const met = sim.storms.filter(s => s.started);
+  const stormFacts = met.map((s, i) => [
+    met.length > 1 ? `Solar storm ${i + 1}` : 'Solar storm',
+    s.flare
+      ? `${s.strength}, sized from the real ${flareLabel(s.flare)}.${s.flare.sep ? ' NASA recorded a real particle storm after it.' : ''}${s.flare.note ? ` ${s.flare.note}` : ''}`
+      : s.strength,
+  ]);
   const facts = [
     ['Lowest life support', `${Math.round(sim.lowestAir)}%`],
     ['Radiation dose', `${Math.round(sim.dose)} of 100${mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`],
     ['Battery empty for', `${Math.round(sim.blackout)} s`],
     ...(sim.food !== null ? [['Meals at the end', `${sim.food} (goal ${sim.goalValue})`]] : []),
     ['Research from samples and data', `${sim.rp}`],
+    ...stormFacts,
   ];
   endMission();
   $('debrief-title').textContent = o.won ? `${mission.name}: mission complete!` : `${mission.name}: not complete yet`;
@@ -322,9 +399,13 @@ function finish() {
   $('debrief-points').textContent = `You earned ${earned} research points. You now have ${save.points}.`;
   $('debrief-lesson').textContent = mission.lesson;
   $('debrief-tips').innerHTML = sim.tips().map(t => `<li>${t}</li>`).join('');
-  $('card-title').textContent = card.title;
-  $('card-body').textContent = card.body;
-  $('card-source').textContent = card.source;
+  $('debrief-cards').replaceChildren(...cards.map(card => {
+    const el = $('card-template').content.firstElementChild.cloneNode(true);
+    el.querySelector('h3').textContent = card.title;
+    el.querySelector('.card-body').textContent = card.body;
+    el.querySelector('.card-source').textContent = card.source;
+    return el;
+  }));
   $('debrief-again').dataset.id = mission.id;
   show('debrief');
 }
@@ -348,6 +429,7 @@ const actions = {
   research: openResearch,
   pick,
   buy,
+  'open-all': () => { save.openAll = true; commit(); renderMissions(); },
   resume,
   leave: openMissions,
   menu: pause,
@@ -374,7 +456,7 @@ addEventListener('keydown', e => {
   else if (!$('pause').hidden) resume();
 });
 
-addEventListener('resize', () => { if (!$('research').hidden) fitMap(); });
+addEventListener('resize', () => { if (!$('research').hidden) { fitMap(); drawStars(); } });
 
 addEventListener('unhandledrejection', () => {
   if (!game) $('start-status').textContent = 'The Moon didn\'t load. Please refresh the page.';
@@ -390,7 +472,7 @@ export function gameReady(api) {
 }
 
 // Debug helpers for scripted checks: window.ui.launch('FirstNight').
-window.ui = { launch, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; } };
+window.ui = { launch, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; }, get cues() { return sound.cuesPlayed; } };
 
 renderStart();
 show('start');

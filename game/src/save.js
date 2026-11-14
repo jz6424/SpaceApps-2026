@@ -6,7 +6,7 @@ import { NODES } from './research.js';
 const KEY = 'moonbase.save.v2';
 
 export function emptySave() {
-  return { mode: 'Cadet', points: 0, unlocks: [], best: {} };
+  return { mode: 'Cadet', points: 0, unlocks: [], best: {}, openAll: false };
 }
 
 // Anything hand-edited or left by an older build is dropped rather than trusted.
@@ -15,6 +15,7 @@ function clean(raw) {
   if (!raw || typeof raw !== 'object') return save;
   if (MODES[raw.mode]) save.mode = raw.mode;
   if (Number.isFinite(raw.points) && raw.points >= 0) save.points = Math.floor(raw.points);
+  save.openAll = raw.openAll === true;
   if (Array.isArray(raw.unlocks)) {
     // Research Tree nodes the player owns, including the two that open missions.
     const known = NODES.map(node => node.id);

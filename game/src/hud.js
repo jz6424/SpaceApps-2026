@@ -1,6 +1,7 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
 import { CONFIG as C, MISSIONS } from './config.js';
-import { dataCard } from './nasa.js';
+import { flareLabel } from './sim.js';
+import { messageCue, soundOn, setSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
 
@@ -31,14 +32,13 @@ export const icon = (name, size = 24) => `<svg class="ico" width="${size}" heigh
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const fixed = v => (Math.round(v * 100) / 100).toFixed(2);
 
-export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
+export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   const hud = $('hud');
   hud.hidden = false;
   let open = null;        // station id with its panel showing
   let lastRender = 0;
   let seen = 0;           // messages already shown
   let speed = 1;
-  const feed = [];
   const notice = text => { if (text) sim.say(text, 'warn'); };
 
   // Fixed parts of the HUD.
@@ -108,18 +108,23 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
       + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}%`, aState)
       + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} of 100${sim.mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`, dState, goalMark);
     if (sim.where === 'outside') html += meter('suit', 'wind', 'Suit air', sim.suit, C.suit.seconds, `${Math.ceil(sim.suit)} s`, sim.suit < 20 ? 'bad' : sim.suit < 40 ? 'warn' : 'ok');
-    const chips = [`${icon('box', 16)} Moon dirt ${Math.floor(sim.regolith)}`, `${icon('star', 16)} Research ${sim.rp}`];
-    if (sim.food !== null) chips.push(`${icon('food', 16)} Meals ${sim.food} (goal ${sim.goalValue})`, `${icon('droplet', 16)} Water ${Math.floor(sim.water ?? 0)}`);
-    html += `<div class="chips">${chips.map(c => `<span>${c}</span>`).join('')}</div>`;
     $('meters').innerHTML = html;
+  }
+
+  // --- Supplies, in the corner above the research points ---
+  function renderSupplies() {
+    const rows = [['box', 'Moon dirt', Math.floor(sim.regolith)]];
+    if (sim.food !== null) rows.push(['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`], ['droplet', 'Water', Math.floor(sim.water ?? 0)]);
+    $('supplies').innerHTML = rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join('');
   }
 
   // --- Sun clock across the top ---
   function renderClock() {
     const pDay = sim.day / sim.total * 100, pNow = Math.min(100, sim.t / sim.total * 100);
     const storms = sim.storms.map(s => {
-      const known = s.warnedBy || s.started;
-      return known ? `<b class="storm-mark" style="left:${s.at / sim.total * 100}%;width:${s.length / sim.total * 100}%" title="Solar storm"></b>` : '';
+      // A storm shows up once you have been warned, or once a forecast you asked for has arrived.
+      const known = s.warnedBy || s.started || (s.forecastAt !== null && sim.t >= s.forecastAt);
+      return known ? `<b class="storm-mark" style="left:${s.at / sim.total * 100}%;width:${s.length / sim.total * 100}%" title="Solar storm${s.flare ? `, sized from the real ${flareLabel(s.flare)}` : ''}"></b>` : '';
     }).join('');
     const earth = `<b class="earth-gap" style="left:${sim.earthGap[0] / sim.total * 100}%;width:${(sim.earthGap[1] - sim.earthGap[0]) / sim.total * 100}%" title="Earth below the horizon"></b>`;
     const when = sim.t < sim.day ? `${icon('sun', 18)} Sunset in ${clock(sim.timeToSunset)}` : `${icon('moon', 18)} Sunrise in ${clock(sim.timeToSunrise)}`;
@@ -134,13 +139,39 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
   }
 
   // --- Messages ---
-  function renderFeed() {
-    if (sim.messages.length === seen) return;
-    for (; seen < sim.messages.length; seen++) feed.push(sim.messages[seen]);
-    while (feed.length > 4) feed.shift();
-    $('feed').innerHTML = feed.map(m => `<li class="msg ${m.kind}">
-      <span class="from">${m.from === 'Mission Control' ? `${icon('radio', 14)} Mission Control <em>1.3 s light delay</em>` : m.from}</span>
-      ${m.text}</li>`).join('');
+  // Each message types itself out, letter by letter, with a short sound when it starts. The newest
+  // is at the bottom; older ones slide up and fade at the top edge, and the list scrolls back.
+  const TYPE_RATE = 90; // letters per second
+  const instant = matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const list = $('feed');
+  let typing = [];        // messages still being typed: { out, text, start }
+  const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 12;
+  const fadeTop = () => list.classList.toggle('faded', list.scrollTop > 4);
+  list.addEventListener('scroll', fadeTop);
+  function renderFeed(now) {
+    const follow = atBottom();
+    for (; seen < sim.messages.length; seen++) {
+      const m = sim.messages[seen], fromEarth = m.from === 'Mission Control';
+      const li = document.createElement('li');
+      li.className = `msg ${m.kind}`;
+      li.innerHTML = `<span class="from">${fromEarth ? `${icon('radio', 14)} Mission Control <em>1.3 s light delay</em>` : m.from}</span>
+        <span class="sr-only"></span><span class="typed" aria-hidden="true"></span>`;
+      li.querySelector('.sr-only').textContent = m.text; // screen readers get the whole message at once
+      list.append(li);
+      const out = li.querySelector('.typed');
+      if (instant) out.textContent = m.text;
+      else { out.classList.add('typing'); typing.push({ out, text: m.text, start: now }); }
+      messageCue(fromEarth);
+    }
+    typing = typing.filter(t => {
+      const shown = Math.floor((now - t.start) / 1000 * TYPE_RATE) + 1;
+      t.out.textContent = t.text.slice(0, shown);
+      if (shown < t.text.length) return true;
+      t.out.classList.remove('typing');
+      return false;
+    });
+    if (follow) list.scrollTop = list.scrollHeight;
+    fadeTop();
   }
 
   // --- What to do next ---
@@ -157,6 +188,7 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
     }
     if (sim.power <= 0) return 'Battery empty! Open Power and switch something off, or set Life Support to Eco.';
     if (sim.air < 20) return 'Life support is low. Set it to Normal or Boost.';
+    if (sim.power > 0 && sim.sunlight === 0 && sim.batteryForecast < sim.timeToSunrise) return 'At this rate the battery runs out before sunrise. Open Power and switch something off, or set Life Support to Eco.';
     if (sim.panels.includes(false)) return 'A solar panel is broken. Fix it outside (Airlock) or send the robot (Robot Map).';
     if (sim.mission.tutorial) {
       if (!f.open_Power) return 'Click the Power label (or walk up and press E) to see your battery.';
@@ -217,10 +249,10 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
       body: `<p class="big">Earth is ${sim.earthUp ? 'above' : 'below'} the horizon</p>
       <div class="opts">
         ${btn('comms', 'Antenna', { arg: sim.comms ? 'off' : 'on', on: sim.comms, note: `Uses ${P.comms} power/s. Mission Control warns you about storms ${sim.mode.warning} s early.` })}
-        ${btn('forecast', 'Ask for a space weather forecast', { disabled: !sim.comms, note: `Answer takes ${C.commsRoundTrip} s: there and back at the speed of light.` })}
+        ${btn('forecast', 'Ask for a space weather forecast', { disabled: !sim.comms, note: `Costs ${P.forecast} power. The answer takes ${C.commsRoundTrip} s, there and back at the speed of light, and puts the next storm on your sun clock.` })}
         ${btn('upload', 'Send science data', { disabled: !sim.comms, note: `Costs ${P.sendData} power. +${C.science.uploadRP} research point.` })}
       </div>
-      <p class="fine">Every message takes about 1.3 s to cross the 384,400 km to Earth. ${flare ? `Today's storm is modelled on a real ${flare.classType} flare from ${flare.date}${flare.live ? ' (live from NASA DONKI)' : ' (from NASA DONKI records)'}.` : ''}</p>`,
+      <p class="fine">Every message takes about 1.3 s to cross the 384,400 km to Earth, and none get through while Earth is below the horizon. ${sim.storms.some(s => s.flare) ? `Storms here are sized from real solar flares${liveFlares ? ' (live from NASA DONKI)' : ' (from NASA DONKI records)'}.` : ''}</p>`,
     }),
     Food: () => {
       if (sim.food === null) {
@@ -363,18 +395,29 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
   $('speed').setAttribute('aria-pressed', 'false');
   const backBtn = () => api.goInside();
   $('back-in').addEventListener('click', backBtn);
+  const showSound = () => {
+    $('sound').setAttribute('aria-pressed', soundOn());
+    $('sound').textContent = soundOn() ? 'Sound on' : 'Sound off';
+  };
+  const soundBtn = () => { setSound(!soundOn()); showSound(); };
+  $('sound').addEventListener('click', soundBtn);
+  showSound();
 
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
     if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) toggleSpeed();
-    renderFeed();
-    checkSuitAir();
     const now = performance.now();
+    renderFeed(now);
+    checkSuitAir();
     if (now - lastRender < 200) return;
     lastRender = now;
     renderMeters();
+    renderSupplies();
     renderClock();
     renderRp();
+    $('keys-tip').textContent = sim.where === 'outside'
+      ? 'Outside, walk up to a red light or a glowing rock and press E.'
+      : 'Inside, click a station label to walk there.';
     $('hint').textContent = hintText();
     $('prompt').hidden = !near || !!open;
     if (near) $('prompt').innerHTML = `Press <kbd>E</kbd> to ${near.label}`;
@@ -395,9 +438,10 @@ export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
+      $('sound').removeEventListener('click', soundBtn);
+      list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;
       $('back-in').removeEventListener('click', backBtn);
     },
-    dataCard: () => dataCard(sim.mission.dataCard, site),
   };
 }
