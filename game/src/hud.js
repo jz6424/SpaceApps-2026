@@ -1,5 +1,5 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
-import { CONFIG as C } from './config.js';
+import { CONFIG as C, MISSIONS } from './config.js';
 import { dataCard } from './nasa.js';
 
 const $ = id => document.getElementById(id);
@@ -19,6 +19,7 @@ export const ICONS = {
   door: '<path d="M3 21h18M5 21V3h14v18M14 12h.01"/>',
   droplet: '<path d="M12 2.7 17.7 8.3a8 8 0 1 1-11.3 0z"/>',
   box: '<path d="M21 16V8l-9-5-9 5v8l9 5 9-5zM3.3 7 12 12l8.7-5M12 22V12"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -30,7 +31,7 @@ export const icon = (name, size = 24) => `<svg class="ico" width="${size}" heigh
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const fixed = v => (Math.round(v * 100) / 100).toFixed(2);
 
-export function createHud({ sim, site, unlocks, api, flare }) {
+export function createHud({ sim, site, unlocks, api, flare, points = 0 }) {
   const hud = $('hud');
   hud.hidden = false;
   let open = null;        // station id with its panel showing
@@ -42,7 +43,48 @@ export function createHud({ sim, site, unlocks, api, flare }) {
 
   // Fixed parts of the HUD.
   $('hud-title').textContent = sim.mission.name;
-  $('hud-mode').textContent = `${sim.modeName} mode`;
+  $('hud-mode').textContent = `· ${sim.modeName} mode`;
+  $('mc-pin').innerHTML = icon('pin', 20);
+  // The Missions box grows in the middle of the screen, then settles into its corner.
+  const card = $('mission-card');
+  card.classList.remove('intro');
+  void card.offsetWidth;
+  card.classList.add('intro');
+
+  // Full screen button (F11 works too).
+  const fsBtn = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+  $('fullscreen').addEventListener('click', fsBtn);
+
+  // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
+  function renderRp() {
+    const total = points + sim.rp;
+    const next = MISSIONS.map(m => m.requires).filter(r => r && !unlocks.includes(r.id)).sort((a, b) => a.cost - b.cost)[0];
+    const goal = next?.cost ?? 0;
+    const pct = next ? Math.min(100, total / goal * 100) : 100;
+    $('rp-bar').innerHTML = `
+      <div class="rp-top">${icon('star', 16)}<span>Research points</span><b>${next ? `${total} / ${goal}` : `${total} · MAX`}</b></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      ${next ? `<div class="rp-next">Next unlock: ${next.name}</div>` : ''}`;
+  }
+
+  // --- Low suit air warnings, shown once per level ---
+  let airLevel = 0; // 0 fine, 1 warning, 2 danger
+  function checkSuitAir() {
+    if (sim.where !== 'outside') { airLevel = 0; return; }
+    const level = sim.suit < 20 ? 2 : sim.suit < 40 ? 1 : 0;
+    if (level > airLevel) {
+      const t = $('air-toast');
+      t.textContent = level === 2 ? 'Danger! Suit air almost gone. Return to the airlock now!' : 'Warning: suit air is getting low.';
+      t.className = level === 2 ? 'bad' : 'warn';
+      t.hidden = false;
+      t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+    }
+    airLevel = level;
+  }
+  $('air-toast').addEventListener('animationend', () => { $('air-toast').hidden = true; });
   $('feed').innerHTML = '';
 
   // --- Meters ---
@@ -326,11 +368,13 @@ export function createHud({ sim, site, unlocks, api, flare }) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
     if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) toggleSpeed();
     renderFeed();
+    checkSuitAir();
     const now = performance.now();
     if (now - lastRender < 200) return;
     lastRender = now;
     renderMeters();
     renderClock();
+    renderRp();
     $('hint').textContent = hintText();
     $('prompt').hidden = !near || !!open;
     if (near) $('prompt').innerHTML = `Press <kbd>E</kbd> to ${near.label}`;
@@ -350,6 +394,8 @@ export function createHud({ sim, site, unlocks, api, flare }) {
       $('station').removeEventListener('click', onClick);
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
+      $('fullscreen').removeEventListener('click', fsBtn);
+      $('air-toast').hidden = true;
       $('back-in').removeEventListener('click', backBtn);
     },
     dataCard: () => dataCard(sim.mission.dataCard, site),

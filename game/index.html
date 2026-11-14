@@ -16,16 +16,19 @@
   <section id="meters" class="panel" aria-label="Base meters"></section>
   <section id="clock" class="panel" aria-label="Sun clock"></section>
   <aside id="mission-card" class="panel" aria-label="Current mission">
-    <h2 id="hud-title"></h2>
-    <p id="hud-mode" class="fine"></p>
+    <h2 class="mc-head"><span id="mc-pin"></span> Missions</h2>
+    <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
     <p id="hint" role="status"></p>
     <div class="row">
       <button class="btn small" id="speed" aria-pressed="false"></button>
       <button class="btn small" data-do="menu">Pause</button>
+      <button class="btn small" id="fullscreen" aria-label="Toggle full screen">Fullscreen</button>
     </div>
   </aside>
   <ul id="feed" aria-live="polite" aria-label="Messages"></ul>
   <p id="prompt" class="panel" hidden></p>
+  <div id="rp-bar" class="panel" aria-label="Research points"></div>
+  <p id="air-toast" hidden role="alert"></p>
   <button id="back-in" class="btn primary" hidden>Back to the airlock</button>
   <p id="keys" class="panel fine"><kbd>WASD</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · <kbd>drag</kbd> look · <kbd>E</kbd> use · <kbd>F</kbd> speed · <kbd>Esc</kbd> pause<br>Inside, click a station label to walk there.</p>
 </div>

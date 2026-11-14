@@ -255,7 +255,7 @@ function launch(id = chosen) {
   const flare = flareFor(mission);
   if (flare) sim.flare = flare;
   sim.say(mission.brief, 'info');
-  hud = createHud({ sim, site: game.site, unlocks: save.unlocks, api: game, flare });
+  hud = createHud({ sim, site: game.site, unlocks: save.unlocks, api: game, flare, points: save.points });
   game.enter(sim, {
     frame(near) {
       hud.frame(near);

@@ -168,8 +168,26 @@ kbd { font: 400 12px "Fira Code", monospace; color: #EAFE07; border: 1px solid r
 .track .storm-mark { position: absolute; top: 0; height: 9px; background: #E43700; }
 .track i { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: #fff; box-shadow: 0 0 0 2px #07173F; }
 
-#mission-card { top: 12px; right: 12px; width: 300px; display: grid; gap: 6px; }
+#mission-card { top: 12px; right: 12px; width: 300px; display: grid; gap: 6px; border: 2px solid #EAFE07; box-shadow: 0 0 10px rgba(234,254,7,.22); animation: mc-glow 3s ease-in-out infinite; }
+#mission-card.intro { animation: mc-intro 4.5s ease-in-out, mc-glow 3s ease-in-out infinite; z-index: 5; }
 #mission-card h2 { font: 900 17px/1.2 "Fira Sans", system-ui, sans-serif; margin: 0; }
+.mc-head { display: flex; align-items: center; gap: 6px; font-size: 20px !important; color: #EAFE07; }
+.mc-head .ico { stroke: #EAFE07; vertical-align: 0; }
+.mc-name { margin: 0; font-size: 14px; }
+#hint { font-size: 16px; }
+@keyframes mc-glow { 0%, 100% { box-shadow: 0 0 8px rgba(234,254,7,.15); } 50% { box-shadow: 0 0 14px rgba(234,254,7,.32); } }
+@keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 90px)) scale(1.4); } 100% { transform: none; } }
+#fullscreen { white-space: nowrap; }
+#rp-bar { left: 50%; bottom: 12px; transform: translateX(-50%); width: min(360px, calc(100vw - 24px)); display: grid; gap: 4px; padding: 6px 12px; }
+.rp-top { display: flex; align-items: center; gap: 6px; font: 700 13px "Fira Sans", system-ui, sans-serif; }
+.rp-top .ico { stroke: #EAFE07; vertical-align: 0; }
+.rp-top b { margin-left: auto; font-variant-numeric: tabular-nums; }
+#rp-bar .bar i { background: #EAFE07; }
+.rp-next { font-size: 12px; color: #C9D8F2; }
+#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 10px 20px; border-radius: 8px; font: 700 20px "Fira Sans", system-ui, sans-serif; text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
+#air-toast.warn { background: rgba(7,23,63,.92); border: 2px solid #EAFE07; color: #EAFE07; }
+#air-toast.bad { background: rgba(142,17,0,.94); border: 2px solid #fff; color: #fff; }
+@keyframes air-fade { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
 #hint { margin: 0; background: #0042A6; border-left: 4px solid #EAFE07; padding: 6px 10px; border-radius: 4px; font-weight: 700; }
 #speed[aria-pressed="true"] { border-color: #EAFE07; color: #EAFE07; }
 

@@ -396,21 +396,39 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(KEYMAP[e.code] || e.code));
 addEventListener('blur', () => keys.clear());
 
+const DRAG_SPEED = 0.005; // radians the view turns per pixel of mouse drag
 let yaw = Math.PI / 2, pitch = 0.2, camDist = 7;
 const canvas = renderer.domElement;
 let down = null;
-canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); down = { x: e.clientX, y: e.clientY, moved: 0 }; });
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  down = { x: e.clientX, y: e.clientY, moved: 0 };
+  // Hide the cursor and let the mouse travel without hitting the screen edge while dragging.
+  try { canvas.requestPointerLock()?.catch?.(() => {}); } catch {}
+});
+// If the browser took the mouse back mid-drag (Esc), act like Esc was pressed so the pause menu opens.
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && down) {
+    down = null;
+    dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }));
+  }
+});
 canvas.addEventListener('pointermove', e => {
-  if (canvas.hasPointerCapture(e.pointerId)) {
+  if (canvas.hasPointerCapture(e.pointerId) || document.pointerLockElement === canvas) {
     if (down) down.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
-    yaw -= e.movementX * 0.005;
-    pitch = THREE.MathUtils.clamp(pitch + e.movementY * 0.005, -0.6, 1.3);
+    // Same turn per pixel sideways and up/down. Raise DRAG_SPEED to turn faster, lower it to turn slower.
+    yaw -= e.movementX * DRAG_SPEED;
+    pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, -0.6, 1.3);
   } else hover(e);
 });
 canvas.addEventListener('pointerup', e => {
-  if (down && down.moved < 6 && state === 'play') click(e);
-  down = null;
+  const wasDown = down;
+  down = null; // clear first so letting go doesn't look like Esc
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (wasDown && wasDown.moved < 6 && state === 'play') click(e);
 });
+// Stop the right-click menu from popping up when a drag ends on the right button.
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   camDist = THREE.MathUtils.clamp(camDist * Math.exp(e.deltaY * 0.001), 2, 60);
