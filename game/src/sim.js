@@ -82,6 +82,12 @@ export class Sim {
     this.panels = Array(C.solar.panels).fill(true);
     this.shielding = 0;
     this.where = 'inside';
+    // The airlock: two doors that are never open together, and the air between them.
+    // inner faces the cabin, outer faces the Moon. pressure is 'pressurized' or 'vacuum'.
+    // cycle is the job in progress: { dir, steps: [{ kind, door, length }], i, t }.
+    this.airlock = { inner: true, outer: false, pressure: 'pressurized', cycle: null, uses: 0 };
+    this.inAirlock = false; // set by the 3D world: the astronaut is standing between the doors
+    this.doorway = null;    // set by the 3D world: 'inner' or 'outer' while standing in that doorway
 
     this.storms = (plan?.storms ?? mission.storms).map(st => ({
       flare: null,     // the real flare this storm is sized from, when there is one
@@ -223,11 +229,85 @@ export class Sim {
     return null;
   }
 
+  // --- Airlock. Each action returns a short hint when it can't be done, like the station actions. ---
+  get airlockStatus() { return this.airlock.cycle ? 'cycling' : this.airlock.pressure; }
+  get airlockStep() {
+    const cy = this.airlock.cycle;
+    return cy ? { ...cy.steps[cy.i], dir: cy.dir, progress: Math.min(1, cy.t / cy.steps[cy.i].length), waiting: !!cy.waiting } : null;
+  }
+  // 'out' ends with the outer door open, 'in' with the inner door open.
+  airlockStart(dir) {
+    const lock = this.airlock, A = C.airlock;
+    if (lock.cycle) return 'The airlock is busy. Hang on!';
+    if (dir === 'out' && this.stormNow) return 'Not during a solar storm!';
+    const [shut, open, goal] = dir === 'out' ? ['inner', 'outer', 'vacuum'] : ['outer', 'inner', 'pressurized'];
+    const steps = [];
+    if (lock[shut]) steps.push({ kind: 'close', door: shut, length: A.doorSeconds });
+    if (lock.pressure !== goal) {
+      if (dir === 'out') steps.push({ kind: 'prebreathe', length: A.prebreathe });
+      steps.push({ kind: 'pump', length: A.pump });
+    }
+    if (!lock[open]) steps.push({ kind: 'open', door: open, length: A.doorSeconds });
+    if (!steps.length) return `The ${open} door is already open.`;
+    // A full cycle needs the astronaut between the doors, or they would be shut out.
+    lock.cycle = { dir, steps, i: 0, t: 0, crew: steps.some(s => s.kind === 'pump') };
+    return null;
+  }
+  // Using one door by hand. The interlock keeps the other one shut.
+  airlockDoor(door) {
+    const lock = this.airlock, other = door === 'inner' ? 'outer' : 'inner';
+    if (lock.cycle) return 'The airlock is busy. Hang on!';
+    if (lock[other]) return `Close the ${other} door first!`;
+    if (lock[door]) {
+      lock.cycle = { dir: null, steps: [{ kind: 'close', door, length: C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
+      return null;
+    }
+    return this.airlockStart(door === 'outer' ? 'out' : 'in');
+  }
+  airlockSkip() {
+    const cy = this.airlock.cycle;
+    if (cy && cy.steps[cy.i].kind === 'prebreathe' && this.modeName === 'Cadet') cy.t = cy.steps[cy.i].length;
+  }
+  // Jump straight to a resting state, for when the astronaut is moved without walking through.
+  airlockSet(pressure) {
+    Object.assign(this.airlock, { inner: pressure === 'pressurized', outer: pressure === 'vacuum', pressure, cycle: null });
+  }
+  airlockTick(dt) {
+    const lock = this.airlock, cy = lock.cycle;
+    if (!cy) return;
+    const step = cy.steps[cy.i];
+    if (cy.t === 0) {
+      // A door waits for the astronaut to step out of the doorway before it shuts.
+      cy.waiting = step.kind === 'close' && this.doorway === step.door;
+      if (cy.waiting) return;
+      if (step.kind === 'close') lock[step.door] = false;
+      if (step.kind === 'open' && !lock[step.door === 'inner' ? 'outer' : 'inner']) lock[step.door] = true;
+      if (step.kind === 'pump' && cy.dir === 'out') {
+        this.air = Math.max(0, this.air - C.airlock.cycleAir);
+        lock.uses++;
+      }
+    }
+    cy.t += dt;
+    if (cy.t < step.length) return;
+    if (step.kind === 'close' && cy.crew && !this.inAirlock) {
+      // Nobody is between the doors, so open up again instead of locking the astronaut out.
+      lock[step.door] = true;
+      lock.cycle = null;
+      this.say('Step inside the airlock first!', 'warn');
+      return;
+    }
+    if (step.kind === 'pump') lock.pressure = cy.dir === 'out' ? 'vacuum' : 'pressurized';
+    cy.i++;
+    cy.t = 0;
+    if (cy.i >= cy.steps.length) lock.cycle = null;
+  }
+
   // --- The clock ---
   tick(dt) {
     if (this.over) return;
     this.t += dt;
     const C_ = C, mode = this.mode;
+    this.airlockTick(dt);
 
     // Messages from Earth land after their light delay.
     this.pending = this.pending.filter(m => {

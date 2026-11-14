@@ -147,6 +147,11 @@ export function dataCard(kind, site) {
       body: `Radio signals travel at the speed of light, and the Moon is about 384,400 km away, so every message takes about 1.3 seconds each way. At the south pole Earth sits very low in the sky and sometimes dips below the hills. NASA's Earth-visibility map says Earth is above the horizon at your spot about ${pct(site.earth)} of the time. That is why a storm warning can come too late, or not at all, while Earth is down. On Mars the wait is much longer: 3 to 22 minutes each way, so a crew there has to decide without Mission Control.`,
       source: 'NASA LRO LOLA Earth-visibility map, NASA PGDA',
     },
+    airlock: {
+      title: 'Data card: the airlock',
+      body: 'On the Space Station, spacewalks start in the Quest airlock, which arrived in July 2001. A spacesuit holds pure oxygen at low pressure. If astronauts went straight from cabin air to the suit, nitrogen in their blood could form bubbles and give them the bends, like a diver who comes up too fast. So first they breathe pure oxygen to clear the nitrogen out. NASA calls this a prebreathe, and the real thing takes hours. The game squeezes it into a few seconds.',
+      source: 'NASA Human Research Program, Risk of Decompression Sickness evidence report; NASA EVA Hardware and Operations Overview (NTRS 20120011735)',
+    },
     air: {
       title: 'Data card: life support',
       body: 'One astronaut breathes about 0.8 kg of oxygen every day and needs a few litres of water. On the Space Station, machines recycle about 98% of the water. Moon dirt is about 45% oxygen by weight, so future bases may bake oxygen out of it.',
@@ -163,6 +168,7 @@ export const SOURCES = [
   ['Solar flares and storm sizes', 'NASA DONKI space weather database, Community Coordinated Modeling Center (CCMC)', 'https://ccmc.gsfc.nasa.gov/tools/DONKI/'],
   ['Radiation limit', 'NASA-STD-3001 Volume 1, crew health standard', 'https://www.nasa.gov/ochmo/human-spaceflight-standards/'],
   ['Life support numbers', 'Ewert and Stromgren (2019), NASA Technical Reports Server 20190027563', 'https://ntrs.nasa.gov/citations/20190027563'],
+  ['Airlock and prebreathe', 'Quest airlock on the International Space Station and oxygen prebreathe, NASA Human Research Program', 'https://humanresearchroadmap.nasa.gov/evidence/reports/DCS.pdf'],
   ['Ice in craters', 'NASA LCROSS mission results (2009)', 'https://www.nasa.gov/mission/lcross/'],
   ['Base site', 'Connecting Ridge was one of NASA\'s Artemis III candidate landing regions (2022)', 'https://www.nasa.gov/artemis/'],
 ];

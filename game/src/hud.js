@@ -1,7 +1,7 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
 import { CONFIG as C, MISSIONS } from './config.js';
 import { flareLabel } from './sim.js';
-import { messageCue, soundOn, setSound } from './sound.js';
+import { airlockSound, messageCue, soundOn, setSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
 
@@ -183,6 +183,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (storm && sim.where !== 'shelter') return 'Solar storm! Go to the Storm Shelter at the back of the Habitat.';
     if (storm) return 'Stay in the shelter until the storm is over.';
     if (next?.warnedBy && !next.started) return sim.where === 'shelter' ? 'Wait here for the storm.' : 'Storm coming! Park the robot (Robot Map), then go to the Storm Shelter.';
+    const lock = sim.airlockStep;
+    if (lock?.waiting) return 'Step away from the door so it can close.';
+    if (lock) return lock.kind === 'open' && lock.door === 'outer' ? 'The outer door is opening. Off you go!' : 'The airlock is working. Hang tight!';
+    if (sim.inAirlock && sim.airlock.pressure === 'vacuum') return 'Step outside for your moonwalk, or use the Airlock panel to come back in.';
     if (sim.where === 'outside' && sim.suit < 35) return 'Suit air low. Walk back to the airlock door (the yellow steps).';
     if (sim.where === 'outside') {
       const broken = sim.panels.indexOf(false);
@@ -322,13 +326,25 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         <p class="fine">Shielding level: ${sim.shielding} of 2.</p>`,
       };
     },
-    Airlock: () => ({
-      title: 'Airlock', icon: 'door',
-      body: `<p class="big">Go on a moonwalk?</p>
-      <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside.</p>
-      <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm' : `Suit air: ${Math.floor(sim.suit)} s` })}</div>
-      <p class="fine">Come back in through the door at the top of the yellow steps.</p>`,
-    }),
+    Airlock: () => {
+      const status = sim.airlockStatus, words = { pressurized: 'Pressurized', cycling: 'Cycling...', vacuum: 'Vacuum' }[status];
+      const cost = `Each trip out costs ${C.airlock.cycleAir}% Life Support.`;
+      const view = {
+        pressurized: `<p class="big">Go on a moonwalk?</p>
+          <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside.</p>
+          <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm' : `Suit air: ${Math.floor(sim.suit)} s. ${cost}` })}</div>`,
+        vacuum: `<p class="big">Ready to come in?</p>
+          <p>The outer door closes, the air comes back, then the inner door opens.</p>
+          <div class="opts">${btn('inside', 'Close up and come inside', { note: 'Takes a few seconds.' })}</div>`,
+        cycling: '<p class="big">The airlock is working</p><p>Watch the bar in the corner of the screen.</p>',
+      }[status];
+      return {
+        title: 'Airlock', icon: 'door',
+        body: `${view}
+        <dl class="facts"><dt>Air in the airlock</dt><dd>${words}</dd><dt>Inner door</dt><dd>${sim.airlock.inner ? 'Open' : 'Closed'}</dd><dt>Outer door</dt><dd>${sim.airlock.outer ? 'Open' : 'Closed'}</dd></dl>
+        <p class="fine">Only one door opens at a time, so the cabin never loses its air. Come back in through the door at the top of the yellow steps.</p>`,
+      };
+    },
   };
 
   function drawMap() {
@@ -374,7 +390,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     upload: () => notice(sim.sendData()),
     robot: arg => notice(sim.setRobot(arg)),
     shield: () => notice(sim.addShielding()),
-    outside: () => { if (sim.stormNow) return; close(); api.goOutside(); },
+    outside: () => { const no = sim.airlockStart('out'); if (no) notice(no); else close(); },
+    inside: () => { const no = sim.airlockStart('in'); if (no) notice(no); else close(); },
   };
   function onClick(e) {
     const b = e.target.closest('[data-act]');
@@ -411,6 +428,38 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('speed').addEventListener('click', speedBtn);
   $('speed').innerHTML = `${icon('ff', 18)} 1x speed`;
   $('speed').setAttribute('aria-pressed', 'false');
+  // --- Airlock progress: one bar per step, with the reason for the step ---
+  const LOCK_STEPS = {
+    'close inner': ['Airlock', 'Closing the inner door', ''],
+    'close outer': ['Airlock', 'Closing the outer door', ''],
+    prebreathe: ['Prebreathe', 'Breathing pure oxygen', 'Astronauts breathe pure oxygen before a spacewalk. It clears nitrogen out of their blood, so they don\'t get the bends.'],
+    'pump out': ['Depressurize', 'Pumping the air out', `Pumps save most of the air for later. This trip costs ${C.airlock.cycleAir}% Life Support.`],
+    'pump in': ['Repressurize', 'Letting the air back in', 'Nearly there. The inner door opens when the air is back.'],
+    'open inner': ['Airlock', 'Opening the inner door', ''],
+    'open outer': ['Airlock', 'Opening the outer door', ''],
+  };
+  let lockShown = '';
+  function renderAirlock() {
+    const step = sim.airlockStep;
+    $('airlock-panel').hidden = !step;
+    if (!step) { lockShown = ''; return; }
+    const key = step.kind === 'pump' ? `pump ${step.dir}` : step.door ? `${step.kind} ${step.door}` : step.kind;
+    if (key + step.waiting !== lockShown) {
+      lockShown = key + step.waiting;
+      if (step.kind === 'pump') airlockSound('hiss', step.length / speed);
+      else if (step.door && !step.waiting) airlockSound('clunk');
+      const [title, text, fact] = LOCK_STEPS[key];
+      $('lock-title').innerHTML = `${icon('door', 20)} ${title}`;
+      $('lock-text').textContent = step.waiting ? 'Step away from the door so it can close!' : text;
+      $('lock-fact').textContent = fact;
+      $('lock-fact').hidden = !fact;
+      $('lock-skip').hidden = !(step.kind === 'prebreathe' && sim.modeName === 'Cadet');
+    }
+    $('lock-bar').setAttribute('aria-valuenow', Math.round(step.progress * 100));
+    $('lock-bar').firstElementChild.style.width = `${step.progress * 100}%`;
+  }
+  const skipBtn = () => sim.airlockSkip();
+  $('lock-skip').addEventListener('click', skipBtn);
   const backBtn = () => api.goInside();
   $('back-in').addEventListener('click', backBtn);
   const showSound = () => {
@@ -427,6 +476,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const now = performance.now();
     renderFeed(now);
     checkSuitAir();
+    renderAirlock();
     if (now - lastRender < 200) return;
     lastRender = now;
     renderMeters();
@@ -460,6 +510,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;
       $('back-in').removeEventListener('click', backBtn);
+      $('lock-skip').removeEventListener('click', skipBtn);
+      $('airlock-panel').hidden = true;
     },
   };
 }

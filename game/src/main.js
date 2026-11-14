@@ -391,6 +391,167 @@ const samples = [[24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
   return { id: `rock${i}`, mesh, label, at };
 });
 
+// --- Airlock: the tube between the cabin and the surface, with a door at each end ---
+// The Habitat was drawn in design units (x toward the door, y to the north side, z up).
+// These helpers take the same numbers as assets/blender/build_habitat.py.
+const U = 1.8 / 5.5;       // metres per design unit
+const DECK = 7.5;          // deck height, design units
+const hab = (x, y, z) => new THREE.Vector3(site.x + x * U, site.y + z * U, site.z - y * U);
+function solid(x0, x1, y0, y1, z0, z1) {
+  const a = hab(x0, y0, z0), b = hab(x1, y1, z1);
+  return world.createCollider(RAPIER.ColliderDesc.cuboid(Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, Math.abs(b.z - a.z) / 2)
+    .setTranslation((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2));
+}
+const paint = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, ...extra });
+const PAINT = { white: paint(0xeceef2), grey: paint(0x969ca6), dark: paint(0x3c4048), blue: paint(0x0042a6), red: paint(0xe43700), glass: paint(0x14285a, { roughness: 0.3 }), gold: paint(0xd6aa3c, { roughness: 0.35 }) };
+function block(x0, x1, y0, y1, z0, z1, mat) {
+  const a = hab(x0, y0, z0), b = hab(x1, y1, z1);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(b.x - a.x), Math.abs(b.y - a.y), Math.abs(b.z - a.z)), mat);
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+
+const DOOR_HALF = 2.2;                    // half the doorway width: each door is two leaves this wide
+const INNER_X = 13.2, OUTER_X = 18.45;    // where the two doors stand along the tube
+const INNER_TALL = 8.4, OUTER_TALL = 8.95;
+const LOCK_LOOK = {                       // light colour and label for each state. Never colour alone.
+  pressurized: { text: 'Pressurized', color: 0x2e96f5 },
+  cycling: { text: 'Cycling...', color: 0xeafe07 },
+  vacuum: { text: 'Vacuum', color: 0xe43700 },
+};
+for (const look of Object.values(LOCK_LOOK)) {
+  look.map = labelSprite(look.text, 'door', `#${look.color.toString(16).padStart(6, '0')}`).material.map;
+}
+
+// A wall across the tube with a doorway in it, so the cabin keeps its air when the chamber is empty.
+(function addBulkhead() {
+  const r = 7.6 * U, cy = 13.5 * U, from = Math.asin((7.3 - 13.5) / 7.6);
+  const wall = new THREE.Shape();
+  wall.absarc(0, cy, r, from, Math.PI - from, false);
+  wall.closePath();
+  const way = new THREE.Path();
+  way.moveTo(-DOOR_HALF * U, DECK * U); way.lineTo(DOOR_HALF * U, DECK * U);
+  way.lineTo(DOOR_HALF * U, (DECK + INNER_TALL) * U); way.lineTo(-DOOR_HALF * U, (DECK + INNER_TALL) * U);
+  way.closePath();
+  wall.holes.push(way);
+  const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(wall, { depth: 0.3 * U, bevelEnabled: false }).rotateY(Math.PI / 2), PAINT.white);
+  mesh.position.set(site.x + (INNER_X + 0.2) * U, site.y, site.z);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+  for (const s of [-1, 1]) {
+    block(INNER_X + 0.15, INNER_X + 0.6, s * DOOR_HALF, s * (DOOR_HALF + 0.4), DECK, DECK + INNER_TALL, PAINT.grey);
+    solid(INNER_X - 0.2, INNER_X + 0.6, Math.min(s * DOOR_HALF, s * 4.4), Math.max(s * DOOR_HALF, s * 4.4), DECK, DECK + 10);
+    // The outer doorway is narrowed to match, with a fixed panel each side.
+    block(18.75, 19.35, Math.min(s * DOOR_HALF, s * 3.05), Math.max(s * DOOR_HALF, s * 3.05), DECK, DECK + OUTER_TALL, PAINT.white);
+    solid(18.6, 19.4, Math.min(s * DOOR_HALF, s * 3.05), Math.max(s * DOOR_HALF, s * 3.05), DECK, DECK + OUTER_TALL);
+  }
+  block(INNER_X + 0.15, INNER_X + 0.6, -DOOR_HALF - 0.4, DOOR_HALF + 0.4, DECK + INNER_TALL, DECK + INNER_TALL + 0.4, PAINT.grey);
+  solid(INNER_X - 0.2, INNER_X + 0.6, -DOOR_HALF, DOOR_HALF, DECK + INNER_TALL, DECK + 10);
+})();
+
+// Each door is two leaves that slide apart into the wall. Closed, it is solid.
+function makeDoor(which, x, tall, lamps) {
+  const leaves = [1, -1].map(side => {
+    const leaf = new THREE.Group();
+    scene.add(leaf);
+    const lo = Math.min(0, side * DOOR_HALF), hi = Math.max(0, side * DOOR_HALF);
+    [
+      block(x - 0.15, x + 0.15, lo, hi, DECK, DECK + tall, PAINT.white),
+      block(x - 0.2, x + 0.2, lo, hi, DECK + 2.5, DECK + 3.2, PAINT.blue),
+      block(x - 0.2, x + 0.2, Math.min(side * 0.5, side * 1.7), Math.max(side * 0.5, side * 1.7), DECK + 4.8, DECK + 6.6, PAINT.glass),
+      block(x - 0.3, x + 0.3, Math.min(side * 0.15, side * 0.4), Math.max(side * 0.15, side * 0.4), DECK + 3.5, DECK + 4.5, PAINT.grey),
+    ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
+    return { leaf, side };
+  });
+  // One lamp on each face of the door, and a label over it that says the same thing in words.
+  const lampMat = paint(0x2e96f5, { emissive: 0x2e96f5, emissiveIntensity: 1.6 });
+  for (const at of lamps) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), lampMat);
+    lamp.position.copy(hab(...at));
+    scene.add(lamp);
+  }
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: LOCK_LOOK.pressurized.map, depthTest: false, transparent: true }));
+  label.scale.set(1.3, 0.325, 1);
+  label.renderOrder = 10;
+  label.position.copy(hab(x, 0, DECK + tall + 2.1));
+  scene.add(label);
+  // Seen from the cabin or the Moon the label hangs over the door. Seen from the chamber's ceiling
+  // camera it sits beside the lamp instead.
+  const labelSpots = { over: label.position.clone(), beside: hab(x + (which === 'inner' ? 1 : -1), 0.9, DECK + 6.4) };
+  return { which, leaves, lampMat, label, labelSpots, slide: 0, collider: solid(x - 0.15, x + 0.15, -DOOR_HALF, DOOR_HALF, DECK, DECK + tall), at: hab(x, 0, DECK) };
+}
+const doors = {
+  // Lamps: above the door on the cabin and Moon sides, beside it inside the chamber (where the
+  // camera looks down from the ceiling).
+  inner: makeDoor('inner', INNER_X, INNER_TALL, [[INNER_X - 0.5, 0, DECK + INNER_TALL + 0.75], [INNER_X + 0.75, 2.45, DECK + 5.6]]),
+  outer: makeDoor('outer', OUTER_X, OUTER_TALL, [[19.75, 0, DECK + OUTER_TALL + 0.75], [OUTER_X - 0.5, 2.6, DECK + 5.6]]),
+};
+
+// A bench for pulling boots on, and a rack with a spare helmet and suit.
+block(16.9, 18.1, 3.0, 4.3, DECK + 1.2, DECK + 1.5, PAINT.white);
+block(17.0, 17.25, 3.1, 4.2, DECK, DECK + 1.2, PAINT.grey);
+block(17.75, 18.0, 3.1, 4.2, DECK, DECK + 1.2, PAINT.grey);
+solid(16.9, 18.1, 3.0, 4.4, DECK, DECK + 1.5);
+block(16.9, 18.1, -4.3, -3.3, DECK, DECK + 0.3, PAINT.dark);
+block(17.4, 17.6, -4.3, -4.1, DECK, DECK + 6.4, PAINT.grey);
+block(16.95, 18.05, -4.3, -4.1, DECK + 6.1, DECK + 6.4, PAINT.grey);
+block(17.05, 17.95, -4.1, -3.4, DECK + 1.6, DECK + 3.9, PAINT.white);
+block(17.03, 17.97, -4.12, -3.38, DECK + 2.6, DECK + 2.9, PAINT.red);
+for (const [mat, radius, y] of [[PAINT.white, 0.95, -3.75], [PAINT.gold, 0.7, -3.35]]) {
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(radius * U, 12, 8), mat);
+  ball.position.copy(hab(17.5, y, DECK + 5));
+  ball.castShadow = true;
+  scene.add(ball);
+}
+solid(16.9, 18.1, -4.4, -3.2, DECK, DECK + 6.4);
+
+// The yellow railings on the landing and down the steps stop you walking off the edge.
+solid(23.25, 23.55, -3.2, 3.2, DECK, DECK + 3.6);
+for (let i = 0; i < 4; i++) {
+  const y = -3.2 - 2.4 * i;
+  solid(23.25, 23.55, y - 2.4, y, DECK - 1.5 * (i + 1), DECK + 3.6 - 1.84 * i);
+}
+solid(23.25, 23.55, -13.2, -12.8, 0, 3.6);
+
+// Where the astronaut is, as the airlock rules see it.
+function airlockZone(p) {
+  const x = (p.x - site.x) / U, y = (site.z - p.z) / U;
+  if (Math.abs(y) > 4.6 || p.y < deckY - 0.3 || x < INNER_X - 1.1 || x > OUTER_X + 1.1) return { inAirlock: false, doorway: null };
+  const doorway = Math.abs(x - INNER_X) < 1.1 ? 'inner' : Math.abs(x - OUTER_X) < 1.1 ? 'outer' : null;
+  return { inAirlock: x > INNER_X && x < OUTER_X, doorway };
+}
+
+// Doors ease open and shut over about 0.6 s of real time, whatever the game speed.
+function syncAirlock(dt, snap = false) {
+  const lock = sim?.airlock ?? { inner: true, outer: false };
+  const look = LOCK_LOOK[sim?.airlockStatus ?? 'pressurized'];
+  const p = crewBody.translation(), zone = airlockZone(p), inside = isInside(p);
+  for (const door of Object.values(doors)) {
+    const goal = lock[door.which] ? 1 : 0;
+    door.slide = snap ? goal : THREE.MathUtils.clamp(door.slide + Math.sign(goal - door.slide) * dt / 0.6, 0, 1);
+    const eased = THREE.MathUtils.smootherstep(door.slide, 0, 1);
+    for (const { leaf, side } of door.leaves) leaf.position.z = -side * eased * DOOR_HALF * U;
+    door.collider.setEnabled(!(goal === 1 && door.slide > 0.7));
+    door.lampMat.color.setHex(look.color);
+    door.lampMat.emissive.setHex(look.color);
+    door.label.material.map = look.map;
+    // Each label shows on the sides of its door you can stand on.
+    door.label.visible = door.which === 'inner' ? inside : zone.inAirlock || zone.doorway === 'outer' || !inside;
+    door.label.position.copy(zone.inAirlock ? door.labelSpots.beside : door.labelSpots.over);
+    door.label.scale.set(zone.inAirlock ? 0.72 : 1.3, zone.inAirlock ? 0.18 : 0.325, 1);
+  }
+}
+
+function useDoor(which) {
+  if (!sim) return;
+  const p = crewBody.translation(), at = doors[which].at;
+  if (Math.hypot(p.x - at.x, p.z - at.z) > 3.5 || Math.abs(p.y - at.y) > 3) return hooks?.notice('Walk up to the door first.');
+  Object.assign(sim, airlockZone(p));
+  hooks?.notice(sim.airlockDoor(which));
+}
+
 // --- Astronaut ---
 // `crew` sits at the middle of the physics capsule. The model (assets/blender/build_astronaut.py)
 // has its pivot at the feet and faces +Z, so it hangs half a body height below.
@@ -502,19 +663,20 @@ function pick(e) {
   raycaster.setFromCamera(mouse, camera);
   const visible = pickables.filter(o => o.isSprite ? o.visible : true);
   const hit = raycaster.intersectObjects(visible, false).find(h => !h.object.isSprite || h.object.visible);
-  return hit?.object.userData.station ?? null;
+  return hit?.object.userData ?? null; // { station } or { door }
 }
 let hovered = null;
 function hover(e) {
-  if (state !== 'play' || !isInside(crewBody.translation())) { hovered = null; canvas.style.cursor = ''; return; }
-  hovered = pick(e);
-  canvas.style.cursor = hovered ? 'pointer' : '';
+  if (state !== 'play') { hovered = null; canvas.style.cursor = ''; return; }
+  const what = pick(e);
+  hovered = isInside(crewBody.translation()) ? what?.station ?? null : null;
+  canvas.style.cursor = hovered || what?.door ? 'pointer' : '';
 }
 let walkTo = null;
 function click(e) {
-  if (!isInside(crewBody.translation())) return;
-  const id = pick(e);
-  if (id) goToStation(id);
+  const what = pick(e);
+  if (what?.door) return useDoor(what.door);
+  if (what?.station && isInside(crewBody.translation())) goToStation(what.station);
 }
 function goToStation(id) {
   walkTo = { id, target: stations[id].stand.clone(), since: 0 };
@@ -551,6 +713,10 @@ function nearestUsable() {
     panels.forEach((pn, i) => { if (!sim.panels[i]) consider(Math.hypot(here.x - pn.at.x, here.z - pn.at.z), { kind: 'panel', i, label: `fix solar panel ${i + 1}` }); });
     samples.forEach(s => { if (!sim.samples.has(s.id)) consider(Math.hypot(here.x - s.at.x, here.z - s.at.z), { kind: 'sample', id: s.id, label: 'pick up the rock sample' }); });
   }
+  for (const door of Object.values(doors)) {
+    // The open door is not offered: walking through it is the point.
+    if (sim && !sim.airlock[door.which]) consider(here.distanceTo(door.at) + 0.6, { kind: 'door', id: door.which, label: `use the ${door.which} door` });
+  }
   return best;
 }
 function useNearest() {
@@ -559,6 +725,7 @@ function useNearest() {
   if (it.kind === 'station') openStation(it.id);
   if (it.kind === 'panel') hooks?.notice(sim.repairPanelByHand(it.i));
   if (it.kind === 'sample') sim.collectSample(it.id);
+  if (it.kind === 'door') useDoor(it.id);
 }
 function openStation(id) {
   walkTo = null;
@@ -572,13 +739,15 @@ function tick(dt) {
   const speedWalk = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   let mx = fx * fwd - fz * side, mz = fz * fwd + fx * side;
-  const p = crewBody.translation();
+  let p = crewBody.translation();
   if (fwd || side) walkTo = null;
   if (walkTo) {
     walkTo.since += dt;
     const dx = walkTo.target.x - p.x, dz = walkTo.target.z - p.z, d = Math.hypot(dx, dz);
     if (d < 0.5) { openStation(walkTo.id); mx = mz = 0; }
-    else if (walkTo.since > 4) { teleport(standSpot(walkTo.id)); openStation(walkTo.id); mx = mz = 0; }
+    // Stuck behind furniture (or a closed door): hop to the station. Read the position again,
+    // or the move below would put the astronaut straight back.
+    else if (walkTo.since > 4 || walkTo.stuck > 0.8) { teleport(standSpot(walkTo.id)); p = crewBody.translation(); openStation(walkTo.id); mx = mz = 0; }
     else { mx = dx; mz = dz; }
   }
   const len = Math.hypot(mx, mz);
@@ -590,6 +759,7 @@ function tick(dt) {
   controller.computeColliderMovement(crewCollider, want);
   const got = controller.computedMovement();
   grounded = controller.computedGrounded();
+  if (walkTo) walkTo.stuck = Math.hypot(got.x, got.z) < 0.3 * Math.hypot(want.x, want.z) ? (walkTo.stuck ?? 0) + dt : 0;
   if (grounded && vy < 0) vy = 0;
   if (vy > 0 && got.y < want.y - 1e-4) vy = 0;
 
@@ -611,10 +781,11 @@ function tick(dt) {
 
   const inside = isInside(now);
   const inHull = inside && now.x < airlockX; // the airlock tube has its own roof, so it uses the normal camera
+  const inLock = airlockZone(now).inAirlock;
   // Cutaway: inside, the roof fades away and the camera looks down from above.
   roofMeshes.forEach(m => { m.visible = !inside; });
   Object.values(stations).forEach(s => {
-    s.marker.visible = inside;
+    s.marker.visible = inside && !(inLock && s.id === 'Airlock'); // it would hang in front of the airlock camera
     const on = inside && (hovered === s.id || nearestUsable()?.id === s.id);
     s.glow += ((on ? 1 : 0) - s.glow) * Math.min(1, dt * 8);
     s.mats.forEach(m => { m.emissive?.setRGB(0.05 * s.glow, 0.26 * s.glow, 0.55 * s.glow); });
@@ -623,7 +794,13 @@ function tick(dt) {
   head.set(now.x, now.y + 0.6, now.z);
   const viewPitch = inHull ? Math.max(pitch, 0.95) : pitch;
   camDir.set(Math.sin(yaw) * Math.cos(viewPitch), Math.sin(viewPitch), Math.cos(yaw) * Math.cos(viewPitch));
-  if (inHull) {
+  if (inLock) {
+    // Between the doors there is no room for a chase camera, so a wide one looks down from the
+    // ceiling, like the cutaway view in the cabin. It tilts so "forward" stays up the screen.
+    const dir = Math.sin(yaw) < 0 ? 1 : -1, mid = (INNER_X + OUTER_X) / 2;
+    camera.position.copy(hab(mid - 1.7 * dir, 0, DECK + 10.7));
+    head.copy(hab(mid + 0.5 * dir, 0, DECK));
+  } else if (inHull) {
     camera.position.copy(head).addScaledVector(camDir, Math.max(camDist, 9));
   } else {
     camRay.origin = head;
@@ -633,6 +810,8 @@ function tick(dt) {
     const d = hit ? Math.max(hit.timeOfImpact - 0.3, 0.2) : want;
     camera.position.copy(head).addScaledVector(camDir, d);
   }
+  const fov = inLock ? 88 : 60;
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
   camera.lookAt(head);
 
   sun.target.position.copy(head);
@@ -709,10 +888,12 @@ renderer.setAnimationLoop(t => {
     if (sim && !sim.over) {
       const p = crewBody.translation();
       sim.where = whereIs(p);
+      Object.assign(sim, airlockZone(p));
       if (!frozen) sim.tick(dt * speed);
       // Out of suit air: the base computer guides you back in, and it costs you.
       if (sim.where === 'outside' && sim.suit <= 0) {
         teleport(insideSpot());
+        sim.airlockSet('pressurized');
         sim.air = Math.max(0, sim.air - 10);
         sim.dose += 3;
         sim.suit = 5;
@@ -720,6 +901,7 @@ renderer.setAnimationLoop(t => {
       }
     }
     syncWorld(dt);
+    syncAirlock(dt);
     hooks?.frame(nearestUsable());
   }
   renderer.render(scene, camera);
@@ -742,6 +924,7 @@ gameReady({
     camDist = 9;
     grounded = false;
     walkTo = null;
+    syncAirlock(0, true);
     frozen = false;
     state = 'play';
   },
@@ -755,8 +938,15 @@ gameReady({
     if (v.z > 1) return null;
     return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
   },
-  goOutside() { teleport(outsideSpot()); yaw = Math.PI / 2; pitch = 0.25; camDist = 7; state = 'play'; },
-  goInside() { teleport(insideSpot()); pitch = 1; state = 'play'; },
+  // Shortcut for scripted checks: skips the airlock and leaves it open to the Moon.
+  goOutside() { teleport(outsideSpot()); sim?.airlockSet('vacuum'); syncAirlock(0, true); yaw = Math.PI / 2; pitch = 0.25; camDist = 7; state = 'play'; },
+  // The "Back to the airlock" button: puts you between the doors and starts the trip in.
+  goInside() {
+    teleport(standSpot('Airlock'));
+    if (sim) { Object.assign(sim, { inAirlock: true, doorway: null }); hooks?.notice(sim.airlockStart('in')); }
+    yaw = Math.PI / 2; pitch = 0.5; camDist = 4;
+    state = 'play';
+  },
   goToStation,
   pause() { state = 'paused'; keys.clear(); walkTo = null; },
   resume() { state = 'play'; },
@@ -782,4 +972,4 @@ gameReady({
 });
 
 // For scripted checks from the browser console.
-window.demo = { goTo: id => goToStation(id), scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { goTo: id => goToStation(id), doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };

@@ -384,6 +384,8 @@ function finish() {
   if (stars) (save.best[mission.id] ??= {})[mode] = Math.max(best, stars);
   commit();
   const cards = mission.dataCards.map(kind => dataCard(kind, game.site));
+  // Anyone who went through the airlock also gets the card about it.
+  if (sim.airlock.uses) cards.push(dataCard('airlock', game.site));
   const met = sim.storms.filter(s => s.started);
   const stormFacts = met.map((s, i) => [
     met.length > 1 ? `Solar storm ${i + 1}` : 'Solar storm',
