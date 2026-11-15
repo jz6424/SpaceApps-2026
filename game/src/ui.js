@@ -196,7 +196,7 @@ function mapHtml() {
   const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px`;
   const line = (id, kind, from = SPOTS[id].parent) => {
     const a = SPOTS[from], b = SPOTS[id];
-    return `<line class="${kind}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+    return `<line class="${kind}" data-a="${from}" data-b="${id}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
   };
   const kindOf = node => (state(node) === 'owned' ? 'on' : isShut(state(node)) ? 'shut' : 'open');
   const lines = BRANCHES.flatMap(branch => [
@@ -205,10 +205,10 @@ function mapHtml() {
     ...branch.nodes.filter(node => SPOTS[node.id].dep).map(node => line(node.id, kindOf(node), SPOTS[node.id].dep)),
   ]);
   const nodes = BRANCHES.flatMap(branch => [
-    `<div class="rt-branch" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${glyph(branch.id, 24, branch.icon)}</span><span class="rt-name">${branch.name}</span></div>`,
+    `<div class="rt-branch" data-spot="branch-${branch.id}" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${glyph(branch.id, 24, branch.icon)}</span><span class="rt-name">${branch.name}</span></div>`,
     ...branch.nodes.map(node => {
       const st = state(node);
-      return `<button class="rt-node is-${st}" id="node-${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
+      return `<button class="rt-node is-${st}" id="node-${node.id}" data-spot="${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
           aria-pressed="${picked === node.id}" aria-label="${node.name}, ${STATE_WORDS[st]}">
         <span class="rt-dot">${glyph(node.id, 24, node.icon)}${st === 'owned' ? `<span class="rt-badge">${glyph('check', 12)}</span>` : isShut(st) ? `<span class="rt-badge">${glyph('lock', 12)}</span>` : ''}</span>
         <span class="rt-name">${node.name}</span>
@@ -217,7 +217,7 @@ function mapHtml() {
   ]);
   return `
     <svg class="rt-lines" viewBox="0 0 ${MAP.size} ${MAP.size}" aria-hidden="true">${lines.join('')}</svg>
-    <div class="rt-hub" style="${at('hub')}"><span class="rt-dot">${glyph('hub', 32)}</span><span class="rt-name">Your base</span></div>
+    <div class="rt-hub" data-spot="hub" style="${at('hub')}"><span class="rt-dot">${glyph('hub', 32)}</span><span class="rt-name">Your base</span></div>
     ${nodes.join('')}`;
 }
 
@@ -365,30 +365,112 @@ function showPanel(id) {
   if (id) $('research-panel').innerHTML = panelHtml(nodeById(id));
 }
 
-// The sky behind the tree: a field of stars, the same every time, redrawn to fit the window.
+// The sky behind the tree: a field of stars, the same every time. Most of them twinkle, each on its
+// own slow beat; a few bright ones carry a soft halo.
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let sky = [];
 function drawStars() {
   const cv = $('research-stars'), w = innerWidth, h = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
   cv.width = Math.round(w * dpr);
   cv.height = Math.round(h * dpr);
   const ctx = cv.getContext('2d');
-  ctx.scale(dpr, dpr);
   let seed = 20261114;
   const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
   const TINTS = ['255, 255, 255', '255, 255, 255', '255, 255, 255', '196, 214, 255', '222, 204, 255'];
+  sky = [];
   for (let i = Math.round(w * h / 650); i > 0; i--) {
     const x = rnd() * w, y = rnd() * h, big = rnd() > 0.93;
     const r = big ? 0.9 + rnd() * 0.7 : 0.35 + rnd() * 0.5;
     const tint = TINTS[Math.floor(rnd() * TINTS.length)], alpha = big ? 0.8 + rnd() * 0.2 : 0.3 + rnd() * 0.6;
-    if (big) { // a soft halo around the few bright ones
-      const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
+    let halo = null;
+    if (big) { // made once: a gradient belongs to its place on the canvas, so it can be reused
+      halo = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
       halo.addColorStop(0, `rgba(${tint}, 0.28)`);
       halo.addColorStop(1, `rgba(${tint}, 0)`);
-      ctx.fillStyle = halo;
-      ctx.beginPath(); ctx.arc(x, y, r * 4, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = `rgba(${tint}, ${alpha})`;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    // phase, speed (one beat every 2 to 8 seconds) and depth of the twinkle
+    sky.push({ x, y, r, fill: `rgb(${tint})`, alpha, halo, phase: rnd() * 6.283, speed: 0.8 + rnd() * 2.4, depth: rnd() < 0.3 ? 0.1 : 0.45 + rnd() * 0.5 });
   }
+  paintStars(0);
+}
+function paintStars(t) {
+  const cv = $('research-stars'), ctx = cv.getContext('2d'), dpr = cv.width / innerWidth;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  for (const st of sky) {
+    const glow = calm ? 1 : 1 - st.depth * (0.5 + 0.5 * Math.sin(t * st.speed + st.phase));
+    ctx.globalAlpha = st.alpha * glow;
+    if (st.halo) { ctx.fillStyle = st.halo; ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 4, 0, 7); ctx.fill(); }
+    ctx.fillStyle = st.fill;
+    ctx.beginPath(); ctx.arc(st.x, st.y, st.r * (0.85 + 0.25 * glow), 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// --- The jiggle: the circles hang on springs. When the map is dragged they lag a little behind,
+// swing past and settle, the outer ones more than the inner ones. Each frame the map's change of
+// speed pushes on every circle; a spring pulls it home and damping calms it.
+const SPRING = 130, DAMP = 7, SWAY = [0, 0.4, 0.62, 0.75]; // stiffness, damping, how much each ring moves
+let wobble = new Map(); // spot id -> { el, w, k, ox, oy, vx, vy }
+let wobbleLines = [];
+function wireWobble() {
+  wobble = new Map();
+  for (const el of $('research-map').querySelectorAll('[data-spot]')) {
+    const id = el.dataset.spot, spot = SPOTS[id];
+    // A small difference in stiffness from circle to circle, so they don't all move as one.
+    const k = SPRING * (0.85 + 0.3 * ((id.length * 37 + id.charCodeAt(0)) % 10) / 10);
+    wobble.set(id, { el, w: SWAY[spot.ring], k, ox: 0, oy: 0, vx: 0, vy: 0 });
+  }
+  wobbleLines = [...$('research-map').querySelectorAll('line[data-a]')].map(el => ({ el, a: el.dataset.a, b: el.dataset.b }));
+}
+const motion = { x: 0, y: 0, s: 0, vx: 0, vy: 0, still: 0 };
+function jiggle(dt) {
+  if (calm || !wobble.size) return;
+  // How fast the map is moving on screen, and how fast that is changing. A zoom isn't a drag.
+  let ax = 0, ay = 0;
+  if (view.s === motion.s) {
+    const vx = (view.x - motion.x) / dt, vy = (view.y - motion.y) / dt;
+    ax = (vx - motion.vx) / dt; ay = (vy - motion.vy) / dt;
+    const most = 9000, a = Math.hypot(ax, ay);
+    if (a > most) { ax *= most / a; ay *= most / a; }
+    motion.vx = vx; motion.vy = vy;
+  } else { motion.vx = motion.vy = 0; }
+  Object.assign(motion, { x: view.x, y: view.y, s: view.s });
+  let busy = false;
+  for (const n of wobble.values()) {
+    if (!n.w) continue;
+    // In map units: the push is the map's acceleration on screen, divided by the zoom.
+    n.vx += (-n.k * n.ox - DAMP * n.vx - n.w * ax / view.s) * dt;
+    n.vy += (-n.k * n.oy - DAMP * n.vy - n.w * ay / view.s) * dt;
+    n.ox = Math.max(-18, Math.min(18, n.ox + n.vx * dt));
+    n.oy = Math.max(-18, Math.min(18, n.oy + n.vy * dt));
+    if (Math.abs(n.ox) + Math.abs(n.oy) > 0.05 || Math.abs(n.vx) + Math.abs(n.vy) > 0.5) busy = true;
+    else { n.ox = n.oy = n.vx = n.vy = 0; }
+  }
+  if (!busy && motion.still) return; // everything at rest, and already drawn at rest
+  motion.still = !busy;
+  for (const n of wobble.values()) n.el.style.transform = n.ox || n.oy ? `translate(${n.ox.toFixed(2)}px, ${n.oy.toFixed(2)}px)` : '';
+  const off = id => wobble.get(id) ?? { ox: 0, oy: 0 };
+  for (const l of wobbleLines) {
+    const a = SPOTS[l.a], b = SPOTS[l.b], oa = off(l.a), ob = off(l.b);
+    l.el.setAttribute('x1', (a.x + oa.ox).toFixed(2)); l.el.setAttribute('y1', (a.y + oa.oy).toFixed(2));
+    l.el.setAttribute('x2', (b.x + ob.ox).toFixed(2)); l.el.setAttribute('y2', (b.y + ob.oy).toFixed(2));
+  }
+}
+
+// One loop for the Research Tree screen while it is open: the twinkle and the jiggle.
+let treeLoop = 0, treeLast = 0;
+function treeFrame(now) {
+  if ($('research').hidden) { treeLoop = 0; return; }
+  const dt = Math.min(0.05, (now - treeLast) / 1000 || 0.016);
+  treeLast = now;
+  jiggle(dt);
+  if (!calm) paintStars(now / 1000);
+  treeLoop = requestAnimationFrame(treeFrame);
+}
+function startTreeLoop() {
+  Object.assign(motion, { x: view.x, y: view.y, s: view.s, vx: 0, vy: 0, still: 0 });
+  if (!treeLoop) { treeLast = performance.now(); treeLoop = requestAnimationFrame(treeFrame); }
 }
 
 function renderResearch() {
@@ -398,6 +480,7 @@ function renderResearch() {
     : 'Point at a circle to see what it does. For now research opens new missions; the upgrades stay locked until a later update. ')
     + (isTouchScreen ? 'Drag to move around, pinch to zoom.' : 'Drag to move around. Scroll or press + and − to zoom.');
   $('research-map').innerHTML = mapHtml();
+  wireWobble();
   panelShows = undefined;
   showPanel(picked);
 }
@@ -408,6 +491,7 @@ function openResearch() {
   show('research');
   fitMap();
   drawStars();
+  startTreeLoop();
 }
 
 // Clicking a circle keeps its details showing; clicking it again puts them away.

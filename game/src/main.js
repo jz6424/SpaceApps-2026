@@ -114,9 +114,37 @@ for (let i = 0; i < 3000; i++) {
   const v = new THREE.Vector3().randomDirection().multiplyScalar(6000);
   if (v.y > -500) starPos.push(v.x, v.y, v.z);
 }
+// The stars twinkle: each one brightens and dims on its own slow beat, so the sky never pulses
+// all at once. About a third hardly change at all, like steady stars.
+const starCount = starPos.length / 3, starBeat = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+  const steady = Math.random() < 0.35;
+  starBeat.set([Math.random() * 6.283, 0.6 + Math.random() * 2.2, steady ? 0.12 : 0.4 + Math.random() * 0.45], i * 3);
+}
+const starSky = new THREE.ShaderMaterial({
+  uniforms: { time: { value: 0 }, size: { value: 1.6 * renderer.getPixelRatio() } },
+  vertexShader: `
+    attribute vec3 beat; // phase, speed, how deep the twinkle goes
+    uniform float time, size;
+    varying float glow;
+    void main() {
+      glow = 1.0 - beat.z * (0.5 + 0.5 * sin(time * beat.y + beat.x));
+      gl_PointSize = size * (0.75 + 0.45 * glow);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    varying float glow;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      gl_FragColor = vec4(vec3(1.0), glow * smoothstep(0.5, 0.2, d));
+    }`,
+  transparent: true, depthWrite: false,
+});
 scene.add(new THREE.Points(
-  new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3)),
-  new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, depthWrite: false }),
+  new THREE.BufferGeometry()
+    .setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3))
+    .setAttribute('beat', new THREE.BufferAttribute(starBeat, 3)),
+  starSky,
 ));
 
 // The Earth hangs low in the sky to the north (the base is at the south pole).
@@ -1104,7 +1132,8 @@ const ACCEL = 7;       // how quickly the walking speed catches up with the keys
 const BRAKE = 10;      // how quickly they stop when you let go
 const TURN = 7;        // how quickly the body turns to face its direction
 const TURN_MAX = 7;
-const AIR_TURN = 1.2;  // how fast the keys can bend your path in mid-air, in radians a second
+const AIR_STEER = 5;   // how quickly the keys turn you in mid-air (a little gentler than on the ground)
+let airCap = WALK;     // the fastest you may go in the air: your speed when you left the ground
 const FOV = 60, FOV_RUN = 68; // the view widens a little while sprinting    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
 let velX = 0, velZ = 0, facing = 0;
 const camRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
@@ -1194,22 +1223,20 @@ function tick(dt) {
   const len = Math.hypot(mx, mz);
   if (len > 0) { mx *= speedWalk / len; mz *= speedWalk / len; }
 
-  // On the ground, speed drifts toward what the keys ask for, so starts, stops and turns are curves.
-  // In the air there is nothing to push against, so the speed you jumped with is the speed you
-  // keep: the keys can only bend the path a little, and Shift changes nothing but the view.
+  // Speed drifts toward what the keys ask for, so starts, stops and turns are curves. In the air
+  // you can still steer any way you like, but you can't go faster than you were going when you
+  // left the ground (and at least a walk): pressing Shift mid-air changes the view, not the speed.
+  // Letting go of the keys mid-air keeps your drift; there is nothing to brake against.
   const ease = rate => 1 - Math.exp(-rate * dt);
   if (grounded) {
     const pull = ease(len > 0 ? ACCEL : BRAKE);
     velX += (mx - velX) * pull;
     velZ += (mz - velZ) * pull;
+    airCap = Math.max(WALK, Math.hypot(velX, velZ));
   } else if (len > 0) {
-    const fly = Math.hypot(velX, velZ);
-    if (fly > 0.05) {
-      const heading = Math.atan2(velX, velZ), wanted = Math.atan2(mx, mz);
-      const bend = THREE.MathUtils.clamp(Math.atan2(Math.sin(wanted - heading), Math.cos(wanted - heading)), -AIR_TURN * dt, AIR_TURN * dt);
-      velX = Math.sin(heading + bend) * fly;
-      velZ = Math.cos(heading + bend) * fly;
-    }
+    const pull = ease(AIR_STEER), unit = Math.hypot(mx, mz); // the keys' direction, whatever the speed asked for
+    velX += (mx / unit * airCap - velX) * pull;
+    velZ += (mz / unit * airCap - velZ) * pull;
   }
   // Sprinting (Shift, or the joystick pushed all the way) widens the view a little, in the air too.
   const sprinting = len > 0 && speedWalk === RUN;
@@ -1354,6 +1381,8 @@ if (new URLSearchParams(location.search).has('low')) lowGraphics();
 let frozen = false; // the guided tour can stop the clock while it explains things
 let last = performance.now();
 renderer.setAnimationLoop(t => {
+  starSky.uniforms.time.value = t / 1000;
+  starSky.uniforms.size.value = 1.6 * renderer.getPixelRatio();
   const dt = Math.min((t - last) / 1000, 1 / 15);
   last = t;
   if (state === 'play' && !low) {
