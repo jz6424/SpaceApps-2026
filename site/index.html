@@ -29,6 +29,22 @@
     <symbol id="i-wind" viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
     <symbol id="i-orbit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="10.5" ry="4" transform="rotate(-25 12 12)"/></symbol>
+    <symbol id="i-mountain" viewBox="0 0 24 24"><path d="M2 20l7-12 4 7 2.5-4L22 20z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></symbol>
+    <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M3.34 7l17.32 10M3.34 17L20.66 7M9 4l3 3 3-3M9 20l3-3 3 3"/></symbol>
+    <!-- The game's logo: a small Moon with the base on top and Earth going round -->
+    <symbol id="logo" viewBox="0 0 96 96">
+      <g transform="rotate(-20 48 56)" fill="none" stroke="#EAFE07" stroke-width="3.5" stroke-linecap="round"><path d="M4 56a44 14 0 0 1 88 0"/></g>
+      <path d="M68 34V14" stroke="#F2F6FC" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M69 14h12l-4 4.5 4 4.5H69z" fill="#E43700"/>
+      <path d="M40 24v5M56 24v5" stroke="#8FA3C8" stroke-width="3" stroke-linecap="round"/>
+      <rect x="33" y="11" width="30" height="15" rx="7.5" fill="#F2F6FC"/>
+      <path d="M40 11h5v15h-5z" fill="#0960E1"/>
+      <circle cx="54" cy="18.5" r="3" fill="#EAFE07"/>
+      <circle cx="48" cy="56" r="30" fill="#C9D8F2"/>
+      <circle cx="37" cy="62" r="7" fill="#8FA3C8"/><circle cx="59" cy="70" r="4" fill="#8FA3C8"/><circle cx="57" cy="47" r="3.5" fill="#8FA3C8"/><circle cx="34" cy="44" r="2.5" fill="#8FA3C8"/>
+      <g transform="rotate(-20 48 56)"><path d="M4 56a44 14 0 0 0 88 0" fill="none" stroke="#EAFE07" stroke-width="3.5" stroke-linecap="round"/><circle cx="72" cy="67.6" r="6" fill="#2E96F5" stroke="#07173F" stroke-width="2.5"/></g>
+    </symbol>
     <clipPath id="patch-clip"><circle cx="48" cy="48" r="38"/></clipPath>
   </defs>
 </svg>
@@ -36,9 +52,9 @@
 <a class="skip" href="#play">Skip to the game</a>
 
 <header class="site-head">
-  <div class="wrap">
+  <div class="wrap wide">
     <a class="brand" href="#top">
-      <svg class="ico" width="24" height="24" aria-hidden="true"><use href="#i-orbit"/></svg>
+      <svg class="brand-mark" width="32" height="32" aria-hidden="true"><use href="#logo"/></svg>
       <span>Moon Base Trainer</span>
     </a>
     <nav aria-label="Sections">
@@ -61,18 +77,18 @@
   <svg class="scene" viewBox="0 0 1440 460" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">
     <defs>
       <linearGradient id="ground" gradientUnits="userSpaceOnUse" x1="0" y1="356" x2="0" y2="452">
-        <stop offset="0" stop-color="#22366A"/><stop offset="1" stop-color="#07173F"/>
+        <stop offset="0" stop-color="#17409F"/><stop offset="1" stop-color="#07173F"/>
       </linearGradient>
       <clipPath id="earth-clip"><circle cx="1180" cy="112" r="52"/></clipPath>
       <clipPath id="hab-clip"><rect x="0" y="20" width="220" height="72" rx="36"/></clipPath>
     </defs>
     <g fill="#fff">
-      <circle cx="96" cy="62" r="1.4" opacity=".5"/><circle cx="212" cy="236" r="1.2" opacity=".4"/><circle cx="318" cy="38" r="1.8" opacity=".6"/>
-      <circle cx="452" cy="268" r="1.4" opacity=".45"/><circle cx="566" cy="24" r="1.2" opacity=".5"/><circle cx="688" cy="92" r="2" opacity=".8"/>
-      <circle cx="742" cy="214" r="1.4" opacity=".6"/><circle cx="806" cy="46" r="1.2" opacity=".6"/><circle cx="858" cy="152" r="1.8" opacity=".85"/>
+      <circle cx="96" cy="62" r="1.4" opacity=".5"/><circle cx="212" cy="236" r="1.2" opacity=".4"/><circle cx="318" cy="38" r="2.2" fill="#2E96F5"/>
+      <circle cx="452" cy="268" r="1.4" opacity=".45"/><circle cx="566" cy="24" r="1.2" opacity=".5"/><circle cx="688" cy="92" r="2.4" fill="#EAFE07"/>
+      <circle cx="742" cy="214" r="1.4" opacity=".6"/><circle cx="806" cy="46" r="1.2" opacity=".6"/><circle cx="858" cy="152" r="2.2" fill="#2E96F5"/>
       <circle cx="914" cy="258" r="1.2" opacity=".6"/><circle cx="962" cy="72" r="2.2" opacity=".9"/><circle cx="1018" cy="190" r="1.4" opacity=".7"/>
       <circle cx="1052" cy="30" r="1.2" opacity=".6"/><circle cx="1096" cy="246" r="1.8" opacity=".8"/><circle cx="1122" cy="204" r="1.2" opacity=".6"/>
-      <circle cx="1268" cy="48" r="1.4" opacity=".7"/><circle cx="1296" cy="184" r="2" opacity=".9"/><circle cx="1348" cy="104" r="1.2" opacity=".6"/>
+      <circle cx="1268" cy="48" r="1.4" opacity=".7"/><circle cx="1296" cy="184" r="2.4" fill="#EAFE07"/><circle cx="1348" cy="104" r="1.2" opacity=".6"/>
       <circle cx="1386" cy="232" r="1.6" opacity=".8"/><circle cx="1412" cy="36" r="1.8" opacity=".75"/><circle cx="1236" cy="226" r="1.2" opacity=".6"/>
       <circle cx="632" cy="286" r="1.2" opacity=".45"/><circle cx="384" cy="150" r="1.2" opacity=".35"/><circle cx="1154" cy="20" r="1.2" opacity=".5"/>
     </g>
@@ -88,8 +104,12 @@
       </g>
     </g>
 
+    <!-- The Sun, low on the horizon the way it is at the south pole -->
+    <g fill="none" stroke="#C9D8F2" stroke-width="2"><circle cx="470" cy="330" r="76" opacity=".3"/><circle cx="470" cy="330" r="108" opacity=".16"/></g>
+    <circle cx="470" cy="330" r="46" fill="#EAFE07"/>
+
     <!-- Far ridge, lit along its top by the low Sun -->
-    <path d="M0 350C160 320 300 345 460 330S760 300 900 318s280-28 540-6v148H0z" fill="#16295A"/>
+    <path d="M0 350C160 320 300 345 460 330S760 300 900 318s280-28 540-6v148H0z" fill="#1D4AB3"/>
     <path d="M0 350C160 320 300 345 460 330S760 300 900 318s280-28 540-6" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".35"/>
 
     <!-- Solar tower on the far ridge -->
@@ -103,7 +123,7 @@
     <!-- Near ground -->
     <path d="M0 400C240 372 520 392 760 380s440-24 680 4v76H0z" fill="url(#ground)"/>
     <path d="M0 400C240 372 520 392 760 380s440-24 680 4" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".5"/>
-    <g fill="#0B1C49">
+    <g fill="#0E2C7A">
       <ellipse cx="300" cy="418" rx="44" ry="7"/><ellipse cx="640" cy="406" rx="26" ry="4"/><ellipse cx="1376" cy="412" rx="34" ry="5"/><ellipse cx="96" cy="432" rx="20" ry="3"/>
     </g>
     <g fill="none" stroke="#C9D8F2" stroke-width="1.5" stroke-linecap="round" opacity=".4">
@@ -155,26 +175,8 @@
     </g>
   </svg>
 
-  <div class="wrap">
-    <div class="hero-copy">
-      <p class="kicker">Moon Base Trainer, made for the NASA Space Apps Challenge 2026</p>
-      <h1>Run your own moon base</h1>
-      <p class="lede">Keep a moon base running at the real lunar south pole. Share your power, watch your air and hide from solar storms. The ground you walk on comes from NASA elevation data.</p>
-      <div class="hero-go">
-        <button class="btn primary big" data-do="play">
-          <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
-          Play now
-        </button>
-        <a class="quiet" href="#how">How to play</a>
-      </div>
-      <ul class="facts"><li>For ages 7 to 12</li><li>About 5 minutes a mission</li><li>No download, no account</li></ul>
-    </div>
-  </div>
-</section>
-
-<section class="play-zone" aria-label="The game">
-  <div class="wrap">
-    <!-- The game. It loads into the frame when you press Start, and this whole box can go full screen. -->
+  <div class="wrap wide">
+    <!-- The game. Before it starts this is its title screen; it loads into the frame when you press Play, and the whole box can go full screen. -->
     <div id="play" class="stage" tabindex="-1">
       <div class="stage-bar">
         <p class="stage-name"><span class="dot" aria-hidden="true"></span><span id="stage-status">Ready to play</span></p>
@@ -191,23 +193,30 @@
       </div>
       <div class="stage-body">
         <div id="poster" class="poster">
-          <img src="img/14-warning.png" width="1280" height="800" fetchpriority="high" alt="A cutaway view of the Habitat in the game. Labels mark the Galley, Robot Map, Comms, Life Support and Power stations, and Mission Control warns that a solar storm is coming.">
-          <div class="poster-bar">
-            <button class="btn primary" data-do="play">
-              <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
-              Start the game
-            </button>
-            <button class="btn" data-do="fullscreen">
-              <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
-              Start in full screen
-            </button>
-            <p class="fine">Works best with a keyboard and mouse</p>
+          <div class="title-card">
+            <p class="kicker">Made for the NASA Space Apps Challenge 2026</p>
+            <h1 class="logo">
+              <svg class="logo-mark" viewBox="0 0 96 96" aria-hidden="true"><use href="#logo"/></svg>
+              <span>Moon Base <span>Trainer</span></span>
+            </h1>
+            <p class="lede">Run your own moon base at the real lunar south pole. Share your power, watch your air and hide from solar storms.</p>
+            <div class="hero-go">
+              <button class="btn primary big" data-do="play">
+                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
+                Play now
+              </button>
+              <button class="btn big" data-do="fullscreen">
+                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
+                Play full screen
+              </button>
+            </div>
+            <ul class="facts"><li>For ages 7 to 12</li><li>About 5 minutes a mission</li><li>No download, no account</li></ul>
+            <p class="fine">Works best with a keyboard and mouse. On a slow computer, <button class="link" data-do="low">start with simple graphics</button>. This browser saves your progress.</p>
           </div>
         </div>
         <iframe id="game" title="Moon Base Trainer game" data-src="play/" allow="fullscreen" allowfullscreen hidden></iframe>
       </div>
     </div>
-    <p class="fine under-stage">On a slow computer, <button class="link" data-do="low">start with simple graphics</button>. This browser saves your progress.</p>
   </div>
 </section>
 
@@ -218,16 +227,16 @@
     <div class="split">
       <dl class="meters" aria-label="The three meters, with example readings from the game">
         <div class="meter">
-          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-zap"/></svg>Power <span class="val">95% · draining</span></dt>
-          <dd><span class="bar" aria-hidden="true"><i style="width:95%"></i></span>Solar panels only work while the Sun is up. Charge the battery by day and make it last through the lunar night.</dd>
+          <dt><span class="chip power"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-zap"/></svg></span>Power <span class="val">95% · draining</span></dt>
+          <dd><span class="bar" aria-hidden="true"><i class="power" style="width:95%"></i></span>Solar panels only work while the Sun is up. Charge the battery by day and make it last through the lunar night.</dd>
         </div>
         <div class="meter">
-          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-wind"/></svg>Life Support <span class="val">89%</span></dt>
+          <dt><span class="chip air"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-wind"/></svg></span>Life Support <span class="val">89%</span></dt>
           <dd><span class="bar" aria-hidden="true"><i style="width:89%"></i></span>This is your air and water. Run it on Eco to save power, or on Boost when you need air fast.</dd>
         </div>
         <div class="meter">
-          <dt><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-shield"/></svg>Radiation dose <span class="val">6 of 100</span></dt>
-          <dd><span class="bar" aria-hidden="true"><i style="width:6%"></i></span>It rises a little all the time and a lot in solar storms. Pile moon dirt on the Storm Shelter and hide inside.</dd>
+          <dt><span class="chip dose"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-shield"/></svg></span>Radiation dose <span class="val">6 of 100</span></dt>
+          <dd><span class="bar" aria-hidden="true"><i class="dose" style="width:6%"></i></span>It rises a little all the time and a lot in solar storms. Pile moon dirt on the Storm Shelter and hide inside.</dd>
         </div>
       </dl>
       <p class="callout"><b>Nothing is free</b> Everything that helps costs power, moon dirt, suit air or radiation dose, so you have to choose what to spend.</p>
@@ -235,9 +244,9 @@
 
     <h2 class="gap">Three missions</h2>
     <ol class="missions">
-      <li>
-        <svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
-          <circle cx="48" cy="48" r="47" fill="#0042A6"/>
+      <li class="m1">
+        <div class="m-art"><svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
+          <circle cx="48" cy="48" r="46" fill="#0042A6" stroke="#fff" stroke-width="2"/>
           <g clip-path="url(#patch-clip)">
             <circle cx="48" cy="58" r="17" fill="#EAFE07"/>
             <path d="M0 62q24-12 48-2t48-4v40H0z" fill="#07173F"/>
@@ -246,13 +255,12 @@
             <g fill="#fff"><circle cx="26" cy="28" r="1.8"/><circle cx="66" cy="22" r="1.4"/><circle cx="74" cy="38" r="1.8"/><circle cx="40" cy="18" r="1.2"/></g>
           </g>
           <circle cx="48" cy="48" r="42" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 4" opacity=".8"/>
-        </svg>
-        <div><p class="tag">Mission 1</p><h3>First Night</h3><p>You just landed. Charge the battery while the Sun is up, then make it last through the dark.</p></div>
-        <p class="goal"><b>Goal</b> Reach sunrise with charge still in the battery</p>
+        </svg></div>
+        <div class="m-body"><p class="tag">Mission 1</p><h3>First Night</h3><p>You just landed. Charge the battery while the Sun is up, then make it last through the dark.</p><p class="goal"><b>Goal</b> Reach sunrise with charge still in the battery</p></div>
       </li>
-      <li>
-        <svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
-          <circle cx="48" cy="48" r="47" fill="#16295A"/>
+      <li class="m2">
+        <div class="m-art"><svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
+          <circle cx="48" cy="48" r="46" fill="#16295A" stroke="#fff" stroke-width="2"/>
           <g clip-path="url(#patch-clip)">
             <circle cx="20" cy="22" r="21" fill="#E43700"/>
             <g fill="none" stroke="#E43700" stroke-width="3" stroke-linecap="round">
@@ -263,13 +271,12 @@
             <rect x="57" y="68" width="12" height="12" rx="3" fill="#0042A6"/>
           </g>
           <circle cx="48" cy="48" r="42" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 4" opacity=".8"/>
-        </svg>
-        <div><p class="tag">Mission 2</p><h3>Solar Storm</h3><p>Two solar storms are coming. Keep the antenna on for warnings from Earth and hide when the storm hits.</p></div>
-        <p class="goal"><b>Goal</b> Keep your radiation dose low through two solar storms</p>
+        </svg></div>
+        <div class="m-body"><p class="tag">Mission 2</p><h3>Solar Storm</h3><p>Two solar storms are coming. Keep the antenna on for warnings from Earth and hide when the storm hits.</p><p class="goal"><b>Goal</b> Keep your radiation dose low through two solar storms</p></div>
       </li>
-      <li>
-        <svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
-          <circle cx="48" cy="48" r="47" fill="#0960E1"/>
+      <li class="m3">
+        <div class="m-art"><svg class="patch" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true">
+          <circle cx="48" cy="48" r="46" fill="#0960E1" stroke="#fff" stroke-width="2"/>
           <g clip-path="url(#patch-clip)">
             <path d="M0 70h96v26H0z" fill="#07173F"/>
             <path d="M48 70V40" stroke="#4CC38A" stroke-width="4" stroke-linecap="round"/>
@@ -278,9 +285,8 @@
             <path d="M24 72l5 6-5 6-5-6zM70 73l4 5-4 5-4-5z" fill="#fff"/>
           </g>
           <circle cx="48" cy="48" r="42" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 4" opacity=".8"/>
-        </svg>
-        <div><p class="tag">Mission 3</p><h3>Ice and Greens</h3><p>Food is low and the cargo lander is late. Send the robot for crater ice and water the greenhouse.</p></div>
-        <p class="goal"><b>Goal</b> Grow enough food to have meals left at sunrise</p>
+        </svg></div>
+        <div class="m-body"><p class="tag">Mission 3</p><h3>Ice and Greens</h3><p>Food is low and the cargo lander is late. Send the robot for crater ice and water the greenhouse.</p><p class="goal"><b>Goal</b> Grow enough food to have meals left at sunrise</p></div>
       </li>
     </ol>
     <p class="fine">Play each mission as a Cadet, Explorer or Commander. Earn stars and research points to unlock the next one. Teachers and judges can open every mission at once from the bottom of the mission menu, or <a href="play/?all" target="_blank" rel="noopener">start with everything open</a>.</p>
@@ -308,22 +314,24 @@
 </section>
 
 <section id="data" class="band electric">
+  <svg class="edge" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true"><path d="M0 48V30C220 6 400 38 640 22s430-24 800 6v20z"/></svg>
   <div class="wrap">
     <h2>The game's Moon comes from NASA data</h2>
     <p class="intro">Your base is on Connecting Ridge, one of the Artemis III candidate landing regions NASA named in 2022. The ground, the sunlight and the storms all come from NASA.</p>
     <dl class="sources">
-      <div><dt>The ground you walk on</dt><dd>Lunar Reconnaissance Orbiter LOLA elevation model, 5 metres per pixel. <a href="https://pgda.gsfc.nasa.gov/products/78" target="_blank" rel="noopener">NASA PGDA product 78</a></dd></div>
-      <div><dt>Sunlight, Earth view and permanent shadow</dt><dd>LOLA south pole illumination maps. They set your solar power, your comms gaps and where the ice is. <a href="https://pgda.gsfc.nasa.gov/products/69" target="_blank" rel="noopener">NASA PGDA product 69</a></dd></div>
-      <div><dt>Solar storms</dt><dd>Every storm is sized from a real solar flare in NASA's space weather database. The flare's class sets how strong the storm is and how long it lasts, and each playthrough draws different flares from the past 12 months. If your browser can't reach the database, the game uses a list of real past flares and says so. <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA DONKI</a></dd></div>
-      <div><dt>Radiation limit</dt><dd>Astronauts follow this crew health standard. <a href="https://www.nasa.gov/ochmo/human-spaceflight-standards/" target="_blank" rel="noopener">NASA-STD-3001</a></dd></div>
-      <div><dt>Air and water numbers</dt><dd>These come from Ewert and Stromgren's 2019 NASA report. <a href="https://ntrs.nasa.gov/citations/20190027563" target="_blank" rel="noopener">NASA Technical Reports Server</a></dd></div>
-      <div><dt>Ice in craters</dt><dd>In 2009 the LCROSS mission found water ice in a permanently shadowed crater. <a href="https://www.nasa.gov/mission/lcross/" target="_blank" rel="noopener">NASA LCROSS</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-mountain"/></svg></span><dt>The ground you walk on</dt><dd>Lunar Reconnaissance Orbiter LOLA elevation model, 5 metres per pixel. <a href="https://pgda.gsfc.nasa.gov/products/78" target="_blank" rel="noopener">NASA PGDA product 78</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-sun"/></svg></span><dt>Sunlight, Earth view and permanent shadow</dt><dd>LOLA south pole illumination maps. They set your solar power, your comms gaps and where the ice is. <a href="https://pgda.gsfc.nasa.gov/products/69" target="_blank" rel="noopener">NASA PGDA product 69</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-zap"/></svg></span><dt>Solar storms</dt><dd>Every storm is sized from a real solar flare in NASA's space weather database. The flare's class sets how strong the storm is and how long it lasts, and each playthrough draws different flares from the past 12 months. If your browser can't reach the database, the game uses a list of real past flares and says so. <a href="https://ccmc.gsfc.nasa.gov/tools/DONKI/" target="_blank" rel="noopener">NASA DONKI</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-shield"/></svg></span><dt>Radiation limit</dt><dd>Astronauts follow this crew health standard. <a href="https://www.nasa.gov/ochmo/human-spaceflight-standards/" target="_blank" rel="noopener">NASA-STD-3001</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-wind"/></svg></span><dt>Air and water numbers</dt><dd>These come from Ewert and Stromgren's 2019 NASA report. <a href="https://ntrs.nasa.gov/citations/20190027563" target="_blank" rel="noopener">NASA Technical Reports Server</a></dd></div>
+      <div><span class="chip"><svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-snow"/></svg></span><dt>Ice in craters</dt><dd>In 2009 the LCROSS mission found water ice in a permanently shadowed crater. <a href="https://www.nasa.gov/mission/lcross/" target="_blank" rel="noopener">NASA LCROSS</a></dd></div>
     </dl>
     <p class="fine">We simplified the game's rates and sped them up so a lunar night fits in a few minutes. The data card after each mission gives the real numbers.</p>
   </div>
 </section>
 
 <section id="how" class="band">
+  <svg class="edge" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true"><path d="M0 48V30C220 6 400 38 640 22s430-24 800 6v20z"/></svg>
   <div class="wrap two-col">
     <div>
       <h2>Make it to sunrise</h2>
@@ -373,6 +381,7 @@
 </main>
 
 <footer class="site-foot">
+  <svg class="edge" viewBox="0 0 1440 48" preserveAspectRatio="none" aria-hidden="true"><path d="M0 48V30C220 6 400 38 640 22s430-24 800 6v20z"/></svg>
   <div class="wrap">
     <p>NASA data is public domain. This game is not affiliated with or endorsed by NASA.</p>
     <p><a href="#top">Back to top</a></p>
