@@ -1,6 +1,7 @@
 // The Moon on the mission menu: a small low-poly globe in the same flat-colour style as the base,
-// turning slowly, with a flag for each mission. Picking a mission turns its flag to face you and
-// moves the camera in. Pressing Play dives the camera down to the flag before the mission starts.
+// turning slowly, with a flag for each mission. Dragging turns it by hand, and it keeps turning the
+// way it was last pushed. Picking a mission turns its flag to face you and moves the camera in.
+// Pressing Play dives the camera down to the flag before the mission starts.
 //
 // The flags stand close together near the south pole, because every mission is flown from the same
 // base on Connecting Ridge. They are spread a little so each can be seen and clicked.
@@ -9,6 +10,9 @@ import * as THREE from 'three';
 const DEG = Math.PI / 180;
 const TILT = -66 * DEG;        // tips the south pole toward the camera, since that is where the base is
 const SPIN = 0.1;              // radians a second while nothing is picked
+const FLING = 5;               // the fastest a flick can spin it, in radians a second
+const SETTLE = 1.4;            // how quickly a flick slows back down to SPIN
+const SLOP = 6;                // pixels the pointer may wander and still count as a click
 const HOME = new THREE.Vector3(0, 0.05, 4.3);   // where the camera rests
 const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -83,7 +87,7 @@ function numberSprite(n) {
   ctx.fillText(String(n), 48, 52);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
   sprite.scale.set(0.075, 0.075, 1);
   sprite.renderOrder = 5;
   return sprite;
@@ -92,6 +96,8 @@ function numberSprite(n) {
 function buildFlag(place, number) {
   const flag = new THREE.Group();
   const up = onGlobe(place.lat, place.lon).normalize();
+  // Where this spot sits when it faces the camera: a little below the middle of the picture.
+  const face = new THREE.Vector3(0, up.y, Math.sqrt(1 - up.y * up.y)).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
   flag.position.copy(up).multiplyScalar(0.985);
   flag.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.2, 6), new THREE.MeshBasicMaterial({ color: 0xf2f6fc }));
@@ -113,7 +119,7 @@ function buildFlag(place, number) {
   const mast = new THREE.Group();
   mast.add(pole, cloth);
   flag.add(mast, ring, badge, reach);
-  return { flag, mast, cloth, ring, badge, reach, up };
+  return { flag, mast, cloth, ring, badge, reach, up, face };
 }
 
 // missions: [{ id, place: { lat, lon } }]. onPick(id) is called when a flag is clicked, and
@@ -128,11 +134,9 @@ export function createMoonMenu(canvas, missions, onPick) {
   sun.position.set(-3, 2.2, 3.5);
   scene.add(sun);
 
-  const tilt = new THREE.Group();
-  tilt.rotation.x = TILT;
   const moon = buildMoon();
-  tilt.add(moon);
-  scene.add(tilt);
+  moon.rotation.x = TILT;
+  scene.add(moon);
   const flags = Object.fromEntries(missions.map((m, i) => {
     const made = buildFlag(m.place, i + 1);
     made.reach.userData.id = m.id;
@@ -149,8 +153,16 @@ export function createMoonMenu(canvas, missions, onPick) {
   const wantUp = new THREE.Vector3(), side = new THREE.Vector3(), seen = new THREE.Vector3(), TOWARD = new THREE.Vector3(0, 0.45, 1).normalize();
   camera.position.copy(HOME);
 
-  // The spin that brings a flag round to face the camera.
-  const facing = id => { const u = flags[id].up; return Math.atan2(-u.x, u.z); };
+  // The Moon turns about `axis`, a line through its middle, at `speed` radians a second. It starts
+  // out turning about its own pole. Dragging turns it by hand and leaves it turning the way it was
+  // last pushed, so any side can be brought round.
+  const axis = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
+  let speed = still ? 0 : SPIN;
+  let drag = null;          // { id, x, y, t, far } while a finger or the mouse holds the Moon
+  let dragged = false;      // the last press moved far enough to be a drag, not a click
+  const down = { x: 0, y: 0 };   // where the last press began
+  const push = new THREE.Vector3(), step = new THREE.Vector3(), turnBy = new THREE.Quaternion(), NONE = new THREE.Quaternion();
+  const turn = (about, angle) => { moon.quaternion.premultiply(turnBy.setFromAxisAngle(about, angle)).normalize(); };
 
   function paint() {
     for (const [id, f] of Object.entries(flags)) {
@@ -169,10 +181,10 @@ export function createMoonMenu(canvas, missions, onPick) {
     last = now;
     const ease = still ? 1 : 1 - Math.exp(-dt * 4.5);
     if (picked) {
-      // Turn the short way round to the flag, then hold it there.
-      const turn = Math.atan2(Math.sin(facing(picked) - moon.rotation.y), Math.cos(facing(picked) - moon.rotation.y));
-      moon.rotation.y += turn * ease;
-      tilt.updateMatrixWorld(true);
+      // Turn the short way round until the flag faces the camera, then hold it there.
+      seen.copy(flags[picked].up).applyQuaternion(moon.quaternion);
+      moon.quaternion.premultiply(turnBy.setFromUnitVectors(seen, flags[picked].face).slerp(NONE, 1 - ease)).normalize();
+      moon.updateMatrixWorld(true);
       flags[picked].flag.getWorldPosition(spot);
       out.copy(spot).normalize();
       // Close in low and from the side, with the ground at the bottom of the picture, so the
@@ -184,7 +196,10 @@ export function createMoonMenu(canvas, missions, onPick) {
       wantUp.copy(out);
       flags[picked].ring.scale.setScalar(1 + 0.12 * Math.sin(now / 260));
     } else {
-      if (!still) moon.rotation.y += SPIN * dt;
+      if (!drag) {
+        speed += ((still ? 0 : SPIN) - speed) * (1 - Math.exp(-dt * SETTLE));
+        turn(axis, speed * dt);
+      }
       wantPos.copy(HOME);
       wantLook.set(0, 0, 0);
       wantUp.set(0, 1, 0);
@@ -221,11 +236,55 @@ export function createMoonMenu(canvas, missions, onPick) {
     const box = canvas.getBoundingClientRect();
     mouse.set((e.clientX - box.left) / box.width * 2 - 1, -((e.clientY - box.top) / box.height) * 2 + 1);
     ray.setFromCamera(mouse, camera);
-    return ray.intersectObjects(Object.values(flags).map(f => f.reach), false)[0]?.object.userData.id ?? null;
+    // The Moon is in the list too, so a flag round the back can't be clicked through it.
+    return ray.intersectObjects([moon, ...Object.values(flags).map(f => f.reach)], false)[0]?.object.userData.id ?? null;
   }
   // A click on a flag picks it. A click anywhere else while zoomed in goes back to the whole Moon.
-  canvas.addEventListener('click', e => { const id = flagAt(e); if (!diveDone && (id || picked)) onPick(id); });
-  canvas.addEventListener('pointermove', e => { canvas.style.cursor = flagAt(e) ? 'pointer' : ''; });
+  canvas.addEventListener('click', e => {
+    if (dragged || Math.hypot(e.clientX - down.x, e.clientY - down.y) > SLOP) return;
+    const id = flagAt(e);
+    if (!diveDone && (id || picked)) onPick(id);
+  });
+
+  // Dragging turns the whole Moon under the pointer, like a globe on a desk. It only works on the
+  // whole-Moon view: once a mission is picked the camera stays on its flag.
+  canvas.addEventListener('pointerdown', e => {
+    dragged = false;
+    down.x = e.clientX; down.y = e.clientY;
+    if (picked || diveDone || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), far: 0 };
+    push.set(0, 0, 0);
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) { canvas.style.cursor = flagAt(e) ? 'pointer' : picked ? 'default' : ''; return; }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y, now = performance.now();
+    drag.far += Math.hypot(dx, dy);
+    if (drag.far > SLOP) { dragged = true; canvas.style.cursor = 'grabbing'; }
+    // How many pixels wide the Moon's radius is, so the ground under the pointer keeps up with it.
+    const radius = canvas.clientHeight / 2 / Math.tan(camera.fov * DEG / 2) / camera.position.length();
+    const angle = Math.hypot(dx, dy) / radius;
+    if (angle > 0) {
+      // Sideways movement turns it about the camera's up, up-and-down movement about its right.
+      step.set(dy, dx, 0).normalize().applyQuaternion(camera.quaternion);
+      turn(step, angle);
+      // Remember how hard and which way it is being pushed, for when it is let go.
+      push.lerp(step.multiplyScalar(angle / Math.max(0.004, (now - drag.t) / 1000)), 0.45);
+    }
+    drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
+  });
+  function letGo(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const resting = performance.now() - drag.t > 90;   // held still before letting go: no flick
+    drag = null;
+    canvas.style.cursor = '';
+    if (!dragged || push.lengthSq() < 1e-6) return;
+    // Keep turning the way it was pushed. A flick spins it fast, then it settles to the slow turn.
+    axis.copy(push).normalize();
+    speed = resting || still ? 0 : Math.min(FLING, push.length());
+  }
+  canvas.addEventListener('pointerup', letGo);
+  canvas.addEventListener('pointercancel', letGo);
 
   paint();
   return {

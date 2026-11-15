@@ -1,4 +1,5 @@
-// The Scrapbook screen. It opens on a contents page that lists every page, locked ones included.
+// The Scrapbook screen. It opens on the contents, which lists every page (locked ones included)
+// across both pages of the open book.
 // Picking a page opens it as a two-page spread: pictures on the left, the write-up on the right.
 // The words and the rules for collecting pages are in scrapbook.js; this file only draws them.
 import './scrapbook.css';
@@ -77,36 +78,46 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     </button></li>`;
   }
 
+  // The contents fills both pages of the open book: the title and the first chapters on the left,
+  // the rest on the right, split where the two lists come out about the same length.
   function contentsHtml() {
     const open = openPages(), read = open.filter(isRead), pay = CONFIG.science.pageRP;
     const picture = cover();
+    const rowsIn = chapter => PAGES.filter(page => page.chapter === chapter.id);
+    let listed = 0;
+    const left = CHAPTERS.filter(chapter => { const first = listed < PAGES.length / 2; listed += rowsIn(chapter).length; return first; });
+    const right = CHAPTERS.filter(chapter => !left.includes(chapter));
+    const chaptersHtml = chapters => chapters.map(chapter => `
+          <h4>${esc(chapter.name)}</h4>
+          <ol>${rowsIn(chapter).map(rowHtml).join('')}</ol>`).join('');
     return `
     <article class="sb-spread" aria-labelledby="sb-title">
-      <section class="sb-leaf sb-cover">
-        <p class="sb-label">Mission scrapbook</p>
-        <h2 id="sb-title" tabindex="-1">My Moon Base Scrapbook</h2>
-        <p class="sb-intro">Every big part of your base gets a page in this book: what it is, how the real one works, and where to read more from NASA.</p>
-        ${picture ? `<figure class="sb-photo tilt-l">
-          <img src="${picture}" width="800" height="800" alt="Your moon base: a white habitat on legs, solar panels and a robot on grey ground under a black sky.">
-          <figcaption><b>Your base</b> Connecting Ridge, near the Moon's south pole.</figcaption>
-        </figure>` : ''}
+      <section class="sb-leaf sb-toc" aria-labelledby="sb-contents">
+        <p class="sb-label">Mission scrapbook · page 1 of ${PAGES.length + 1}</p>
+        <div class="sb-top">
+          <div>
+            <h2 id="sb-title" tabindex="-1">My Moon Base Scrapbook</h2>
+            <p class="sb-intro">Every big part of your base gets a page: what it is, how the real one works, and where to read more from NASA.</p>
+          </div>
+          ${picture ? `<figure class="sb-photo tilt-r">
+            <img src="${picture}" width="800" height="800" alt="Your moon base: a white habitat on legs, solar panels and a robot on grey ground under a black sky.">
+            <figcaption><b>Your base</b></figcaption>
+          </figure>` : ''}
+        </div>
         <dl class="sb-tally">
           <div><dt>Pages collected</dt><dd>${open.length} of ${PAGES.length}</dd></div>
           <div><dt>Pages read</dt><dd>${read.length}</dd></div>
           <div><dt>Points from reading</dt><dd>${read.length * pay}</dd></div>
         </dl>
+        <h3 id="sb-contents">Contents</h3>${chaptersHtml(left)}
+      </section>
+      <section class="sb-leaf sb-toc" aria-label="Contents, continued">
+        <p class="sb-label">Contents, continued</p>${chaptersHtml(right)}
         <aside class="sb-fact">
           <h3>How to fill your scrapbook</h3>
           <p>Use a station or a machine during a mission and its page is added to the book. Two pages come from the Research Tree.</p>
           <p>The first time you read a page, you earn ${points(pay)}.</p>
         </aside>
-      </section>
-      <section class="sb-leaf sb-toc" aria-labelledby="sb-contents">
-        <p class="sb-label">Page 1 of ${PAGES.length + 1}</p>
-        <h3 id="sb-contents">Contents</h3>
-        ${CHAPTERS.map(chapter => `
-          <h4>${esc(chapter.name)}</h4>
-          <ol>${PAGES.filter(page => page.chapter === chapter.id).map(rowHtml).join('')}</ol>`).join('')}
       </section>
     </article>`;
   }

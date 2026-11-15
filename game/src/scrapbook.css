@@ -65,17 +65,23 @@
 .sb-fact h3 { font-size: .9rem; text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); }
 .sb-fact p { font-size: 1rem; line-height: 1.45; }
 
-/* The cover leaf of the contents */
-.sb-intro { font-size: 1.1rem; max-width: 30em; }
-.sb-cover .sb-photo { width: min(100%, 330px); align-self: center; }
-.sb-cover .sb-fact { width: 100%; transform: rotate(-.6deg); }
+/* The top of the contents: the title beside a small snapshot of the base */
+.sb-intro { font-size: 1.05rem; max-width: 30em; }
+.sb-top { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 20px; align-items: start; width: 100%; }
+.sb-top .sb-photo { width: 132px; margin: 4px 0 0; padding: 6px 6px 8px; }
+.sb-top .sb-photo::before { width: 56px; height: 18px; margin-left: -28px; top: -9px; }
+.sb-top .sb-photo figcaption { padding-top: 4px; }
+.sb-toc .sb-fact { width: 100%; margin-top: auto; transform: rotate(-.6deg); }
+.sb-toc .sb-fact h3 { font-size: .9rem; font-weight: 700; margin: 0; }
+.sb-top > div { display: grid; gap: 10px; }
 .sb-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; margin: 4px 0 0; }
 .sb-tally div { border-top: 3px solid var(--ink); padding-top: 6px; }
 .sb-tally dt { font: 700 .85rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--pencil); }
 .sb-tally dd { margin: 0; font: 500 1.5rem var(--mono); font-variant-numeric: tabular-nums; }
 
 /* Contents: one line per page, with a row of dots out to the page number. */
-.sb-toc h3 { font-size: 1.6rem; font-weight: 900; }
+.sb-toc h3 { font-size: 1.6rem; font-weight: 900; margin-top: 4px; }
+.sb-toc h4:first-of-type { margin-top: 0; }
 .sb-toc h4 { margin: 10px 0 0; font: 700 .85rem var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--electric); }
 .sb-toc ol { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 2px; }
 .sb-row {

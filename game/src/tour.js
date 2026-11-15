@@ -79,12 +79,18 @@ function buildSteps() {
     {
       id: 'trip-offer', title: 'Your first moonwalk', at: 'center', freeze: true, alt: skipPractice, nextLabel: 'Let\'s go',
       closeStation: true,
-      text: ['The glowing rocks are outside. Let\'s go out through the airlock together and pick up the first one. It takes about a minute.'],
+      text: [
+        'The glowing rocks are outside. Let\'s go out through the airlock together and pick up the first one. It takes about a minute.',
+        '<b>The mission clock starts when you press Let\'s go.</b> Until then, time stands still.',
+      ],
     },
     {
       id: 'trip-open', title: 'Open the Airlock', target: { station: 'Airlock' }, side: 'above', at: 'right', alt: skipPractice,
       hint: 'Click the Airlock label (or walk up and press E).',
-      text: ['Click the glowing <b>Airlock</b> label.'],
+      text: [
+        '<b>The clock is running now.</b> The Sun clock at the top of the screen counts down to sunset.',
+        'Click the glowing <b>Airlock</b> label.',
+      ],
       waitOpen: 'Airlock', noNext: true, closeStation: true,
     },
     {
@@ -152,6 +158,21 @@ export function createTour({ sim, game, hud }) {
     });
   }
 
+  // The clock stands still while the tour explains things. The first time it is let go, say so:
+  // a message from the base computer, and the Sun clock flashes.
+  let started = false;
+  function startClock() {
+    if (started) return;
+    started = true;
+    const left = Math.round(sim.timeToSunset), time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    sim.say(`The mission clock has started. Sunset is in ${time}.`, 'warn');
+    const clock = $('clock');
+    clock.classList.remove('started');
+    void clock.offsetWidth;   // lets the flash play again on a second mission
+    clock.classList.add('started');
+    setTimeout(() => clock.classList.remove('started'), 3200);
+  }
+
   function enter(n) {
     i = n;
     const s = steps[i];
@@ -160,11 +181,15 @@ export function createTour({ sim, game, hud }) {
     if (s.callouts) buildCallouts(s.callouts);
     // While the screen is being labelled, the base's own labels step back so nothing crowds.
     document.body.classList.toggle('tour-labels', s.callouts === SCREEN_BOTTOM || s.callouts === SCREEN_TOP);
-    setFreeze(s.freeze);
+    // The last card holds the clock too, unless the moonwalk already started it.
+    const hold = !!s.freeze || (!!s.last && !started);
+    setFreeze(hold);
+    if (!hold) startClock();
     sim.flags.tourHint = s.hint ? forTouch(s.hint) : null;
     $('tour-step').textContent = `Tour: step ${i + 1} of ${steps.length}`;
     $('tour-title').textContent = s.title;
-    $('tour-text').innerHTML = s.text.map(p => `<p>${forTouch(p)}</p>`).join('');
+    const text = s.last ? [...s.text, started ? 'The mission clock is already running.' : '<b>The mission clock starts when you press Start the night.</b>'] : s.text;
+    $('tour-text').innerHTML = text.map(p => `<p>${forTouch(p)}</p>`).join('');
     $('tour-more').hidden = true;
     $('tour-next').hidden = !!s.noNext;
     $('tour-next').textContent = s.last ? 'Start the night' : (s.nextLabel ?? 'Next');
@@ -306,6 +331,7 @@ export function createTour({ sim, game, hud }) {
     if (!alive) return;
     alive = false;
     setFreeze(false);
+    startClock();
     sim.flags.tourHint = null;
     clearCallouts();
     document.body.classList.remove('tour-labels');
