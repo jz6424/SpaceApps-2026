@@ -56,18 +56,29 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Moving between screens (ui.js picks the move). While it plays, the screen that is leaving
    stays on top and can't be clicked.
    - move-fade: the old screen fades away over the new one.
-   - move-up: the view tips up to the sky. The old screen sinks out of the bottom of the window
-     as the new one comes down from the top. move-down is the way back.
+   - move-up: the view tips up to the sky. The sky is already in place behind; the old screen
+     sinks out of the bottom of the window, and its top edge fades out into the sky so there is no
+     hard line between the two. ui.js moves the stars and gives them their streaks.
+   - move-down: the way back. The new screen rises over the sky, again with a soft top edge.
    With reduced motion ui.js doesn't use these: screens cut. */
 .screen.leaving { z-index: 5; pointer-events: none; }
 .screen.arriving { z-index: 4; }
 .screen.leaving.move-fade { animation: screen-fade .35s ease both; }
-.screen.leaving.move-up { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) both; }
-.screen.arriving.move-up { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) reverse both; --dir: -1; }
-.screen.leaving.move-down { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) both; --dir: -1; }
-.screen.arriving.move-down { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) reverse both; }
+/* The soft edge is a mask taller than the screen: see-through at its top, solid below. It starts
+   pushed up out of the way, so the screen is whole, and slides down into place as the move begins. */
+.screen.leaving.move-up, .screen.arriving.move-down {
+  --soft: 55vh;
+  -webkit-mask: linear-gradient(to bottom, transparent, #000 var(--soft)) 0 0 / 100% calc(100% + var(--soft)) no-repeat;
+  mask: linear-gradient(to bottom, transparent, #000 var(--soft)) 0 0 / 100% calc(100% + var(--soft)) no-repeat;
+}
+.screen.leaving.move-up { animation: screen-sink 1.1s cubic-bezier(.65, 0, .35, 1) both, screen-soften .5s ease-out both; }
+.screen.arriving.move-down { z-index: 6; animation: screen-sink 1s cubic-bezier(.65, 0, .35, 1) reverse both, screen-soften .45s ease-out .55s reverse both; }
 @keyframes screen-fade { to { opacity: 0; } }
-@keyframes screen-sink { to { transform: translateY(calc(var(--dir, 1) * 100%)); } }
+@keyframes screen-sink { to { transform: translateY(100%); } }
+@keyframes screen-soften { from { -webkit-mask-position: 0 calc(0px - var(--soft)); mask-position: 0 calc(0px - var(--soft)); } }
+/* The Research Tree's title bar and buttons fade in once the sky has slowed, and out as it leaves. */
+#research.arriving.move-up :is(.rt-top, .rt-zoom) { animation: screen-fade .5s ease .55s reverse backwards; }
+#research.leaving.move-down :is(.rt-top, .rt-zoom, #research-panel) { animation: screen-fade .3s ease both; }
 /* A screen that is sliding carries its pinned parts with it. If it had been scrolled, this keeps
    them where they were (--scrolled is set by ui.js). */
 .screen.leaving:is(.move-up, .move-down) .orbits { top: calc(var(--scrolled, 0px) - 120px); }

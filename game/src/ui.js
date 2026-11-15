@@ -48,10 +48,11 @@ const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} an
 
 // Most screens swap with a plain cut. A few swaps are a move instead, named here with how long
 // they take in milliseconds (the moves themselves are in ui.css, "Moving between screens"):
-//   up    the view tips up to the sky: the old screen sinks away as the new one comes down
-//   down  the same, back down again
+//   up    the view tips up to the sky: the old screen sinks away, with a soft top edge, off the
+//         sky that was waiting behind it, while the stars rush down and slow to a stop
+//   down  the way back: the stars rush up as the new screen rises over the sky
 //   fade  the old screen fades away over the new one
-const MOVES = { up: 900, down: 900, fade: 350 };
+const MOVES = { up: 1100, down: 1000, fade: 350 };
 const showing = () => SCREENS.find(key => !$(key).hidden && !$(key).classList.contains('leaving'));
 let moving = null;   // { from, to, timer } while a move is playing
 function settle() {
@@ -176,7 +177,9 @@ function openMissions() {
   selected = null;
   diving = false;
   $('dive').classList.remove('on');
-  show('missions', { research: 'down', scrapbook: 'fade' }[showing()]);
+  const from = showing();
+  if (from === 'research') startPan(-1, MOVES.down / 1000);
+  show('missions', { research: 'down', scrapbook: 'fade' }[from]);
   // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
   moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
   renderMissions();
@@ -465,23 +468,67 @@ function drawStars() {
       halo.addColorStop(1, `rgba(${tint}, 0)`);
     }
     // phase, speed (one beat every 2 to 8 seconds) and depth of the twinkle
-    sky.push({ x, y, r, fill: `rgb(${tint})`, alpha, halo, phase: rnd() * 6.283, speed: 0.8 + rnd() * 2.4, depth: rnd() < 0.3 ? 0.1 : 0.45 + rnd() * 0.5 });
+    sky.push({ x, y, r, tint, fill: `rgb(${tint})`, alpha, halo, phase: rnd() * 6.283, speed: 0.8 + rnd() * 2.4, depth: rnd() < 0.3 ? 0.1 : 0.45 + rnd() * 0.5 });
   }
   paintStars(0);
 }
 // The sky could drift with the map (SKY_DRIFT above 0; it wraps round at the edges); for now it stays still.
 const SKY_DRIFT = 0; // the sky stays still behind the map
 const skyFrom = { x: 0, y: 0 };
+// --- Looking up and down. Going to the tree from the mission menu, the view tips up: the whole sky
+// moves down the screen, fast at first and slowing to a stop, and while it moves each star leaves
+// a streak behind it, longer the faster it goes. Going back, the sky rushes up and away. The map
+// rides with the stars. panTo(now) works out where the sky is and how fast it is moving.
+const STREAK = 0.05;   // a star's streak is as long as the distance it covers in this many seconds
+let pan = null;        // { t0, seconds, way } while the sky moves. way 1: arriving, -1: leaving
+const panAt = { off: 0, speed: 0 };   // how far the sky is from its resting place (px), and px a second
+function startPan(way, seconds) {
+  if (calm) return;
+  pan = { t0: performance.now(), seconds, way };
+  panTo(pan.t0);
+}
+function stopPan() {
+  pan = null;
+  panAt.off = panAt.speed = 0;
+  Object.assign($('research-view').style, { transform: '', opacity: '' });
+}
+function panTo(now) {
+  if (!pan) return;
+  const p = Math.min(1, Math.max(0, (now - pan.t0) / 1000 / pan.seconds)), far = innerHeight * 0.9;
+  // Slow, fast, slow: the same curve as the screen's own move in ui.css.
+  const e = p < 0.5 ? 4 * p ** 3 : 1 - (2 - 2 * p) ** 3 / 2, rate = (p < 0.5 ? 12 * p * p : 12 * (1 - p) ** 2) / pan.seconds;
+  if (p >= 1 && pan.way > 0) return stopPan();
+  panAt.off = pan.way > 0 ? -far * (1 - e) : -far * e;
+  panAt.speed = pan.way * far * rate;
+  // The map comes into view with the stars, and is only shown once they have slowed down.
+  const seen = pan.way > 0 ? (p - 0.45) / 0.35 : 1 - p / 0.4;
+  Object.assign($('research-view').style, { transform: `translateY(${panAt.off.toFixed(1)}px)`, opacity: Math.min(1, Math.max(0, seen)).toFixed(3) });
+}
 function paintStars(t) {
   const cv = $('research-stars'), ctx = cv.getContext('2d'), dpr = cv.width / innerWidth, w = innerWidth, h = innerHeight;
-  const px = calm ? 0 : (view.x - skyFrom.x) * SKY_DRIFT, py = calm ? 0 : (view.y - skyFrom.y) * SKY_DRIFT;
+  const px = calm ? 0 : (view.x - skyFrom.x) * SKY_DRIFT, py = (calm ? 0 : (view.y - skyFrom.y) * SKY_DRIFT) + panAt.off;
   const wrap = (v, size) => ((v % size) + size) % size;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
+  // A streak trails behind a moving star: above it while the sky moves down, below while it moves up.
+  // One fading strip is made for each star colour and reused for every star of that colour.
+  const long = Math.min(130, Math.abs(panAt.speed) * STREAK), back = panAt.speed > 0 ? -1 : 1, strips = {};
   for (const st of sky) {
     const glow = calm ? 1 : 1 - st.depth * (0.5 + 0.5 * Math.sin(t * st.speed + st.phase));
-    ctx.setTransform(dpr, 0, 0, dpr, (wrap(st.x + px, w) - st.x) * dpr, (wrap(st.y + py, h) - st.y) * dpr);
+    const sx = wrap(st.x + px, w), sy = wrap(st.y + py, h);
     ctx.globalAlpha = st.alpha * glow;
+    if (long > 2) {
+      if (!strips[st.tint]) {
+        strips[st.tint] = ctx.createLinearGradient(0, 0, 0, back * long);
+        strips[st.tint].addColorStop(0, `rgba(${st.tint}, 0.85)`);
+        strips[st.tint].addColorStop(1, `rgba(${st.tint}, 0)`);
+      }
+      const wide = Math.max(1, st.r * 1.7);
+      ctx.setTransform(dpr, 0, 0, dpr, sx * dpr, sy * dpr);
+      ctx.fillStyle = strips[st.tint];
+      ctx.fillRect(-wide / 2, back > 0 ? 0 : -long, wide, long);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, (sx - st.x) * dpr, (sy - st.y) * dpr);
     if (st.halo) { ctx.fillStyle = st.halo; ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 4, 0, 7); ctx.fill(); }
     ctx.fillStyle = st.fill;
     ctx.beginPath(); ctx.arc(st.x, st.y, st.r * (0.85 + 0.25 * glow), 0, 7); ctx.fill();
@@ -583,6 +630,7 @@ function treeFrame(now) {
   const dt = Math.min(0.05, (now - treeLast) / 1000 || 0.016);
   treeLast = now;
   jiggle(dt);
+  panTo(now);
   drawTrace(now);
   if (!calm) paintStars(now / 1000);
   treeLoop = requestAnimationFrame(treeFrame);
@@ -613,9 +661,11 @@ function openResearch() {
   renderResearch();
   show('research', up ? 'up' : undefined);
   fitMap();
+  stopPan();
+  if (up) startPan(1, 1.5);   // the stars take a little longer to settle than the menu takes to go
   drawStars();
   startTreeLoop();
-  if (from !== 'research') startTrace(up && !calm ? MOVES.up / 1000 - 0.25 : 0.15);
+  if (from !== 'research') startTrace(up && !calm ? 1.15 : 0.15);
 }
 
 // Clicking a circle keeps its details showing; clicking it again puts them away.
