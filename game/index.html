@@ -111,7 +111,34 @@
       </div>
     </div>
     <h2>Choose your mission</h2>
-    <section id="mission-list" aria-label="Missions"></section>
+    <div class="mission-layout">
+      <section id="mission-list" aria-label="Missions"></section>
+      <div id="moon-view">
+        <canvas id="moon" aria-hidden="true"></canvas>
+        <p id="moon-caption" class="fine">Your base is on Connecting Ridge, near the Moon's south pole. Pick a mission to see where you will land.</p>
+        <div id="moon-info" hidden>
+          <div id="brief-site" class="sitefacts"></div>
+          <p id="brief-flare" class="fine"></p>
+        </div>
+      </div>
+    </div>
+    <!-- The briefing for the picked mission. It is moved inside that mission's box when one is picked. -->
+    <div id="brief-holder" hidden>
+      <div id="brief-panel">
+        <p id="brief-text"></p>
+        <p class="goal"><b>Goal:</b> <span id="brief-goal"></span></p>
+        <section id="brief-mode" aria-labelledby="mode-title">
+          <h3 id="mode-title">Choose your difficulty</h3>
+          <div id="mode-choice" role="group" aria-labelledby="mode-title"></div>
+          <p id="mode-about"></p>
+        </section>
+        <section id="brief-stars" aria-labelledby="star-title">
+          <h3 id="star-title"></h3>
+          <ul id="star-list" class="star-list"></ul>
+        </section>
+        <button class="btn primary" id="brief-play" data-do="launch">Play</button>
+      </div>
+    </div>
     <div class="footnotes">
       <p id="save-note" class="fine"></p>
       <p id="open-all" class="fine"></p>
@@ -119,6 +146,8 @@
     </div>
   </div>
 </main>
+<!-- Fades to black as the camera dives to the mission's flag, then lifts again over the base. -->
+<div id="dive" aria-hidden="true"></div>
 
 <!-- Research Tree: spend research points between missions -->
 <main id="research" class="screen" hidden>
@@ -152,29 +181,6 @@
 </main>
 
 <!-- Briefing before a mission -->
-<main id="brief" class="screen" hidden>
-  <div class="dialog wide">
-    <p class="eyebrow">Mission briefing</p>
-    <h2 id="brief-title"></h2>
-    <p id="brief-text"></p>
-    <section id="brief-mode" aria-labelledby="mode-title">
-      <h3 id="mode-title">Choose your difficulty</h3>
-      <div id="mode-choice" role="group" aria-labelledby="mode-title"></div>
-      <p id="mode-about"></p>
-    </section>
-    <section id="brief-stars" aria-labelledby="star-title">
-      <h3 id="star-title"></h3>
-      <ul id="star-list" class="star-list"></ul>
-    </section>
-    <p class="goal"><b>Goal:</b> <span id="brief-goal"></span></p>
-    <div id="brief-site" class="sitefacts"></div>
-    <p id="brief-flare" class="fine"></p>
-    <div class="row">
-      <button class="btn primary" data-do="launch">Start mission</button>
-      <button class="btn" data-do="open-missions">Back</button>
-    </div>
-  </div>
-</main>
 
 <div id="pause" class="screen" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
   <div class="dialog">

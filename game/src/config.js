@@ -121,6 +121,8 @@ export const MISSIONS = [
   {
     id: 'FirstNight',
     name: 'First Night',
+    short: 'Collect 5 rocks and last the night.',
+    place: { lat: -79, lon: 150 },  // where its flag stands on the menu Moon (see moon-menu.js)
     multiplier: 1,
     goal: 'Collect 5 glowing rock samples and survive the night.',
     brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the tour to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
@@ -138,6 +140,8 @@ export const MISSIONS = [
   {
     id: 'SolarStorm',
     name: 'Solar Storm',
+    short: 'Hide from two solar storms.',
+    place: { lat: -74, lon: 262 },
     multiplier: 1.5,
     requires: { id: 'Shielding', name: 'Regolith Shielding', about: 'Regolith is the science word for moon dirt.', cost: 10 },
     goal: 'Keep your radiation dose low through two solar storms.',
@@ -154,6 +158,8 @@ export const MISSIONS = [
   {
     id: 'IceAndGreens',
     name: 'Ice and Greens',
+    short: 'Grow food with crater ice.',
+    place: { lat: -81, lon: 30 },
     multiplier: 2,
     requires: { id: 'Greenhouse', name: 'Greenhouse', cost: 20 },
     goal: 'Grow enough food to have meals left at sunrise.',

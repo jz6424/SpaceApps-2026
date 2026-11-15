@@ -116,7 +116,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #start-picture { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Mission menu */
-#missions .inner { position: relative; max-width: 1080px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 24px; }
+#missions .inner { position: relative; max-width: 1240px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 24px; }
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
 .score { --fill: rgba(3, 8, 24, .4); padding: 4px 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
@@ -131,13 +131,41 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .seg:hover { color: var(--yellow); }
 .seg[aria-pressed="true"], .seg[aria-selected="true"] { --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
 #mode-about { min-height: 3em; }
-#mission-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; }
-.mission { --fill: rgba(3, 8, 24, .38); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
+/* Mission menu: a column of mission boxes beside the turning Moon. The picked box opens. */
+.mission-layout { display: grid; grid-template-columns: minmax(300px, 440px) minmax(0, 1fr); gap: 24px; align-items: start; }
+#mission-list { display: grid; gap: 12px; }
+.mission { --fill: rgba(3, 8, 24, .38); padding: 0; transition: box-shadow .15s var(--ease); }
 .mission.locked { --fill: rgba(3, 8, 24, .2); }
-.mission.locked h3, .mission.locked > p:not(.need) { opacity: .75; }
-.mission .num { font: 400 2.6rem/1 var(--mono); color: var(--yonder); font-variant-numeric: tabular-nums; }
+.mission.selected { --fill: rgba(3, 8, 24, .62); box-shadow: inset 0 0 0 2px var(--yellow); }
+.m-head { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; width: 100%; box-sizing: border-box; padding: 16px 20px; margin: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.m-head:hover .m-title b { color: var(--yellow); }
+.mission .num { font: 400 2.2rem/1 var(--mono); color: var(--yonder); font-variant-numeric: tabular-nums; }
 .mission .num::before { content: "0"; opacity: .45; }
-.mission .btn { width: 100%; }
+.mission.selected .num { color: var(--yellow); }
+.m-title { display: grid; gap: 2px; min-width: 0; }
+.m-title b { font: 700 1.2rem/1.2 var(--head); }
+.m-title span { color: var(--soft); font-size: .95rem; line-height: 1.35; }
+.mission.locked .m-title { opacity: .75; }
+.m-stars { color: var(--yellow); letter-spacing: .08em; white-space: nowrap; }
+.m-stars .off { color: rgba(255, 255, 255, .3); }
+.m-lock { display: inline-flex; align-items: center; gap: 4px; color: var(--soft); font-size: .9rem; white-space: nowrap; }
+.m-lock .ico { stroke: currentColor; }
+.m-body { display: grid; gap: 12px; padding: 0 20px 20px; justify-items: start; }
+.m-body:empty { display: none; }
+#brief-panel { display: grid; gap: 16px; justify-items: start; width: 100%; }
+#moon-view { position: sticky; top: 16px; display: grid; gap: 12px; justify-items: center; }
+#moon { display: block; width: 100%; max-width: 640px; aspect-ratio: 1; max-height: max(320px, calc(100vh - 300px)); }
+#moon-caption { text-align: center; max-width: 30em; }
+#moon-info { display: grid; gap: 12px; width: 100%; }
+/* Play: the screen goes dark as the camera reaches the flag, then clears over the base. */
+#dive { position: fixed; inset: 0; z-index: 60; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
+#dive.on { opacity: 1; pointer-events: auto; transition: opacity .9s cubic-bezier(.7, 0, .84, 0); }
+@media (prefers-reduced-motion: reduce) { #dive, #dive.on { transition: none; } }
+@media (max-width: 900px) {
+  .mission-layout { grid-template-columns: 1fr; }
+  #moon-view { position: static; order: -1; }
+  #moon { max-width: 320px; }
+}
 .stars { font-weight: 600; }
 .stars span[aria-hidden] { color: var(--yellow); letter-spacing: .08em; }
 .stars .off { color: rgba(255, 255, 255, .3); }

@@ -12,9 +12,10 @@ import { PAGES } from './scrapbook.js';
 import { createScrapbook } from './scrapbook-view.js';
 import * as sound from './sound.js';
 import { isTouch as isTouchScreen } from './touch.js';
+import { createMoonMenu } from './moon-menu.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'brief', 'pause', 'debrief', 'how', 'credits'];
+const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'debrief', 'how', 'credits'];
 
 let save = loadSave();
 let saveWorks = writeSave(save);
@@ -47,6 +48,7 @@ const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} an
 
 function show(name) {
   for (const key of SCREENS) $(key).hidden = key !== name;
+  if (name !== 'missions') moonMenu?.stop();   // the Moon only turns while it is on screen
   // Start on the screen's main button, so Enter does the expected thing.
   const screen = $(name ?? '');
   (screen?.querySelector('.btn.primary:not([disabled])') ?? screen?.querySelector('button:not([disabled])'))?.focus();
@@ -66,22 +68,31 @@ function renderStart() {
 }
 
 // --- Mission menu ---
+// The missions are a column of boxes beside a turning Moon with a flag for each one. Picking a
+// mission opens its box (briefing, difficulty, star tests, Play) and turns the Moon to its flag.
+let selected = null;   // mission id whose box is open on the menu
+let moonMenu = null;   // the Moon, made the first time the menu is shown
+let diving = false;    // true while the camera flies down to the flag after Play
+
 function missionCard(mission, index) {
-  const open = isOpen(mission);
-  // Difficulty is picked after the mission, so the card shows your best result in any mode.
-  const [bestMode, best] = Object.entries(save.best[mission.id] ?? {}).sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
+  const open = isOpen(mission), on = mission.id === selected;
+  // Difficulty is picked inside the box, so the closed box shows your best result in any mode.
+  const best = Math.max(0, ...Object.values(save.best[mission.id] ?? {}));
   const need = mission.requires;
-  let action;
-  if (open) action = `<button class="btn primary" data-do="brief" data-id="${mission.id}">Choose this mission</button>`;
-  else action = '<button class="btn" data-do="research">Open Research Tree</button>';
+  const mark = open
+    ? `<span class="m-stars" aria-hidden="true">${'★'.repeat(best)}<span class="off">${'★'.repeat(3 - best)}</span></span><span class="sr-only">${best ? `${best} of 3 stars` : 'No stars yet'}</span>`
+    : `<span class="m-lock">${icon('shield', 16)} Locked</span>`;
   return `
-    <article class="mission ${open ? '' : 'locked'}">
-      <div class="num" aria-hidden="true">${index + 1}</div>
-      <h3>${mission.name}</h3>
-      <p>${mission.goal}</p>
-      ${open ? `<p>${starsHtml(best)}${best ? ` in ${MODES[bestMode].label} mode` : ''}</p>`
-        : `<p class="need">${icon('shield', 16)} Unlock ${need.name} in Research Tree.${need.about ? ` ${need.about}` : ''}</p>`}
-      ${action}
+    <article class="mission ${open ? '' : 'locked'} ${on ? 'selected' : ''}" data-mission="${mission.id}">
+      <button class="m-head" data-do="brief" data-id="${mission.id}" aria-expanded="${on}">
+        <span class="num" aria-hidden="true">${index + 1}</span>
+        <span class="m-title"><b>${mission.name}</b><span>${mission.short}</span></span>
+        ${mark}
+      </button>
+      <div class="m-body">${on && !open ? `
+        <p>${mission.brief}</p>
+        <p class="need">${icon('shield', 16)} Unlock ${need.name} in the Research Tree to fly this mission.${need.about ? ` ${need.about}` : ''}</p>
+        <button class="btn" data-do="research">Open Research Tree</button>` : ''}</div>
     </article>`;
 }
 
@@ -90,7 +101,20 @@ function renderMissions() {
   const unread = scrapbook.unread();
   $('scrapbook-new').textContent = `${unread} new`;
   $('scrapbook-new').hidden = !unread;
+  // The briefing panel is one piece of the page that moves into whichever box is open. Park it
+  // before the list is redrawn so it is not thrown away with the old boxes.
+  $('brief-holder').append($('brief-panel'));
   $('mission-list').innerHTML = MISSIONS.map(missionCard).join('');
+  const mission = selected && missionById(selected);
+  if (mission && isOpen(mission)) {
+    $('mission-list').querySelector(`[data-mission="${selected}"] .m-body`).append($('brief-panel'));
+    $('brief-text').textContent = mission.brief;
+    renderBriefMode();
+  }
+  $('moon-caption').hidden = !!mission;
+  $('moon-info').hidden = !mission;
+  moonMenu?.setLocked(MISSIONS.filter(m => !isOpen(m)).map(m => m.id));
+  moonMenu?.pick(selected);
   $('save-note').textContent = saveWorks
     ? 'Your stars and points save by themselves in this browser. No account needed.'
     : 'This browser is blocking saves, so your progress will be lost when you close the page.';
@@ -105,8 +129,14 @@ function renderMissions() {
 function openMissions() {
   if (hud) endMission();
   confirmErase = false;
-  renderMissions();
+  selected = null;
+  diving = false;
+  $('dive').classList.remove('on');
   show('missions');
+  // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
+  moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id !== selected) brief(id); });
+  renderMissions();
+  moonMenu.start();
 }
 
 // --- Research Tree ---
@@ -567,23 +597,37 @@ function renderBriefMode() {
   $('brief-goal').textContent = goalText(mission, save.mode);
 }
 
+// Picking a mission on the menu (its box or its flag). Picking the open one again closes it.
 async function brief(id) {
-  chosen = id;
-  const mission = missionById(id);
-  const site = game.site;
-  $('brief-title').textContent = mission.name;
-  $('brief-text').textContent = mission.brief;
-  renderBriefMode();
+  if (diving) return;
+  selected = selected === id ? null : id;
+  if (selected) chosen = id;
+  renderMissions();
+  const box = $('mission-list').querySelector(`[data-mission="${id}"]`);
+  box.querySelector('.m-head').focus();
+  if (!selected) return;
+  box.scrollIntoView({ block: 'nearest' });
+  const mission = missionById(id), site = game.site;
   $('brief-site').innerHTML = `
     <div>${icon('sun', 24)}<b>${Math.round(site.sun * 100)}%</b><span>of the time in sunlight at your base</span></div>
     <div>${icon('globe', 24)}<b>${Math.round(site.earth * 100)}%</b><span>of the time Earth is above the horizon</span></div>
     <div>${icon('droplet', 24)}<b>${site.iceDistance} m</b><span>to the nearest ice-cold shadow</span></div>`;
-  show('brief');
   $('brief-flare').textContent = mission.storms.length ? 'Checking NASA DONKI for real solar flares…' : 'Real terrain: NASA LRO LOLA laser altimeter, 5 m per pixel.';
   if (mission.storms.length) {
     await flaresReady;
-    if (chosen === id) $('brief-flare').textContent = spaceWeatherReport();
+    if (selected === id) $('brief-flare').textContent = spaceWeatherReport();
   }
+}
+
+// Play: the camera flies down to the mission's flag while the screen fades, then the mission starts.
+async function playChosen() {
+  if (diving || !selected || !isOpen(missionById(selected))) return;
+  diving = true;
+  $('dive').classList.add('on');
+  await moonMenu?.dive(selected);
+  diving = false;
+  launch(selected);
+  $('dive').classList.remove('on');
 }
 
 // --- Playing ---
@@ -744,7 +788,7 @@ const actions = {
   credits: () => { renderCredits(); show('credits'); },
   mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus(); },
   brief,
-  launch: () => launch(),
+  launch: playChosen,
   again: id => launch(id),
   restart: () => launch(sim.mission.id),
   research: openResearch,
