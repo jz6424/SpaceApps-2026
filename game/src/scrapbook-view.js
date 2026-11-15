@@ -32,6 +32,8 @@ const GLYPHS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   back: '<path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/>',
+  up: '<path d="m6 15 6-6 6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
 };
@@ -333,6 +335,30 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     }
     return fresh;
   }
+
+  // Two little arrows float over the book and show where the rest of it is: one at the bottom
+  // of the screen while part of the book is below it, one at the top while part is above.
+  // A click on an arrow scrolls that way. They only repeat what scrolling does, so they are left
+  // out of the tab order and hidden from screen readers.
+  const screen = $('scrapbook'), book = $('scrapbook-book');
+  const arrows = ['up', 'down'].map(way => {
+    screen.insertAdjacentHTML('beforeend', `<button class="sb-more ${way}" tabindex="-1" aria-hidden="true" title="More of the Scrapbook is ${way === 'up' ? 'above' : 'below'}">${glyph(way, 22)}</button>`);
+    const arrow = screen.lastElementChild;
+    arrow.addEventListener('click', () => {
+      const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      screen.scrollBy({ top: (way === 'up' ? -0.8 : 0.8) * screen.clientHeight, behavior: calm ? 'auto' : 'smooth' });
+    });
+    return arrow;
+  });
+  function pointToRest() {
+    if (screen.hidden) return;
+    const box = book.getBoundingClientRect(), HIDDEN = 16;   // px of book out of sight before an arrow shows
+    arrows[0].classList.toggle('on', box.top < -HIDDEN);
+    arrows[1].classList.toggle('on', box.bottom > screen.clientHeight + HIDDEN);
+  }
+  screen.addEventListener('scroll', pointToRest, { passive: true });
+  addEventListener('resize', pointToRest);
+  new ResizeObserver(pointToRest).observe(book);   // a new page, or its pictures arriving
 
   // Left and right arrow keys turn the pages.
   addEventListener('keydown', e => {

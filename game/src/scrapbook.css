@@ -235,6 +235,22 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
 .sb-spread.closing::before { animation-direction: reverse; }
 @keyframes sb-rings { 0%, 44% { opacity: 0; } 56% { opacity: 1; } }
 
+/* Arrows that show where the rest of the book is, when it is taller than the screen. They float at
+   the top and bottom of the screen, over the book, and bob toward the hidden part. */
+.sb-more {
+  position: fixed; z-index: 5; left: 50%; width: 44px; height: 44px; margin-left: -22px; padding: 0;
+  display: grid; place-items: center; border: 2px solid #fff; border-radius: 50%;
+  background: var(--electric); color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(2, 7, 22, .5);
+  opacity: 0; visibility: hidden; transition: opacity .2s var(--ease), visibility .2s, background-color .15s var(--ease);
+}
+.sb-more.up { top: 12px; --bob: -4px; }
+.sb-more.down { bottom: 12px; --bob: 4px; }
+.sb-more.on { opacity: 1; visibility: visible; animation: sb-bob .7s ease-in-out infinite alternate; }
+.sb-more:hover { background: var(--yonder); }
+.sb-more .ico { stroke-width: 2.5; }
+@keyframes sb-bob { to { translate: 0 var(--bob); } }
+#scrapbook:has(.opening, .closing) .sb-more { opacity: 0; visibility: hidden; }   /* not while the cover is moving */
+
 /* The "3 new" marker on the Scrapbook button in the mission menu. */
 .pip { background: var(--yellow); color: var(--deep); font: 500 .8rem var(--mono); letter-spacing: 0; padding: 1px 6px; border-radius: 2px; }
 
@@ -268,7 +284,7 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
 }
 /* Reduced motion: nothing swings or slides. The shut book fades into the open one. */
 @media (prefers-reduced-motion: reduce) {
-  .sb-spread, .sb-spread.opening, .sb-stamp.new, .sb-cover::after { animation: none; }
+  .sb-spread, .sb-spread.opening, .sb-stamp.new, .sb-cover::after, .sb-more.on { animation: none; }
   .sb-cover { animation: sb-fade-out var(--flip) var(--hold) both; }
   .sb-spread.opening .sb-leaf, .sb-spread.opening .sb-leaf:first-of-type, .sb-spread.opening::before { animation: sb-fade-in var(--flip) var(--hold) both; }
 }
