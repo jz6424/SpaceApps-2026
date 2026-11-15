@@ -4,20 +4,20 @@
      them so they read over anything.
    - Everything else (messages, the mission box, station panels, menus) is dark glass with no
      border, see-through enough to show the Moon behind it.
-   - Labels are small spaced capitals, numbers are in a fixed-width face, bars are cut into segments.
-   - Colours are the Space Apps palette (docs/space-apps-style-spec.md): blues, white, Neon Yellow
-     for the thing to press or look at, Rocket Red for danger.
+   - The typeface is Exo 2, kept light. Labels are small spaced capitals, bars are cut into segments.
+   - The theme is a navy that is almost black. Accents are from the Space Apps palette
+     (docs/space-apps-style-spec.md): Neon Yellow for the thing to press or look at, Rocket Red for danger.
    - Spacing sits on a 4px grid. Text in the mission screen is never smaller than 14px. */
 :root {
-  --deep: #07173F; --electric: #0042A6; --yonder: #2E96F5;
+  --deep: #050C22; --electric: #0042A6; --yonder: #2E96F5;
   --yellow: #EAFE07; --red: #E43700; --martian: #8E1100;
   --text: #fff; --soft: #C9D8F2;
   --line: rgba(201, 216, 242, .24);
-  --glass: rgba(5, 14, 40, .3);        /* over the 3D view, with the view behind it blurred and dimmed */
-  --glass-solid: rgba(5, 14, 40, .84);  /* where the browser can't blur, or simple graphics is on */
-  --head: "Fira Sans", system-ui, sans-serif;
-  --body: Overpass, system-ui, sans-serif;
-  --mono: "Fira Code", ui-monospace, monospace;
+  --glass: rgba(3, 8, 24, .34);        /* over the 3D view, with the view behind it blurred and dimmed */
+  --glass-solid: rgba(3, 8, 24, .88);  /* where the browser can't blur, or simple graphics is on */
+  --head: "Exo 2", system-ui, sans-serif;
+  --body: "Exo 2", system-ui, sans-serif;
+  --mono: "Exo 2", system-ui, sans-serif;  /* numbers: same face, with figures of equal width */
   --ease: cubic-bezier(.22, 1, .36, 1);
   /* A bar cut into short segments. */
   --segments: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px);
@@ -46,18 +46,18 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* Small spaced capitals: the label on every instrument. */
 .label, .m-label, .supply span, .rp-top span, .mc-head, .st-head h3, #station-body h4, .setting > span, .eyebrow, .n-change b {
-  font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+  font-family: var(--head); font-weight: 600; text-transform: uppercase; letter-spacing: .1em;
 }
 
 .screen {
   position: fixed; inset: 0; overflow-y: auto; font-size: 17px; line-height: 1.5;
-  background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%);
+  background: linear-gradient(135deg, #0A1B4D 0%, #040A1E 45%, #02040B 100%);
 }
-/* Brand type: Fira Sans Black and Bold for headings, the game's title in capitals. */
+/* Headings in Exo 2, the game's title in capitals. */
 .screen h1, .screen h2, .screen h3 { font-family: var(--head); margin: 0; line-height: 1.1; }
-.screen h1 { font-weight: 900; text-transform: uppercase; letter-spacing: .05em; font-size: clamp(2.2rem, 7vw, 4.2rem); line-height: 1.02; }
-.screen h2 { font-weight: 900; font-size: clamp(1.5rem, 4vw, 2.2rem); }
-.screen h3 { font-weight: 700; font-size: 1.35rem; }
+.screen h1 { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: clamp(2.2rem, 7vw, 4.2rem); line-height: 1.02; }
+.screen h2 { font-weight: 700; font-size: clamp(1.5rem, 4vw, 2.2rem); }
+.screen h3 { font-weight: 600; font-size: 1.35rem; }
 .screen p { margin: 0; }
 /* The orbit rings in the corner are broken arcs. */
 .orbits { position: fixed; right: -140px; top: -120px; width: 620px; opacity: .3; pointer-events: none; }
@@ -71,7 +71,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
    two clipped corners. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  font: 700 .9rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
+  font: 600 .9rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
   --fill: rgba(255, 255, 255, .1);
   padding: 0 20px; min-height: 48px; cursor: pointer;
   transition: color .15s var(--ease), transform .15s var(--ease);
@@ -102,7 +102,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .eyebrow::before { content: ""; width: 32px; height: 1px; background: currentColor; }
 .lede { font-size: 1.15rem; font-weight: 400; max-width: 34em; }
 #start-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-#start-status { font-weight: 700; }
+#start-status { font-weight: 600; }
 #start-status:empty { display: none; }
 #start .row { gap: 8px 24px; }
 .fine { font-size: .9rem; color: var(--soft); }
@@ -118,13 +118,13 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Mission menu */
 #missions .inner { position: relative; max-width: 1080px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 24px; }
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
-.score { --fill: rgba(5, 14, 40, .4); padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score { --fill: rgba(3, 8, 24, .4); padding: 4px 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
 #brief-mode { display: grid; gap: 8px; width: 100%; }
 #brief-mode h3 { font-size: 1.1rem; }
 #mode-choice { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg {
-  font: 700 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
+  font: 600 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
   --fill: rgba(255, 255, 255, .07); padding: 0 16px; min-height: 44px; cursor: pointer;
   transition: color .15s var(--ease);
 }
@@ -132,13 +132,13 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .seg[aria-pressed="true"], .seg[aria-selected="true"] { --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
 #mode-about { min-height: 3em; }
 #mission-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; }
-.mission { --fill: rgba(5, 14, 40, .38); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
-.mission.locked { --fill: rgba(5, 14, 40, .2); }
+.mission { --fill: rgba(3, 8, 24, .38); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
+.mission.locked { --fill: rgba(3, 8, 24, .2); }
 .mission.locked h3, .mission.locked > p:not(.need) { opacity: .75; }
 .mission .num { font: 400 2.6rem/1 var(--mono); color: var(--yonder); font-variant-numeric: tabular-nums; }
 .mission .num::before { content: "0"; opacity: .45; }
 .mission .btn { width: 100%; }
-.stars { font-weight: 700; }
+.stars { font-weight: 600; }
 .stars span[aria-hidden] { color: var(--yellow); letter-spacing: .08em; }
 .stars .off { color: rgba(255, 255, 255, .3); }
 .need { color: var(--soft); }
@@ -173,7 +173,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .rt-dot { position: absolute; left: -28px; top: -28px; width: 56px; height: 56px; border-radius: 50%; box-sizing: border-box; display: grid; place-items: center; background: #000; border: 1.5px solid rgba(255, 255, 255, .8); color: #fff; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
 /* Thin, square-ended strokes give the glyphs their instrument look. */
 .rt-dot .ico { stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; vertical-align: 0; }
-.rt-name { position: absolute; top: 32px; left: 0; transform: translateX(-50%); width: max-content; max-width: 112px; text-align: center; font: 700 .85rem/1.2 var(--body); background: rgba(0, 0, 0, .62); padding: 2px 8px; }
+.rt-name { position: absolute; top: 32px; left: 0; transform: translateX(-50%); width: max-content; max-width: 112px; text-align: center; font: 600 .85rem/1.2 var(--body); background: rgba(0, 0, 0, .62); padding: 2px 8px; }
 .rt-hub .rt-dot { left: -36px; top: -36px; width: 72px; height: 72px; background: #fff; border-color: #fff; color: #000; outline: 1px solid rgba(255, 255, 255, .5); outline-offset: 6px; }
 .rt-hub .rt-name { top: 48px; }
 .rt-branch .rt-dot { left: -24px; top: -24px; width: 48px; height: 48px; border-color: #fff; outline: 1px solid rgba(255, 255, 255, .4); outline-offset: 4px; }
@@ -192,11 +192,11 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #research-panel { position: sticky; top: 16px; --fill: rgba(3, 4, 12, .55); padding: 16px; display: grid; gap: 12px; justify-items: start; }
 .n-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
 .n-cost { font: 400 .85rem var(--mono); color: var(--soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.n-opens { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; }
+.n-opens { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; }
 .n-science { font-size: .95rem; color: var(--soft); }
 .n-change { background: rgba(255, 255, 255, .08); border-left: 2px solid #fff; padding: 8px 12px; width: 100%; box-sizing: border-box; font-size: .95rem; }
 .n-change b { display: block; font-size: .8rem; color: var(--soft); }
-.n-status { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; color: var(--soft); }
+.n-status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; color: var(--soft); }
 .n-status.done { color: #fff; }
 @media (max-width: 1100px) {
   .rt-layout { grid-template-columns: 1fr; }
@@ -204,12 +204,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 }
 
 /* Game paused sits above everything in the mission screen, the guided tour included. */
-#pause { background: rgba(4, 12, 34, .62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
+#pause { background: rgba(2, 5, 14, .68); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
 #debrief, #brief, #how, #credits { display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
-.dialog { position: relative; --fill: rgba(5, 14, 40, .55); padding: 28px; display: grid; gap: 16px; width: min(520px, 100%); justify-items: start; }
+.dialog { position: relative; --fill: rgba(3, 8, 24, .55); padding: 28px; display: grid; gap: 16px; width: min(520px, 100%); justify-items: start; }
 .dialog.wide { width: min(760px, 100%); }
 #brief .dialog, #debrief .dialog, #how .dialog, #credits .dialog { margin: auto; }
-.lesson, .goal { background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 12px 16px; width: 100%; box-sizing: border-box; }
+.lesson, .goal { background: rgba(0, 66, 166, .38); border-left: 2px solid var(--yellow); padding: 12px 16px; width: 100%; box-sizing: border-box; }
 .sitefacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
 .sitefacts div { --fill: rgba(255, 255, 255, .04); padding: 12px; display: grid; gap: 4px; }
 .sitefacts .ico { stroke: var(--soft); }
@@ -220,10 +220,10 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .cards { display: grid; gap: 12px; width: 100%; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0; font-variant-numeric: tabular-nums; }
 .facts dt { color: var(--soft); }
-.facts dd { margin: 0; font-weight: 700; }
+.facts dd { margin: 0; font-weight: 600; }
 #debrief-tips { margin: 0; padding-left: 20px; }
 .steps { margin: 0; padding-left: 24px; display: grid; gap: 12px; }
-.steps em { font-style: normal; font-weight: 700; color: var(--yellow); }
+.steps em { font-style: normal; font-weight: 600; color: var(--yellow); }
 .sources { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
 .sources a, .dialog a { color: var(--yellow); word-break: break-all; }
 #credits h3 { margin-top: 8px; }
@@ -232,7 +232,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .page { display: grid; gap: 8px; width: 100%; }
 .controls { margin: 0; display: grid; gap: 4px; width: 100%; }
 .controls > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 16px; padding: 4px 16px; min-height: 36px; background: rgba(255, 255, 255, .04); border-radius: 4px; }
-.controls dt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-weight: 700; }
+.controls dt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-weight: 600; }
 .controls dd { margin: 0; color: var(--soft); }
 .controls kbd { min-width: 16px; text-align: center; padding: 0 6px; }
 .settings { display: grid; gap: 8px; width: 100%; }
@@ -242,8 +242,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 
 /* ---- In-mission screen ----
    Messages top left, sun clock top middle, the settings gear top right, the mission drawer halfway
-   down the right edge, meters bottom left, supplies and research points bottom right.
-   The middle is kept clear for the base. */
+   down the right edge, meters bottom left, the hotbar bottom middle, supplies and research points
+   bottom right. The middle is kept clear for the base. */
 #hud .fine, #station .fine { font-size: 14px; color: var(--soft); margin: 0; }
 #station :focus-visible, #hud :focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 
@@ -267,7 +267,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .m-top .ico { stroke: var(--soft); vertical-align: 0; }
 .m-label { font-size: 14px; }
 .m-label { white-space: nowrap; }
-.m-val { margin-left: auto; font: 400 14px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.m-val { margin-left: auto; font: 500 14px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .m-note { font-size: 14px; color: var(--soft); }
 /* Bars are a row of short segments. The track and the fill are cut the same way so they line up. */
 .bar { position: relative; height: 8px; }
@@ -279,19 +279,22 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .meter[data-m="dose"].warn .bar i { background: var(--yellow); }
 .meter[data-m="dose"].bad .bar i { background: var(--red); }
 .goal-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; }
-.m-state { font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); display: flex; align-items: center; gap: 4px; }
+.m-state { font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); display: flex; align-items: center; gap: 4px; }
 .m-state .ico { vertical-align: 0; }
 .meter.bad .m-state { color: #fff; background: var(--martian); padding: 0 8px; justify-self: start; }
 
 #corner { position: fixed; right: 16px; bottom: 16px; width: 296px; display: flex; flex-direction: column; gap: 12px; }
 #corner .panel { position: static; }
-/* Airlock progress: one bar per step, stacked with the other bottom-right boxes */
-#airlock-panel { display: grid; gap: 8px; }
-#airlock-panel h3 { font: 700 16px var(--head); text-transform: uppercase; letter-spacing: .1em; margin: 0; display: flex; gap: 8px; align-items: center; }
+/* Airlock progress: one bar per step, in the middle of the screen above the hotbar, barely tinted */
+#airlock-panel {
+  left: 50%; bottom: 156px; transform: translateX(-50%); width: min(400px, calc(100vw - 24px)); display: grid; gap: 8px; text-align: center;
+  --fill: rgba(3, 8, 24, .18); -webkit-backdrop-filter: blur(6px) brightness(.82); backdrop-filter: blur(6px) brightness(.82);
+}
+#airlock-panel h3 { font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; margin: 0; display: flex; gap: 8px; align-items: center; justify-content: center; }
 #airlock-panel h3 .ico { stroke: var(--soft); vertical-align: 0; }
 #airlock-panel p { margin: 0; }
-#lock-text { font-weight: 700; }
-#lock-skip { justify-self: start; }
+#lock-text { font-weight: 600; }
+#lock-skip { justify-self: center; }
 #supplies { display: grid; gap: 4px; }
 .supply { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .supply .ico { stroke: var(--soft); vertical-align: 0; }
@@ -305,7 +308,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .rp-next { font-size: 14px; color: var(--soft); }
 
 #clock { top: 16px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 680px)); min-width: 280px; display: grid; gap: 8px; }
-.c-row { display: flex; gap: 4px 16px; flex-wrap: wrap; font-weight: 700; font-size: 14px; }
+.c-row { display: flex; gap: 4px 16px; flex-wrap: wrap; font-weight: 600; font-size: 14px; }
 .c-row .ico { vertical-align: -4px; }
 .c-row .dim { color: var(--soft); font-weight: 400; }
 .c-row .hot { color: #fff; background: var(--martian); padding: 0 8px; }
@@ -313,7 +316,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .track .night { position: absolute; top: 0; bottom: 0; right: 0; background: var(--electric); }
 .track .earth-gap { position: absolute; bottom: -4px; height: 2px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }
 .track .storm-mark { position: absolute; top: 0; bottom: 0; background: var(--red); }
-.track i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(5, 14, 40, .8); }
+.track i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(3, 8, 24, .8); }
 
 /* The gear in the top right corner is a bare icon: it pauses the game and opens the settings. */
 .hud-icons { position: fixed; top: 8px; right: 12px; display: flex; gap: 4px; z-index: 6; }
@@ -334,15 +337,15 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #mission-handle::before, #mission-handle::after { content: ""; width: 2px; height: 100%; border-radius: 1px; background: currentColor; opacity: .85; }
 #mission-handle .ico { vertical-align: 0; stroke-width: 2; }
 #mission-handle:hover { color: var(--yellow); }
-#mission-card { position: static; width: 300px; display: grid; gap: 8px; border-radius: 4px 0 0 4px; }
+#mission-card { position: static; width: 300px; display: grid; gap: 8px; border-radius: 4px 0 0 4px; --fill: rgba(3, 8, 24, .16); -webkit-backdrop-filter: blur(6px) brightness(.84); backdrop-filter: blur(6px) brightness(.84); }
 #mission-card h2 { font-size: 14px; line-height: 1.2; margin: 0; }
 .mc-head { display: flex; align-items: center; gap: 8px; color: var(--yellow); }
 .mc-head .ico { vertical-align: 0; }
 /* A rule that starts after the title and fades out before it reaches the corner. */
 .mc-head::after, .st-head h3::after { content: ""; flex: 1; height: 1px; margin-left: 4px; background: linear-gradient(90deg, currentColor, transparent 85%); opacity: .6; }
 .mc-name { margin: 0; font-size: 14px; }
-#hint { margin: 0; background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 8px 12px; font-weight: 700; font-size: 16px; }
-#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; font: 700 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
+#hint { margin: 0; background: rgba(0, 66, 166, .3); border-left: 2px solid var(--yellow); padding: 8px 12px; font-weight: 600; font-size: 16px; }
+#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; font: 600 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
 #air-toast.warn { background: var(--glass-solid); border: 1.5px solid var(--yellow); color: var(--yellow); }
 #air-toast.bad { background: rgba(142, 17, 0, .94); border: 1.5px solid #fff; color: #fff; }
 @keyframes air-fade { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
@@ -356,10 +359,10 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .msg {
   --k: rgba(201, 216, 242, .7);
   flex: none; padding: 8px 12px 8px 16px; font-size: 14px; animation: pop .3s var(--ease);
-  background: linear-gradient(var(--k), var(--k)) 0 0 / 2px 100% no-repeat, rgba(5, 14, 40, .42);
+  background: linear-gradient(var(--k), var(--k)) 0 0 / 2px 100% no-repeat, rgba(3, 8, 24, .42);
   border-radius: 0 4px 4px 0;
 }
-.msg .from { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
+.msg .from { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
 .msg .from .ico { vertical-align: 0; }
 /* The game's signature: every word from Earth carries its light delay. */
 .msg .from em { font: 400 14px var(--body); text-transform: none; letter-spacing: 0; color: var(--yellow); }
@@ -367,12 +370,28 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .msg.warn { --k: var(--yellow); }
 .msg.bad { --k: var(--red); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
-#prompt { left: 50%; bottom: 56px; transform: translateX(-50%); font-weight: 700; margin: 0; }
+/* Hotbar: four see-through slots at the bottom of the screen. The one in use lifts and brightens. */
+#hotbar-wrap { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
+#hotbar-name { margin: 0; min-height: 20px; font: 600 14px/20px var(--head); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 6px rgba(0, 0, 0, .3); }
+#hotbar { display: flex; gap: 8px; }
+.slot {
+  position: relative; width: 56px; height: 56px; padding: 0; display: grid; place-items: center; color: var(--text); cursor: pointer;
+  background: rgba(3, 8, 24, .22); border: 1px solid rgba(255, 255, 255, .26); border-radius: 8px;
+  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+  transition: transform .15s var(--ease), border-color .15s var(--ease), background-color .15s var(--ease);
+}
+.slot .ico { vertical-align: 0; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
+.slot:hover:not(:disabled) { border-color: rgba(255, 255, 255, .7); }
+.slot.on { transform: translateY(-4px); border-color: #fff; background: rgba(255, 255, 255, .16); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+.slot.empty { cursor: default; border-color: rgba(255, 255, 255, .14); background: rgba(3, 8, 24, .12); }
+.slot-key { position: absolute; left: 6px; top: 2px; font: 500 14px var(--body); color: var(--soft); opacity: .8; }
+.low .slot { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(3, 8, 24, .6); }
+#prompt { left: 50%; bottom: 104px; transform: translateX(-50%); font-weight: 600; margin: 0; }
 
 /* A solar storm is live danger, so this is the one thing on screen that pulses. */
 #storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 6px var(--red), inset 0 0 120px rgba(228, 55, 0, .45); animation: throb 1.2s ease-in-out infinite alternate; }
 #storm-frame.safe { box-shadow: inset 0 0 0 4px var(--yonder), inset 0 0 80px rgba(46, 150, 245, .3); animation: none; }
-#storm-frame p { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--martian); padding: 8px 16px; font: 700 16px var(--head); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
+#storm-frame p { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--martian); padding: 8px 16px; font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
 #storm-frame.safe p { background: var(--electric); }
 @keyframes throb { to { box-shadow: inset 0 0 0 6px var(--red), inset 0 0 40px rgba(228, 55, 0, .25); } }
 
@@ -380,17 +399,17 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
    the panel and not the labels floating behind it. */
 #station {
   left: 50%; top: 50%; transform: translate(-50%, -46%); width: min(540px, calc(100vw - 680px)); max-height: calc(100vh - 160px); overflow-y: auto;
-  display: grid; gap: 12px; padding: 20px 24px; --fill: rgba(5, 14, 40, .5);
+  display: grid; gap: 12px; padding: 20px 24px; --fill: rgba(3, 8, 24, .5);
   -webkit-backdrop-filter: blur(18px) brightness(.55); backdrop-filter: blur(18px) brightness(.55);
 }
-.low #station { --fill: rgba(5, 14, 40, .95); }
+.low #station { --fill: rgba(3, 8, 24, .95); }
 .st-head { display: flex; align-items: center; gap: 12px; }
 .st-head h3 { flex: 1; font-size: 16px; margin: 0; display: flex; gap: 8px; align-items: center; }
 .st-head .ico { vertical-align: 0; }
 #station-body { display: grid; gap: 12px; }
 #station-body p { margin: 0; }
 #station-body h4 { margin: 4px 0 0; font-size: 14px; color: var(--soft); }
-#station .big { font: 700 24px/1.2 var(--head); }
+#station .big { font: 600 24px/1.2 var(--head); }
 .opts { display: grid; gap: 8px; }
 .opt {
   text-align: left; font: 400 14px var(--body); color: var(--text); --fill: rgba(255, 255, 255, .06);
@@ -398,8 +417,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 }
 .opt:hover:not(:disabled) { --fill: rgba(234, 254, 7, .08); }
 .opt.on { --fill: rgba(0, 66, 166, .6); box-shadow: inset 2px 0 0 var(--yellow); }
-.opt-label { font: 700 16px var(--head); }
-.opt-label small { font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); }
+.opt-label { font: 600 16px var(--head); }
+.opt-label small { font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); }
 .opt-note { color: var(--soft); font-size: 14px; }
 .opt:disabled { opacity: .5; cursor: default; }
 .maprow { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; }
@@ -415,12 +434,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 
 /* Guided tour (First Night). It has to grab attention, so it keeps a solid red edge. */
 #tour { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
-#tour-card { width: 330px; display: grid; gap: 8px; --fill: rgba(5, 14, 40, .8); border: 2px solid var(--red); pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
+#tour-card { width: 330px; display: grid; gap: 8px; --fill: rgba(3, 8, 24, .8); border: 2px solid var(--red); pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
 #tour-card.at-right { right: 12px; top: 56px; }
 #tour-card.at-bottom { left: 50%; bottom: 96px; transform: translateX(-50%); }
 #tour-card.at-center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); }
 #tour-card.at-left { left: 12px; top: 300px; }
-#tour-title { margin: 0; font: 900 18px var(--head); color: var(--yellow); }
+#tour-title { margin: 0; font: 700 18px var(--head); color: var(--yellow); }
 #tour-text { display: grid; gap: 8px; font-size: 15px; }
 #tour-text p { margin: 0; }
 #tour-text b { color: #fff; }
@@ -449,6 +468,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
   .mc-name { display: none; }
   #feed { order: 3; max-height: 18vh; }
   #prompt { order: 4; align-self: center; margin-top: auto; }
+  #airlock-panel { order: 4; }
+  #hotbar-wrap { order: 7; justify-self: center; align-self: center; }
   #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; gap: 8px 24px; }
   #corner > * { flex: 1 1 160px; }
   .rp-next { display: none; }
@@ -466,10 +487,10 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 
 /* Sound and music sliders in the pause menu */
 .volume { display: grid; gap: 8px; padding: 12px 16px; background: rgba(255, 255, 255, .04); border-radius: 4px; text-align: left; }
-.volume h3 { margin: 0; font: 700 .85rem var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
+.volume h3 { margin: 0; font: 600 .85rem var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
 .volume-row { display: grid; grid-template-columns: 112px 1fr 44px auto; align-items: center; gap: 12px; }
 .volume-row:not(:has(button)) { grid-template-columns: 112px 1fr 44px; }
-.volume-row label { font-weight: 700; font-size: 14px; }
+.volume-row label { font-weight: 600; font-size: 14px; }
 .volume-row output { font: 400 14px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
 .volume input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--yellow) var(--fill, 50%), rgba(255, 255, 255, .18) var(--fill, 50%)); outline-offset: 4px; cursor: pointer; }
 .volume input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--electric); }
@@ -480,7 +501,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Tour labels: every one sits next to what it describes, with a red arrow pointing at it */
 #tour-callouts { position: fixed; inset: 0; pointer-events: none; }
 .tour-callout { position: fixed; box-sizing: border-box; display: grid; gap: 0; padding: 3px 9px; white-space: nowrap; width: max-content; background: rgba(7,23,63,.96); border: 2px solid #E43700; border-radius: 6px; font-size: 12px; line-height: 1.25; color: #fff; }
-.tour-callout b { color: #EAFE07; font: 900 13px "Fira Sans", system-ui, sans-serif; }
+.tour-callout b { color: var(--yellow); font: 700 13px var(--head); }
 .tour-callout .c-arrow { position: absolute; display: block; width: 22px; height: 28px; pointer-events: none; }
 .tour-callout .c-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
 .tour-ring-sm { position: fixed; border: 2px solid #E43700; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 0 10px rgba(228,55,0,.6); }

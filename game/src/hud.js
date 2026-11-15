@@ -24,6 +24,8 @@ export const ICONS = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>',
+  scoop: '<path d="M4 20 13 11"/><path d="m11 7 6 6 3.5-2.5c1.2-3.2-.8-6.8-4.5-7.5z"/>',
   left: '<path d="m15 5-7 7 7 7"/>',
   right: '<path d="m9 5 7 7-7 7"/>',
   target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
@@ -75,6 +77,45 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
   $('fullscreen').addEventListener('click', fsBtn);
+
+  // --- Hotbar: four slots at the bottom of the screen ---
+  // Keys 1 to 4 (or a click) put a tool in the astronaut's right hand; the same key again puts it
+  // away. Fixing a panel or picking up a rock takes out the right tool by itself. For now the tools
+  // are for show: nothing in the rules depends on which one is out.
+  const SLOTS = [
+    { id: 'wrench', name: 'Repair tool', icon: 'wrench' },
+    { id: 'scoop', name: 'Sample scoop', icon: 'scoop' },
+    null,
+    null,
+  ];
+  let held = -1;
+  function renderHotbar() {
+    $('hotbar').innerHTML = SLOTS.map((slot, i) => `<button class="slot${i === held ? ' on' : ''}${slot ? '' : ' empty'}" data-slot="${i}" ${slot ? '' : 'disabled'}
+        aria-pressed="${i === held}" aria-label="Slot ${i + 1}: ${slot ? slot.name : 'empty'}" title="${slot ? slot.name : 'Empty'}">
+        <span class="slot-key">${i + 1}</span>${slot ? icon(slot.icon, 28) : ''}</button>`).join('');
+    $('hotbar-name').textContent = held >= 0 ? SLOTS[held].name : '';
+  }
+  function selectSlot(i) {
+    if (!SLOTS[i]) return;
+    held = held === i ? -1 : i;
+    api.hold(held >= 0 ? SLOTS[held].id : null);
+    renderHotbar();
+  }
+  function holdTool(id) {
+    const i = SLOTS.findIndex(slot => slot?.id === id);
+    if (i < 0 || i === held) return;
+    held = i;
+    api.hold(id);
+    renderHotbar();
+  }
+  const slotBtn = e => {
+    const b = e.target.closest('[data-slot]');
+    if (!b || b.disabled) return;
+    selectSlot(Number(b.dataset.slot));
+    document.activeElement?.blur?.(); // so Space keeps meaning "jump", not "press this button again"
+  };
+  $('hotbar').addEventListener('click', slotBtn);
+  renderHotbar();
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
   function renderRp() {
@@ -352,7 +393,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         vacuum: `<p class="big">Ready to come in?</p>
           <p>The outer door closes, the air comes back, then the inner door opens.</p>
           <div class="opts">${btn('inside', 'Close up and come inside', { note: 'Takes a few seconds.' })}</div>`,
-        cycling: '<p class="big">The airlock is working</p><p>Watch the bar in the corner of the screen.</p>',
+        cycling: '<p class="big">The airlock is working</p><p>Watch the bar in the middle of the screen.</p>',
       }[status];
       return {
         title: 'Airlock', icon: 'door',
@@ -424,6 +465,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     hologramSound('open');
     sim.flags[`open_${id}`] = true;
     $('station').hidden = false;
+    $('hotbar-wrap').hidden = true; // out of the way of a tall panel
     renderStation(true);
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
@@ -431,6 +473,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (open) hologramSound('close');
     open = null;
     $('station').hidden = true;
+    $('hotbar-wrap').hidden = false;
     document.activeElement?.blur?.();
   }
 
@@ -530,7 +573,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   }
 
   return {
-    frame, openStation, close, toggleSpeed,
+    frame, openStation, close, toggleSpeed, selectSlot, holdTool,
     notice,
     busy: () => !!open,
     get open() { return open; },
@@ -543,6 +586,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
       $('mission-handle').removeEventListener('click', missionBtn);
+      $('hotbar').removeEventListener('click', slotBtn);
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;

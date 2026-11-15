@@ -64,7 +64,7 @@ function buildSteps() {
       id: 'trip-go', title: 'Suit up', target: '#station-body [data-act="outside"]', side: 'left', at: 'right', alt: skipPractice,
       hint: 'Press "Suit up and go outside", then walk out when the outer door opens.',
       text: [
-        'Press <b>Suit up and go outside</b>. Watch the bar in the corner while the doors and air pump work.',
+        'Press <b>Suit up and go outside</b>. Watch the bar in the middle of the screen while the doors and air pump work.',
         '<b>When the outer door is open, walk out onto the Moon</b> with WASD.',
       ],
       until: sim => sim.where === 'outside', noNext: true,

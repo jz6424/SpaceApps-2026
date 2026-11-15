@@ -7,7 +7,7 @@
 <meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code&family=Fira+Sans:wght@700;900&family=Overpass:ital,wght@0,300;0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&display=swap">
 </head>
 <body>
 
@@ -29,17 +29,22 @@
   </aside>
   <section id="meters" class="panel" aria-label="Base meters"></section>
   <div id="corner">
-    <section id="airlock-panel" class="panel" aria-label="Airlock" aria-live="polite" hidden>
-      <h3 id="lock-title"></h3>
-      <p id="lock-text"></p>
-      <div class="bar" id="lock-bar" role="progressbar" aria-labelledby="lock-title" aria-valuemin="0" aria-valuemax="100"><i></i></div>
-      <p id="lock-fact" class="fine"></p>
-      <button class="btn small primary" id="lock-skip" hidden>Skip</button>
-    </section>
     <div id="supplies" class="panel" aria-label="Supplies"></div>
     <div id="rp-bar" class="panel" aria-label="Research points"></div>
   </div>
+  <section id="airlock-panel" class="panel" aria-label="Airlock" aria-live="polite" hidden>
+    <h3 id="lock-title"></h3>
+    <p id="lock-text"></p>
+    <div class="bar" id="lock-bar" role="progressbar" aria-labelledby="lock-title" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+    <p id="lock-fact" class="fine"></p>
+    <button class="btn small primary" id="lock-skip" hidden>Skip</button>
+  </section>
   <p id="prompt" class="panel" hidden></p>
+  <!-- Hotbar: four slots. Keys 1 to 4, or a click, put a tool in the astronaut's hand. -->
+  <div id="hotbar-wrap">
+    <p id="hotbar-name" aria-live="polite"></p>
+    <div id="hotbar" role="toolbar" aria-label="Tools"></div>
+  </div>
   <p id="air-toast" hidden role="alert"></p>
   <div id="tour" hidden>
     <div id="tour-ring"></div>
@@ -181,6 +186,7 @@
         <div><dt>Mouse wheel</dt><dd>Zoom in and out</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>Use what you are next to</dd></div>
         <div><dt>Click a label</dt><dd>Walk there and open it</dd></div>
+        <div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></dt><dd>Pick a tool from the hotbar</dd></div>
         <div><dt><kbd>F</kbd></dt><dd>Speed up time</dd></div>
         <div><dt><kbd>Esc</kbd></dt><dd>Pause and settings</dd></div>
       </dl>
@@ -244,7 +250,7 @@
     <h3>Use of AI</h3>
     <p>We used Claude, an AI assistant made by Anthropic, to help write code, balance the game numbers, script the Blender models, check science facts and write text. Our team chose the design, directed the work and reviewed and tested the results.</p>
     <h3>Open-source tools</h3>
-    <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Fira Sans, Overpass and Fira Code (SIL Open Font License). Icons drawn in the style of Feather (MIT). Interface polish followed the unslop design checklist by Damir Sokolovsky (CC BY 4.0).</p>
+    <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Font: Exo 2 (SIL Open Font License). Icons drawn in the style of Feather (MIT). Interface polish followed the unslop design checklist by Damir Sokolovsky (CC BY 4.0).</p>
     <p class="fine">NASA data is public domain. This game is not affiliated with or endorsed by NASA.</p>
     <div class="row"><button class="btn primary" data-do="home">Back</button></div>
   </div>

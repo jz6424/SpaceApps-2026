@@ -416,6 +416,8 @@ function launch(id = chosen) {
     notice: t => hud.notice(t),
     busy: () => hud.busy(),
     toggleSpeed: () => hud.toggleSpeed(),
+    hotbar: i => hud.selectSlot(i),
+    useTool: id => hud.holdTool(id),
   });
   if (mission.tutorial) tour = createTour({ sim, game, hud });
   show(null);

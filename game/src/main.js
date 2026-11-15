@@ -19,6 +19,8 @@ const USE_RANGE = 2.4;         // how close you must be to use something with E
 const SUN_FULL = 3;
 
 await RAPIER.init();
+// The labels are drawn on canvases, so their typeface has to be loaded before the first one is drawn.
+await document.fonts.load('600 40px "Exo 2"').catch(() => {});
 const world = new RAPIER.World({ x: 0, y: 0, z: 0 }); // gravity is applied by hand in tick()
 const loader = new GLTFLoader();
 
@@ -300,7 +302,7 @@ function iconPath(ctx, name, x, y, s, width = 2) {
 function calloutSprite(text, icon, color = '#FFFFFF') {
   const CALLOUT = 0.0056; // metres of sprite per pixel of drawing
   const H = 128, AX = 22, AY = H - 22, EX = 68, EY = 60, LX = 94, RING = 12; // dot, elbow, where the name starts
-  const ICON = 40, GAP = 10, PAD = 14, FONT = '700 40px "Fira Sans", system-ui, sans-serif';
+  const ICON = 40, GAP = 10, PAD = 14, FONT = '600 40px "Exo 2", system-ui, sans-serif';
   const label = text.toUpperCase();
   const canvas = document.createElement('canvas');
   let ctx = canvas.getContext('2d');
@@ -360,7 +362,7 @@ function labelSprite(text, icon, color = '#FFFFFF') {
   const ctx = canvas.getContext('2d');
   ctx.scale(2, 2);
   const label = text.toUpperCase();
-  ctx.font = '700 44px "Fira Sans", system-ui, sans-serif';
+  ctx.font = '600 44px "Exo 2", system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
   const ICON = 56, GAP = 16, PAD = 24, textMax = W - 28 - 2 * PAD - ICON - GAP;
@@ -659,19 +661,165 @@ crew.add(crewModel);
 crew.traverse(o => { o.castShadow = true; o.frustumCulled = false; });
 scene.add(crew);
 
-// Idle, Walk and Run loop in place; tick() picks one from how the astronaut is moving. The clips
-// play a little fast because the game's speeds are quicker than a real moonwalk.
+// The skeleton's joints, and how each one sits at rest, for the body language added in tick().
+const BONES = ['Hips', 'Spine', 'ArmL', 'ArmR', 'ForearmL', 'ForearmR', 'ThighL', 'ThighR', 'ShinL', 'ShinR', 'FootL', 'FootR'];
+const bones = Object.fromEntries(BONES.map(n => [n, crewModel.getObjectByName(n)]));
+const rest = Object.fromEntries(BONES.map(n => [n, bones[n].quaternion.clone()]));
+const smoothed = Object.fromEntries(BONES.map(n => [n, bones[n].quaternion.clone()]));
+
+// Idle, Walk and Run loop in place; tick() picks one from how the astronaut is moving. The run
+// plays slower than the walk: in the Moon's low gravity a run is a long, floating lope.
 const crewMixer = new THREE.AnimationMixer(crewModel);
-const MOVE_RATE = { Idle: 1, Walk: 1.5, Run: 1.15 };
+const MOVE_RATE = { Idle: 1, Walk: 1.5, Run: 0.9 };
 const moves = Object.fromEntries(crewGltf.animations.map(clip => [clip.name, crewMixer.clipAction(clip)]));
 let move = 'Idle';
 moves.Idle.play();
 crewMixer.update(0);
 function setMove(name) {
   if (name === move) return;
-  moves[move].fadeOut(0.2);
-  moves[name].reset().setEffectiveTimeScale(MOVE_RATE[name]).fadeIn(0.2).play();
+  moves[move].fadeOut(0.3);
+  moves[name].reset().setEffectiveTimeScale(MOVE_RATE[name]).fadeIn(0.3).play();
   move = name;
+}
+
+// --- Tools held in the right hand (picked from the hotbar) ---
+const TOOLS = {};
+{
+  const part = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
+  const wrench = new THREE.Group();   // a handle with an open jaw
+  wrench.add(part(0.04, 0.26, 0.04, PAINT.grey, 0, 0.1, 0), part(0.13, 0.05, 0.045, PAINT.gold, 0, 0.25, 0), part(0.04, 0.07, 0.045, PAINT.gold, -0.045, 0.3, 0), part(0.04, 0.07, 0.045, PAINT.gold, 0.045, 0.3, 0));
+  const scoop = new THREE.Group();    // a handle with a small open box on the end
+  scoop.add(part(0.035, 0.3, 0.035, PAINT.grey, 0, 0.12, 0), part(0.14, 0.02, 0.12, PAINT.blue, 0, 0.28, 0.02), part(0.14, 0.07, 0.02, PAINT.blue, 0, 0.31, -0.04), part(0.02, 0.07, 0.12, PAINT.blue, -0.07, 0.31, 0.02), part(0.02, 0.07, 0.12, PAINT.blue, 0.07, 0.31, 0.02));
+  for (const [id, tool] of Object.entries({ wrench, scoop })) {
+    tool.position.set(0, -0.27, 0.04);       // in the fist, at the end of the forearm
+    tool.rotation.x = Math.PI / 2;           // pointing forward, out of the hand
+    tool.visible = false;
+    bones.ForearmR.add(tool);
+    TOOLS[id] = tool;
+  }
+}
+let holding = null;
+function hold(id) {
+  holding = TOOLS[id] ? id : null;
+  for (const [key, tool] of Object.entries(TOOLS)) tool.visible = key === holding;
+}
+
+// --- Moon dust: small puffs kicked up by running feet and by landings ---
+// With no air, dust on the Moon doesn't hang in a cloud: every grain flies in an arc and drops
+// straight back, in the Moon's weak gravity. Each puff is a handful of grains that do just that.
+const PUFFS = 12, GRAINS = 22;
+const dustDot = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d'), shade = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  shade.addColorStop(0, 'rgba(255,255,255,1)'); shade.addColorStop(0.5, 'rgba(255,255,255,.55)'); shade.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = shade; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const puffs = Array.from({ length: PUFFS }, () => {
+  const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(GRAINS * 3), 3));
+  const points = new THREE.Points(geo, new THREE.PointsMaterial({ map: dustDot, color: 0xc4c1ba, size: 0.3, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false }));
+  points.frustumCulled = false;
+  points.visible = false;
+  scene.add(points);
+  return { points, speed: new Float32Array(GRAINS * 3), age: 0, life: 1, floor: 0 };
+});
+let nextPuff = 0;
+// at: where the foot is. power: how hard it hit (about 0.3 for a running step, up to 1.5 for a
+// hard landing). pushX/pushZ: which way the foot was moving, so a run throws dust backwards.
+function kickDust(at, power, pushX = 0, pushZ = 0) {
+  const puff = puffs[nextPuff++ % PUFFS], pos = puff.points.geometry.attributes.position;
+  for (let i = 0; i < GRAINS; i++) {
+    // Scattered around the foot, not on a ring, each grain with its own speed, so it reads as a cloud.
+    const turn = Math.random() * Math.PI * 2, from = Math.random() * 0.22, out = (0.1 + Math.random() * 1.1) * power;
+    pos.setXYZ(i, at.x + Math.cos(turn) * from, at.y + 0.03 + Math.random() * 0.06, at.z + Math.sin(turn) * from);
+    puff.speed.set([Math.cos(turn) * out - pushX * 0.25, (0.2 + Math.random() * 0.95) * power, Math.sin(turn) * out - pushZ * 0.25], i * 3);
+  }
+  pos.needsUpdate = true;
+  Object.assign(puff, { age: 0, life: 1.1 + power * 0.9, floor: at.y });
+  puff.points.material.size = 0.24 + 0.16 * Math.min(1, power);
+  puff.points.visible = true;
+}
+function driftDust(dt) {
+  for (const puff of puffs) {
+    if (!puff.points.visible) continue;
+    puff.age += dt;
+    if (puff.age >= puff.life) { puff.points.visible = false; continue; }
+    const pos = puff.points.geometry.attributes.position, v = puff.speed;
+    for (let i = 0; i < GRAINS; i++) {
+      if (pos.getY(i) <= puff.floor && v[i * 3 + 1] < 0) continue; // this grain has landed
+      v[i * 3 + 1] -= GRAVITY * dt;
+      pos.setXYZ(i, pos.getX(i) + v[i * 3] * dt, Math.max(puff.floor, pos.getY(i) + v[i * 3 + 1] * dt), pos.getZ(i) + v[i * 3 + 2] * dt);
+    }
+    pos.needsUpdate = true;
+    puff.points.material.opacity = 0.42 * (1 - puff.age / puff.life) ** 1.3;
+  }
+}
+
+// --- Body language, layered over the clips every frame ---
+//   - the limbs follow the clip a touch late, which rounds off its corners (a softer, floatier run)
+//   - a run leans forward and bounds
+//   - in the air the arms drift out and circle slowly for balance and the knees go soft
+//   - a held tool is carried in front of the body
+const twist = new THREE.Quaternion(), aim = new THREE.Quaternion(), turnBy = new THREE.Euler(), footAt = new THREE.Vector3();
+function bend(name, x, y, z, weight) {
+  if (weight <= 0.001) return;
+  aim.copy(rest[name]).multiply(twist.setFromEuler(turnBy.set(x, y, z)));
+  bones[name].quaternion.slerp(aim, Math.min(1, weight));
+}
+let airTime = 0, air = 0, carry = 0, lope = 0, poseClock = 0, lastStep = 0, wasGrounded = true, fallSpeed = 0;
+function bodyLanguage(dt, pace, outside) {
+  const ease = rate => 1 - Math.exp(-rate * dt);
+  poseClock += dt;
+  // Follow the clip softly.
+  const follow = ease(move === 'Idle' ? 30 : 13);
+  for (const name of BONES) bones[name].quaternion.copy(smoothed[name].slerp(bones[name].quaternion, follow));
+
+  const running = move === 'Run' && grounded;
+  lope += ((running ? 1 : 0) - lope) * ease(5);
+  carry += ((holding ? 1 : 0) - carry) * ease(8);
+  airTime = grounded ? 0 : airTime + dt;
+  air += ((airTime > 0.07 ? 1 : 0) - air) * ease(airTime > 0.07 ? 4.5 : 9);
+
+  // Run: lean in and bound. The clip takes two steps per loop, so the body rises twice.
+  const stride = moves.Run.time / moves.Run.getClip().duration; // 0 to 1 through the loop
+  crewModel.position.y = -CREW_HEIGHT / 2 + lope * 0.07 * Math.abs(Math.sin(stride * Math.PI * 2));
+  bend('Spine', 0.2, 0, 0, lope * 0.8);
+
+  // A tool in the right hand: elbow bent, forearm forward.
+  bend('ArmR', -0.45, 0, -0.1, carry);
+  bend('ForearmR', -1.05, 0, 0, carry);
+
+  // In the air: arms out and slowly circling, like someone keeping their balance.
+  const slow = Math.sin(poseClock * 2.0), slower = Math.sin(poseClock * 1.5 + 1.2);
+  bend('ArmL', 0.3 * slower, 0, 1.2 + 0.3 * slow, air);
+  bend('ArmR', -0.3 * slower, 0, -(1.2 - 0.3 * slow), air);
+  bend('ForearmL', -0.3, 0, 0.25, air);
+  bend('ForearmR', -0.3, 0, -0.25, air);
+  bend('ThighL', -0.4, 0, 0.1, air * 0.85);
+  bend('ShinL', 0.75, 0, 0, air * 0.85);
+  bend('ThighR', 0.15, 0, -0.1, air * 0.85);
+  bend('ShinR', 0.45, 0, 0, air * 0.85);
+  bend('Spine', -0.08, 0, 0.06 * slow, air);
+
+  // Dust, on open ground only: a small puff from each running step, a bigger one on landing.
+  const feet = crew.position.y - CREW_HEIGHT / 2;
+  if (outside && running) {
+    const step = Math.floor(stride * 2);
+    if (step !== lastStep) {
+      bones[step ? 'FootL' : 'FootR'].getWorldPosition(footAt);
+      footAt.y = feet;
+      kickDust(footAt, 0.32, velX, velZ);
+    }
+    lastStep = step;
+  }
+  if (outside && grounded && !wasGrounded && fallSpeed > 0.9) {
+    footAt.set(crew.position.x, feet, crew.position.z);
+    kickDust(footAt, Math.min(1.5, 0.45 + fallSpeed * 0.3), velX * 0.5, velZ * 0.5);
+  }
+  if (!grounded) fallSpeed = Math.max(0, -vy);
+  wasGrounded = grounded;
+  driftDust(dt);
 }
 
 const outsideSpot = () => new THREE.Vector3(site.x + 11, site.y + CREW_HEIGHT / 2 + 0.1, site.z + 6);
@@ -702,6 +850,8 @@ addEventListener('keydown', e => {
   if (!e.repeat) {
     if (code === 'KeyE') useNearest();
     if (code === 'KeyF') hooks?.toggleSpeed();
+    const slot = /^Digit([1-4])$/.exec(e.code);
+    if (slot) hooks?.hotbar?.(Number(slot[1]) - 1);
   }
   keys.add(code);
 });
@@ -828,8 +978,8 @@ function useNearest() {
   const it = nearestUsable();
   if (!it || !sim) return;
   if (it.kind === 'station') openStation(it.id);
-  if (it.kind === 'panel') hooks?.notice(sim.repairPanelByHand(it.i));
-  if (it.kind === 'sample') sim.collectSample(it.id);
+  if (it.kind === 'panel') { hooks?.useTool?.('wrench'); hooks?.notice(sim.repairPanelByHand(it.i)); }
+  if (it.kind === 'sample') { hooks?.useTool?.('scoop'); sim.collectSample(it.id); }
   if (it.kind === 'door') useDoor(it.id);
 }
 function openStation(id) {
@@ -901,6 +1051,7 @@ function tick(dt) {
   }
   setMove(pace > (WALK + RUN) / 2 ? 'Run' : pace > 0.3 ? 'Walk' : 'Idle');
   crewMixer.update(dt);
+  bodyLanguage(dt, pace, !isInside(now));
 
   const inside = isInside(now);
   const inHull = inside && now.x < airlockX; // the airlock tube has its own roof, so it uses the normal camera
@@ -1052,11 +1203,13 @@ gameReady({
     camDist = 9;
     grounded = false;
     walkTo = null;
+    hold(null);
     syncAirlock(0, true);
     frozen = false;
     state = 'play';
   },
   setSpeed(s) { speed = s; },
+  hold, // which tool is in the astronaut's hand: 'wrench', 'scoop' or null
   freeze(on) { frozen = on; },
   // Where a station's floating label is on the screen (null if it is behind the camera).
   stationScreen(id) {
