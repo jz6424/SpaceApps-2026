@@ -124,7 +124,7 @@
       <button class="btn small" data-do="home">Back</button>
       <div class="row">
         <button class="btn small" data-do="scrapbook">Scrapbook <span id="scrapbook-new" class="pip" hidden></span></button>
-        <button class="btn small" data-do="research">Research Tree</button>
+        <button class="btn small rt-btn" data-do="research">Research Tree <span id="research-new" class="rt-dot-new" hidden><span class="sr-only">: you have research points to use</span></span></button>
         <p class="score">Research points: <b id="points">0</b></p>
       </div>
     </div>
@@ -301,6 +301,13 @@
   </div>
 </main>
 
+<!-- After a mission, when there is something the player can research. -->
+<div id="rp-nudge" role="dialog" aria-modal="false" aria-labelledby="rp-nudge-title" hidden>
+  <button class="rp-nudge-x" data-do="rp-nudge-close" aria-label="Close">&times;</button>
+  <h3 id="rp-nudge-title">You Have Research Points to Use</h3>
+  <p id="rp-nudge-text"></p>
+  <div class="row"><button class="btn primary small" data-do="rp-nudge-open">Open the Research Tree</button><button class="btn small" data-do="rp-nudge-close">Later</button></div>
+</div>
 <main id="debrief" class="screen" hidden>
   <div class="dialog wide">
     <p class="eyebrow">Debrief</p>

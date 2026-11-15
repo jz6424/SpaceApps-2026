@@ -94,6 +94,7 @@ function settle() {
 }
 function show(name, move) {
   settle();   // a move that is still playing ends here
+  if (name !== 'missions') $('rp-nudge').hidden = true; // the research popup belongs to the mission menu
   const from = showing();
   for (const key of SCREENS) $(key).hidden = key !== name;
   if (move && from && name && from !== name && !calm) {
@@ -170,8 +171,23 @@ function missionCard(mission, index) {
     </article>`;
 }
 
+// Research the player can afford right now (not counting upgrades that aren't switched on).
+const canResearch = () => BRANCHES.flatMap(b => b.nodes).filter(node => nodeState(node, unlocksNow(), save.points) === 'ready');
+// After a mission, the menu says once if there is research to spend points on: a red dot on the
+// Research Tree button (it stays while there is), and a popup that can be closed.
+let nudgeAfterMission = false;
+function showNudge() {
+  const first = recommended(), ready = canResearch().sort((a, b) => (b.id === first) - (a.id === first)); // the recommended pick first
+  nudgeAfterMission = false;
+  if (!ready.length) return;
+  $('rp-nudge-text').textContent = `You have ${save.points} research point${save.points === 1 ? '' : 's'}, enough for ${ready.length === 1 ? ready[0].name : `${ready.length} things, like ${ready[0].name}`}.`;
+  $('rp-nudge').hidden = false;
+}
+const hideNudge = () => { $('rp-nudge').hidden = true; };
+
 function renderMissions() {
   $('points').textContent = save.points;
+  $('research-new').hidden = !canResearch().length;
   const unread = scrapbook.unread();
   $('scrapbook-new').textContent = `${unread} new`;
   $('scrapbook-new').hidden = !unread;
@@ -226,6 +242,7 @@ function openMissions() {
   // The menu starts on its first mission, so Enter opens that and doesn't go back to the title.
   $('mission-list').querySelector('.m-head')?.focus({ preventScroll: true });
   moonMenu.start();
+  if (nudgeAfterMission) showNudge();
 }
 // The Moon is made once, as soon as the game has loaded, so that its maps of the real Moon have
 // arrived by the time the menu opens. It sizes itself to its place on the page when it starts.
@@ -731,6 +748,7 @@ function renderResearch() {
 
 // From the mission menu the view tips up to the sky, where the tree is waiting as points of light.
 function openResearch() {
+  hideNudge();
   const from = showing(), up = from === 'missions';
   picked = null;
   renderResearch();
@@ -973,6 +991,7 @@ function resume() {
 }
 
 function finish() {
+  nudgeAfterMission = true; // back at the mission menu, say if there is research to spend points on
   stopReading(); // the mission is over: stop reading a panel that is about to go
   const o = sim.over, mission = sim.mission, mode = sim.modeName;
   const stars = o.won ? o.stars : 0;
@@ -1058,6 +1077,8 @@ function renderCredits() {
 const actions = {
   // Leaving the Scrapbook, the book shuts first.
   'open-missions': () => (showing() === 'scrapbook' ? scrapbook.close(openMissions) : openMissions()),
+  'rp-nudge-close': hideNudge,
+  'rp-nudge-open': () => { hideNudge(); openResearch(); },
   home: () => { renderStart(); show('start', showing() === 'missions' ? 'scope-back' : undefined); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },
@@ -1105,6 +1126,7 @@ addEventListener('keydown', e => {
   // It closes the innermost thing first: a pinned Research Tree box, then the tree; a Scrapbook
   // page goes back to the contents, then the book shuts.
   if (!hud) {
+    if (!$('rp-nudge').hidden) { e.preventDefault(); hideNudge(); return; } // the popup closes first
     const on = showing();
     if (on === 'research' && picked) { e.preventDefault(); picked = null; showPanel(null); renderResearch(); return; }
     if (on === 'scrapbook' && scrapbook.page) { e.preventDefault(); openScrapbook(); return; }
