@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Junior Astronaut Moon Base Trainer</title>
 <meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,6 +40,12 @@
     <button class="btn small primary" id="lock-skip" hidden>Skip</button>
   </section>
   <p id="prompt" class="panel" hidden></p>
+  <!-- Phones and tablets only (see touch.js): a joystick to walk, and Use and Jump buttons. -->
+  <div id="touch-stick" aria-hidden="true"><div id="touch-knob"></div></div>
+  <div id="touch-actions">
+    <button id="touch-jump" class="touch-btn" aria-label="Jump">Jump</button>
+    <button id="touch-use" class="touch-btn" aria-label="Use what you are next to">Use</button>
+  </div>
   <!-- Hotbar: four slots. Keys 1 to 4, or a click, put a tool in the astronaut's hand. -->
   <div id="hotbar-wrap">
     <p id="hotbar-name" aria-live="polite"></p>
@@ -178,7 +184,17 @@
       </section>
     </div>
     <div class="page" id="page-controls" role="tabpanel" aria-labelledby="tab-controls" hidden>
-      <dl class="controls">
+      <dl class="controls touch-only">
+        <div><dt>Joystick</dt><dd>Walk. Push it all the way to run</dd></div>
+        <div><dt>Use button</dt><dd>Use what you are next to</dd></div>
+        <div><dt>Jump button</dt><dd>Jump</dd></div>
+        <div><dt>Drag on the base</dt><dd>Look around</dd></div>
+        <div><dt>Pinch</dt><dd>Zoom in and out</dd></div>
+        <div><dt>Tap a label</dt><dd>Walk there and open it</dd></div>
+        <div><dt>Tap a hotbar slot</dt><dd>Pick a tool</dd></div>
+        <div><dt>Gear</dt><dd>Pause, speed and settings</dd></div>
+      </dl>
+      <dl class="controls key-only">
         <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows</dt><dd>Walk</dd></div>
         <div><dt><kbd>Shift</kbd></dt><dd>Run</dd></div>
         <div><dt><kbd>Space</kbd></dt><dd>Jump</dd></div>
@@ -234,7 +250,8 @@
       <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back. Every storm is sized from a real solar flare, and they change each time you play.</li>
       <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
     </ol>
-    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the settings and the list of controls. The arrow on the right edge slides your mission out of the way and back.</p>
+    <p class="fine key-only">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the settings and the list of controls. The arrow on the right edge slides your mission out of the way and back.</p>
+    <p class="fine touch-only">On a phone or tablet: use the joystick to walk (push it all the way to run), tap Use and Jump, drag to look around, pinch to zoom, and tap a label to walk there. The gear pauses the game and holds the settings.</p>
     <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
   </div>
 </main>

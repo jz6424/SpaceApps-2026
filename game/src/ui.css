@@ -455,26 +455,26 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
   #mission-card { width: 252px; }
   #station { width: calc(100vw - 600px); }
 }
-/* Narrow and upright (tablets held upright, phones): the corners can't sit side by side, so the
-   panels stack in reading order down the screen and the base shows through the gap in the middle. */
+/* A narrow, upright window on a computer: the corners can't sit side by side, so the panels stack
+   in reading order down the screen. Phones and tablets have their own layout further down. */
 @media (max-width: 900px) and (orientation: portrait) {
-  #hud { position: fixed; inset: 0; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-  #hud > :not(#air-toast, #tour) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
-  .hud-icons { order: 0; align-self: flex-end; }
-  #clock { order: 1; }
-  #mission-drawer, #mission-drawer.shut { order: 2; transform: none; display: block; }
-  #mission-handle { display: none; }
-  #mission-card { width: auto; border-radius: 4px; }
-  .mc-name { display: none; }
-  #feed { order: 3; max-height: 18vh; }
-  #prompt { order: 4; align-self: center; margin-top: auto; }
-  #airlock-panel { order: 4; }
-  #hotbar-wrap { order: 7; justify-self: center; align-self: center; }
-  #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; gap: 8px 24px; }
-  #corner > * { flex: 1 1 160px; }
-  .rp-next { display: none; }
-  #meters { order: 6; gap: 8px; }
-  #station { left: 8px; right: 8px; top: auto; bottom: 8px; transform: none; width: auto; max-height: 72vh; }
+  html:not(.touch) #hud { position: fixed; inset: 0; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  html:not(.touch) #hud > :not(#air-toast, #tour) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
+  html:not(.touch) .hud-icons { order: 0; align-self: flex-end; }
+  html:not(.touch) #clock { order: 1; }
+  html:not(.touch) #mission-drawer, html:not(.touch) #mission-drawer.shut { order: 2; transform: none; display: block; }
+  html:not(.touch) #mission-handle { display: none; }
+  html:not(.touch) #mission-card { width: auto; border-radius: 4px; }
+  html:not(.touch) .mc-name { display: none; }
+  html:not(.touch) #feed { order: 3; max-height: 18vh; }
+  html:not(.touch) #prompt { order: 4; align-self: center; margin-top: auto; }
+  html:not(.touch) #airlock-panel { order: 4; }
+  html:not(.touch) #hotbar-wrap { order: 7; justify-self: center; align-self: center; }
+  html:not(.touch) #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; gap: 8px 24px; }
+  html:not(.touch) #corner > * { flex: 1 1 160px; }
+  html:not(.touch) .rp-next { display: none; }
+  html:not(.touch) #meters { order: 6; gap: 8px; }
+  html:not(.touch) #station { left: 8px; right: 8px; top: auto; bottom: 8px; transform: none; width: auto; max-height: 72vh; }
 }
 @media (max-width: 760px) {
   .sitefacts { grid-template-columns: 1fr; }
@@ -506,3 +506,88 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .tour-callout .c-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
 .tour-ring-sm { position: fixed; border: 2px solid #E43700; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 0 10px rgba(228,55,0,.6); }
 .tour-callout[hidden], .tour-ring-sm[hidden] { display: none; }
+
+/* ---- Phones and tablets ----
+   Everything below applies only when touch.js has put the "touch" class on the page, which it
+   does only where a finger is the main pointer. On a computer the joystick and buttons are never
+   shown and none of this layout is used.
+   The screen is a grid: meters, sun clock and supplies across the top; messages under the meters;
+   joystick, hotbar and the Use and Jump buttons across the bottom. The gear, the mission drawer,
+   the airlock bar and the "Tap Use" prompt keep their own fixed spots. */
+#touch-stick, #touch-actions, .touch-only { display: none; }
+.touch .key-only { display: none; }
+.touch .touch-only { display: grid; }
+.touch p.touch-only { display: block; }
+.touch body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.touch #hud {
+  position: fixed; inset: 0; box-sizing: border-box; pointer-events: none; display: grid; gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  grid-template-columns: minmax(0, 232px) minmax(0, 1fr) minmax(0, 232px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "meters clock corner" "feed . ." "stick hotbar actions";
+}
+.touch #meters, .touch #clock, .touch #corner, .touch #feed, .touch #hotbar-wrap {
+  position: static; transform: none; width: auto; min-width: 0; max-width: none; pointer-events: auto;
+}
+.touch #meters { grid-area: meters; align-self: start; gap: 8px; }
+.touch #clock { grid-area: clock; align-self: start; justify-self: center; width: min(360px, 100%); }
+.touch #corner { grid-area: corner; align-self: start; margin-top: 40px; gap: 8px; } /* under the gear */
+.touch .rp-next, .touch .m-note { display: none; }
+.touch .rp-top span, .touch .supply span, .touch .m-label { white-space: nowrap; letter-spacing: .05em; }
+.touch #feed { grid-area: feed; align-self: start; max-height: min(30vh, 220px); }
+.touch #hotbar-wrap { grid-area: hotbar; align-self: end; justify-self: center; }
+.touch .hud-icons, .touch #mission-drawer, .touch #prompt, .touch #airlock-panel { pointer-events: auto; }
+.touch .hud-icons { top: max(4px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); }
+/* The prompt sits just above the Use button it talks about. */
+.touch #prompt { left: auto; right: calc(44px + env(safe-area-inset-right)); bottom: calc(112px + env(safe-area-inset-bottom)); transform: none; max-width: 240px; text-align: right; } /* 44px: clear of the drawer's arrow */
+.touch #airlock-panel { bottom: auto; top: 46%; transform: translateX(-50%); }
+.touch #station { width: min(540px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); transform: translate(-50%, -50%); z-index: 7; }
+
+/* The joystick: a ring with a knob that follows the thumb. */
+.touch #touch-stick {
+  grid-area: stick; display: block; align-self: end; justify-self: start; position: relative; width: 124px; height: 124px; border-radius: 50%;
+  pointer-events: auto; touch-action: none; background: rgba(3, 8, 24, .2); border: 1.5px solid rgba(255, 255, 255, .34);
+  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+}
+#touch-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255, 255, 255, .3); border: 1.5px solid rgba(255, 255, 255, .7); pointer-events: none; }
+.touch #touch-actions { grid-area: actions; display: flex; align-items: flex-end; gap: 12px; align-self: end; justify-self: end; pointer-events: auto; }
+.touch-btn {
+  width: 64px; height: 64px; border-radius: 50%; padding: 0; color: var(--text); cursor: pointer; touch-action: none;
+  font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .08em;
+  background: rgba(3, 8, 24, .22); border: 1.5px solid rgba(255, 255, 255, .34);
+  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+}
+.touch-btn:active { background: rgba(255, 255, 255, .22); transform: scale(.95); }
+#touch-use { width: 80px; height: 80px; }
+#touch-use.ready { border-color: var(--yellow); color: var(--yellow); background: rgba(234, 254, 7, .12); }
+
+/* A phone held upright: two columns. The hotbar gets its own row above the joystick. */
+@media (max-width: 600px) {
+  .touch #hud {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "clock clock" "meters meters" "corner corner" "feed feed" "hotbar hotbar" "stick actions";
+  }
+  .touch #clock { justify-self: stretch; width: auto; margin-right: 44px; } /* leaves the corner for the gear */
+  .touch #corner { margin-top: 0; }
+  .touch #feed { max-height: 16vh; justify-self: start; width: min(100%, 320px); }
+  .touch #mission-card { width: min(300px, calc(100vw - 56px)); }
+  .touch #prompt { bottom: calc(236px + env(safe-area-inset-bottom)); } /* above the hotbar row */
+}
+/* A phone held sideways: very little height, so everything is a size smaller. */
+@media (max-height: 480px) {
+  .touch #hud { gap: 4px; grid-template-columns: minmax(0, 208px) minmax(0, 1fr) minmax(0, 208px); }
+  .touch #meters { gap: 4px; }
+  .touch #feed { max-height: 26vh; }
+  .touch #touch-stick { width: 104px; height: 104px; }
+  .touch #touch-knob { width: 48px; height: 48px; margin: -24px 0 0 -24px; }
+  .touch .slot { width: 48px; height: 48px; }
+  .touch #hotbar-name { display: none; }
+  .touch #lock-fact { display: none; }
+  .touch #prompt { bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .touch #touch-use { width: 72px; height: 72px; }
+  .touch .rp-top span, .touch .supply span, .touch .m-label { letter-spacing: .02em; }
+  .touch #mission-drawer { top: 59%; } /* between the supplies above and the buttons below */
+  .touch #mission-handle { height: 80px; }
+  .touch .touch-btn { width: 56px; height: 56px; }
+}

@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { gameReady } from './ui.js';
 import { readSiteMaps } from './nasa.js';
+import { isTouch, setupTouch } from './touch.js';
 
 const GRID = 512;              // terrain samples per side
 const POST = 5;                // metres between samples (LOLA 5 m/px)
@@ -962,8 +963,36 @@ const DRAG_SPEED = 0.005; // radians the view turns per pixel of mouse drag
 let yaw = Math.PI / 2, pitch = 0.2, camDist = 7;
 const canvas = renderer.domElement;
 let down = null;
+// Fingers (phones and tablets): one finger drags the view, two pinch to zoom, a tap is a click.
+// The browser doesn't report how far a finger moved between events the way it does for a mouse,
+// so each finger's last position is kept here.
+const fingers = new Map(); // pointer id -> { x, y, moved }
+let pinch = 0;             // distance between two fingers at the last move, 0 when not pinching
+function fingerMove(e) {
+  const f = fingers.get(e.pointerId);
+  if (!f) return;
+  const dx = e.clientX - f.x, dy = e.clientY - f.y;
+  Object.assign(f, { x: e.clientX, y: e.clientY, moved: f.moved + Math.abs(dx) + Math.abs(dy) });
+  if (fingers.size === 1) {
+    yaw -= dx * DRAG_SPEED * 1.4;
+    pitch = THREE.MathUtils.clamp(pitch + dy * DRAG_SPEED * 1.4, -0.6, 1.3);
+  } else if (fingers.size === 2) {
+    const [a, b] = [...fingers.values()], apart = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinch && apart > 0) camDist = THREE.MathUtils.clamp(camDist * pinch / apart, 2, 60);
+    pinch = apart;
+  }
+}
+function fingerUp(e, tap) {
+  const f = fingers.get(e.pointerId);
+  fingers.delete(e.pointerId);
+  pinch = 0;
+  if (tap && f && f.moved < 12 && fingers.size === 0 && state === 'play') click(e);
+}
+canvas.addEventListener('pointercancel', e => { if (e.pointerType === 'touch') fingerUp(e, false); });
+
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId);
+  if (e.pointerType === 'touch') { fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 }); pinch = 0; return; }
   down = { x: e.clientX, y: e.clientY, moved: 0 };
   // Hide the cursor and let the mouse travel without hitting the screen edge while dragging.
   try { canvas.requestPointerLock()?.catch?.(() => {}); } catch {}
@@ -976,6 +1005,7 @@ document.addEventListener('pointerlockchange', () => {
   }
 });
 canvas.addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch') return fingerMove(e);
   if (canvas.hasPointerCapture(e.pointerId) || document.pointerLockElement === canvas) {
     if (down) down.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
     // Same turn per pixel sideways and up/down. Raise DRAG_SPEED to turn faster, lower it to turn slower.
@@ -984,6 +1014,7 @@ canvas.addEventListener('pointermove', e => {
   } else hover(e);
 });
 canvas.addEventListener('pointerup', e => {
+  if (e.pointerType === 'touch') return fingerUp(e, true);
   const wasDown = down;
   down = null; // clear first so letting go doesn't look like Esc
   if (document.pointerLockElement) document.exitPointerLock();
@@ -1039,6 +1070,14 @@ function goToStation(id) {
 
 // --- Loop ---
 let vy = 0, grounded = false;
+// Phones and tablets: the joystick's push, and whether the Jump button was just touched.
+const stick = { x: 0, y: 0 };
+let jumpAsked = false;
+const touchPad = isTouch ? setupTouch({
+  move: (x, y) => { stick.x = x; stick.y = y; },
+  jump: () => { if (state === 'play' && !hooks?.busy()) jumpAsked = true; },
+  use: () => { if (state === 'play' && !hooks?.busy()) useNearest(); },
+}) : null;
 const LOCK_YAW = Math.PI / 2;   // the bearing of the fixed airlock view: "up the screen" is toward the cabin
 let lockSteer = false;         // true while the keys follow the airlock view instead of the chase camera
 // The astronaut eases into a walk and swings round to face the way they are going, instead of
@@ -1094,13 +1133,21 @@ function useNearest() {
 function openStation(id) {
   walkTo = null;
   keys.clear();
+  touchPad?.letGo();
   hooks?.openStation(id);
 }
 
 function tick(dt) {
   let fwd = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   let side = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  const speedWalk = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
+  let speedWalk = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
+  // The on-screen joystick: a gentle push walks slowly, a full push runs.
+  const lean = Math.hypot(stick.x, stick.y);
+  if (lean > 0.15) {
+    fwd = -stick.y / lean;
+    side = stick.x / lean;
+    speedWalk = lean > 0.9 ? RUN : WALK * Math.max(0.45, lean / 0.9);
+  }
   let p = crewBody.translation();
   // In the airlock the view is fixed, so the keys follow the screen: W toward the cabin door at
   // the top, S toward the Moon door at the bottom. The switch waits until the keys are let go,
@@ -1137,7 +1184,8 @@ function tick(dt) {
   velX += (mx - velX) * pull;
   velZ += (mz - velZ) * pull;
 
-  if (grounded && keys.has('Space')) vy = JUMP;
+  if (grounded && (keys.has('Space') || jumpAsked)) vy = JUMP;
+  jumpAsked = false;
   vy -= GRAVITY * dt;
   const want = { x: velX * dt, y: vy * dt, z: velZ * dt };
   controller.computeColliderMovement(crewCollider, want);
@@ -1253,7 +1301,7 @@ function syncWorld(dt) {
 
 // Slow computers (school Chromebooks) get simpler graphics: no shadows and fewer pixels.
 // Add ?low to the address to force it.
-let low = false, frames = 0, slowSince = performance.now();
+let low = false, frames = 0, slowSince = performance.now(), lastPlayed = -Infinity;
 function lowGraphics() {
   if (low) return;
   low = true;
@@ -1271,6 +1319,10 @@ renderer.setAnimationLoop(t => {
   const dt = Math.min((t - last) / 1000, 1 / 15);
   last = t;
   if (state === 'play' && !low) {
+    // Only time spent actually playing counts. After a menu, a pause or a hidden tab, start the
+    // count again; otherwise that idle time looks like a very slow computer.
+    if (t - lastPlayed > 500) { frames = 0; slowSince = t; }
+    lastPlayed = t;
     frames++;
     if (t - slowSince > 4000) {
       if (frames / ((t - slowSince) / 1000) < 24) lowGraphics();
@@ -1350,7 +1402,7 @@ gameReady({
     state = 'play';
   },
   goToStation,
-  pause() { state = 'paused'; keys.clear(); walkTo = null; },
+  pause() { state = 'paused'; keys.clear(); touchPad?.letGo(); walkTo = null; },
   resume() { state = 'play'; },
   stop() { state = 'off'; keys.clear(); sim = null; hooks = null; },
   // A still of the base for the start screen. Reading the canvas right after drawing keeps it filled.

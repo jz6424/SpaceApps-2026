@@ -1,6 +1,7 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
 import { CONFIG as C, MISSIONS } from './config.js';
 import { flareLabel } from './sim.js';
+import { isTouch, forTouch } from './touch.js';
 import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
@@ -68,7 +69,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   };
   const missionBtn = () => showMission($('mission-drawer').classList.contains('shut'));
   $('mission-handle').addEventListener('click', missionBtn);
-  showMission(true);
+  // On a small phone the drawer starts tucked away, so it doesn't cover the base.
+  showMission(!(isTouch && Math.min(innerWidth, innerHeight) < 560));
 
   // The speed, sound and full screen buttons live in the Game paused panel (the gear button, or Esc).
   // Full screen button (F11 works too).
@@ -466,6 +468,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     sim.flags[`open_${id}`] = true;
     $('station').hidden = false;
     $('hotbar-wrap').hidden = true; // out of the way of a tall panel
+    $('touch-stick').hidden = $('touch-actions').hidden = true;
     renderStation(true);
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
@@ -474,6 +477,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     open = null;
     $('station').hidden = true;
     $('hotbar-wrap').hidden = false;
+    $('touch-stick').hidden = $('touch-actions').hidden = false;
     document.activeElement?.blur?.();
   }
 
@@ -566,9 +570,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     renderSupplies();
     renderClock();
     renderRp();
-    $('hint').textContent = hintText();
+    $('hint').textContent = forTouch(hintText());
     $('prompt').hidden = !near || !!open;
-    if (near) $('prompt').innerHTML = `Press <kbd>E</kbd> to ${near.label}`;
+    if (near) $('prompt').innerHTML = isTouch ? `Tap <b>Use</b> to ${near.label}` : `Press <kbd>E</kbd> to ${near.label}`;
+    $('touch-use').classList.toggle('ready', !!near && !open); // the Use button lights up when there is something to use
     if (open && now % 1000 < 220) renderStation();
   }
 

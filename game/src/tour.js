@@ -3,6 +3,8 @@
 // Labels ("callouts") each sit next to the thing they describe, with a red arrow pointing at it.
 // Steps that only explain stop the game clock; steps that ask the player to do something let it run.
 
+import { forTouch } from './touch.js';
+
 const $ = id => document.getElementById(id);
 
 // Everything on the screen, labelled at once. side = which side of the thing the label sits on.
@@ -116,7 +118,7 @@ export function createTour({ sim, game, hud }) {
     callouts = list.map(c => {
       const el = document.createElement('div');
       el.className = 'tour-callout';
-      el.innerHTML = `<b>${c.title}</b><span>${c.text}</span><i class="c-arrow">${ARROW}</i>`;
+      el.innerHTML = `<b>${c.title}</b><span>${forTouch(c.text)}</span><i class="c-arrow">${ARROW}</i>`;
       const box = document.createElement('div');
       box.className = 'tour-ring-sm';
       holder.append(box, el);
@@ -131,10 +133,10 @@ export function createTour({ sim, game, hud }) {
     clearCallouts();
     if (s.callouts) buildCallouts(s.callouts);
     setFreeze(s.freeze);
-    sim.flags.tourHint = s.hint ?? null;
+    sim.flags.tourHint = s.hint ? forTouch(s.hint) : null;
     $('tour-step').textContent = `Tour: step ${i + 1} of ${steps.length}`;
     $('tour-title').textContent = s.title;
-    $('tour-text').innerHTML = s.text.map(p => `<p>${p}</p>`).join('');
+    $('tour-text').innerHTML = s.text.map(p => `<p>${forTouch(p)}</p>`).join('');
     $('tour-more').hidden = true;
     $('tour-next').hidden = !!s.noNext;
     $('tour-next').textContent = s.last ? 'Start the night' : (s.nextLabel ?? 'Next');
