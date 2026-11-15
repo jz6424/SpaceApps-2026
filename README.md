@@ -30,6 +30,12 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 ## The game loop
 
 * **Three core meters:** Power (solar + battery), Life Support (air and water), Radiation dose.
+* **Air is a trade-off:** you breathe and the base slowly leaks, so Normal only just keeps up (a Cadet
+  still gains a little), Eco saves power but drains the air, and Boost refills it with power and moon
+  dirt. The bar shows filling or draining. Your suit is filled from the base's air (a full tank is 9%),
+  you need 45 s of suit air to go out, and running out on a moonwalk rescues you at the cost of half
+  your Life Support, with a screen that explains what happened. Stars need Life Support to stay at
+  25% (two) or 40% (three).
 * **Stations in the Habitat:** Power, Life Support (Eco / Normal / Boost), Comms (antenna, forecast,
   science uploads, 1.3 s light delay), Galley and greenhouse, Robot Map (dig regolith, haul crater ice,
   fix panels), Storm Shelter (regolith shielding), Airlock (moonwalks).

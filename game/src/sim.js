@@ -123,6 +123,7 @@ export class Sim {
 
     this.share = 1;           // power share in a brownout (1 = everything runs)
     this.lowestAir = this.air;
+    this.airNet = 0;
     this.blackout = 0;
     this.emergency = 0;       // seconds spent at 0 air
     this.foodTimer = 0;
@@ -279,6 +280,7 @@ export class Sim {
     if (lock.cycle) return 'The airlock is busy. Hang on!';
     // Going out is stopped during a storm, but coming back in never is: nobody gets locked out.
     if (dir === 'out' && this.stormNow && !fromOutside) return 'Not during a solar storm!';
+    if (dir === 'out' && !fromOutside && this.suit < this.C.suit.minOut) return `Your suit is still filling with air from the base: ${Math.floor(this.suit)} of the ${this.C.suit.minOut} s you need to go out.`;
     const [shut, open, goal] = dir === 'out' ? ['inner', 'outer', 'vacuum'] : ['outer', 'inner', 'pressurized'];
     const steps = [];
     if (lock[shut]) steps.push({ kind: 'close', door: shut, length: A.doorSeconds });
@@ -422,8 +424,12 @@ export class Sim {
       else make = A.make.normal;
     }
     make = make * this.share + (this.greenhouse ? A.greenhouse * this.share : 0);
-    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * ease * (1 + A.coldPenalty * (1 - this.share));
-    this.air = Math.min(C_.meters.airMax, this.air + (make - use) * dt);
+    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * (1 + A.coldPenalty * (1 - this.share));
+    // The base leaks a little all the time. airNet is what the HUD shows: filling or draining. The
+    // tutorial's ease softens only a drain, so refilling is never free.
+    this.airNet = make - use - A.leak;
+    if (this.airNet < 0) this.airNet *= ease;
+    this.air = Math.min(C_.meters.airMax, this.air + this.airNet * dt);
     if (this.air <= 0) {
       this.air = 0;
       this.emergency += dt;
@@ -440,9 +446,12 @@ export class Sim {
     if (this.where === 'outside') {
       this.suit -= dt;
       if (!this.flags.suitLow && this.suit < 20) { this.flags.suitLow = true; this.say('Suit air low! Head back to the airlock.', 'warn'); }
+      if (!this.flags.suitHalf && this.suit < C_.suit.seconds / 2) { this.flags.suitHalf = true; this.say(`Suit air: ${Math.round(this.suit)} s left. Start heading back to the airlock.`, 'warn'); }
     } else {
-      this.suit = Math.min(C_.suit.seconds, this.suit + C_.suit.refill * dt);
-      this.flags.suitLow = false;
+      // The suit refills from the base's own air, so every moonwalk costs Life Support.
+      const add = this.air > 0 ? Math.min(C_.suit.seconds - this.suit, C_.suit.refill * dt) : 0;
+      if (add > 0) { this.suit += add; this.air = Math.max(0, this.air - add * C_.suit.refillAir); }
+      this.flags.suitLow = this.flags.suitHalf = false;
     }
 
     // Radiation.

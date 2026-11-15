@@ -32,8 +32,11 @@ export const CONFIG = {
 
   // Life Support = the air and water loop. One astronaut uses it up; the machine refills it.
   air: {
-    crewUse: 0.4,
-    make: { eco: 0.3, normal: 0.46, boost: 0.8 },
+    crewUse: 0.42,
+    leak: 0.04,         // every station slowly leaks air through its seals; the Space Station tops up too
+    // With breathing and the leak (0.46 a second for an Explorer), Normal only just keeps up (a Cadet
+    // still gains a little, a Commander slowly loses), Eco drains and Boost refills.
+    make: { eco: 0.28, normal: 0.45, boost: 0.8 },
     boostRegolith: 0.1, // Boost makes extra oxygen from moon dirt (regolith is about 45% oxygen)
     greenhouse: 0.05,   // plants turn CO2 back into oxygen
     coldPenalty: 0.6,   // a brownout means cold and CO2 build-up: crew use x (1 + this x shortfall)
@@ -53,7 +56,9 @@ export const CONFIG = {
   },
 
   // The suit's own air tank for moonwalks. Refills inside.
-  suit: { seconds: 90, refill: 6 },
+  // refillAir: Life Support used per second of suit air refilled (the suit is filled from the
+  // base's own air, so a full 90 s tank costs 9%). minOut: suit air needed before going out.
+  suit: { seconds: 90, refill: 6, refillAir: 0.1, minOut: 45 },
 
   // The airlock between the cabin and the surface. Times are game seconds.
   airlock: {

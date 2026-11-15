@@ -301,6 +301,15 @@
   </div>
 </main>
 
+<!-- When suit air runs out on a moonwalk: what happened and what it cost. The game waits. -->
+<div id="rescue" class="screen" role="alertdialog" aria-modal="true" aria-labelledby="rescue-title" aria-describedby="rescue-text" hidden>
+  <div class="dialog">
+    <p class="eyebrow">Moonwalk</p>
+    <h2 id="rescue-title">Your suit ran out of air</h2>
+    <div id="rescue-text"></div>
+    <div class="row"><button class="btn primary" data-do="rescue-ok">Got it</button></div>
+  </div>
+</div>
 <!-- After a mission, when there is something the player can research. -->
 <div id="rp-nudge" role="dialog" aria-modal="false" aria-labelledby="rp-nudge-title" hidden>
   <button class="rp-nudge-x" data-do="rp-nudge-close" aria-label="Close">&times;</button>

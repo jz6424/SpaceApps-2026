@@ -2307,14 +2307,18 @@ renderer.setAnimationLoop(t => {
       Object.assign(sim, airlockZone(p));
       if (!frozen) sim.tick(dt * speed);
       else sim.airlockTick(dt); // the airlock keeps working while the tour holds the clock, so nobody is shut in
-      // Out of suit air: the base computer guides you back in, and it costs you.
+      // Out of suit air: you are rescued back into the airlock, and it is a real setback. The base
+      // floods the airlock with its own air to bring you in, which uses half of Life Support, and
+      // the empty suit has to refill from the base before you can go out again. ui.js explains it.
       if (sim.where === 'outside' && sim.suit <= 0) {
         teleport(insideSpot());
         sim.airlockSet('pressurized');
-        sim.air = Math.max(0, sim.air - 10);
+        const lost = Math.round(sim.air / 2);
+        sim.air -= lost;
         sim.dose += 3;
-        sim.suit = 5;
-        sim.say('Suit air ran out! You made it back to the airlock, but it cost life support air.', 'bad');
+        sim.suit = 0;
+        sim.rescued = { lost };
+        sim.say(`Suit air ran out! The base pumped its own air into the airlock to save you: Life Support -${lost}%.`, 'bad');
       }
     }
     syncWorld(dt);

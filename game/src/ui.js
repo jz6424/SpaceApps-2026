@@ -16,7 +16,7 @@ import { createMoonMenu } from './moon-menu.js';
 import { stopReading } from './speak.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'success', 'debrief', 'how', 'credits'];
+const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'success', 'debrief', 'how', 'credits', 'rescue'];
 
 let save = loadSave();
 let saveWorks = writeSave(save);
@@ -924,6 +924,7 @@ function launch(id = chosen) {
     frame(near) {
       hud.frame(near);
       tour?.frame();
+      if (sim.rescued) showRescue(); // out of suit air: stop and explain
       // A few times a second: has the player just met something that has a Scrapbook page?
       if (frames++ % 20 === 0) {
         const fresh = scrapbook.collect(sim);
@@ -971,6 +972,23 @@ function pause(tab = 'settings') {
   pauseTab(tab);
   $('hud').inert = true; // Tab stays inside the pause panel instead of reaching the HUD behind it
   show('pause');
+}
+
+// Suit air ran out: the game waits while this says what happened, why it matters and what to do.
+function showRescue() {
+  const { lost } = sim.rescued;
+  sim.rescued = null;
+  hud.close();
+  game.pause();
+  $('air-toast').hidden = true; // the "suit air almost gone" warning is over
+  $('rescue-text').innerHTML = `
+    <p>Outside, your suit's tank is your only air. With none left, an astronaut would pass out within minutes.</p>
+    <p>The base pumped its own air into the airlock to bring you back in. That used <b>half of your Life Support (-${lost}%)</b>.</p>
+    <p>Your suit is empty now. It refills from the base's air, so wait until it has at least ${sim.C.suit.minOut} s before going out again, and set Life Support to Normal or Boost to make up the loss.</p>
+    <p class="fine">Next time, head back when the Suit air bar turns yellow. Real astronauts always come back with plenty of air left.</p>`;
+  $('hud').inert = true;
+  show('rescue');
+  $('rescue').querySelector('[data-do="rescue-ok"]').focus();
 }
 
 // Abandoning asks first, and says plainly what will be lost.
@@ -1086,6 +1104,7 @@ const actions = {
   // Leaving the Scrapbook, the book shuts first.
   'open-missions': () => (showing() === 'scrapbook' ? scrapbook.close(openMissions) : openMissions()),
   'rp-nudge-close': hideNudge,
+  'rescue-ok': resume,
   'rp-nudge-open': () => { hideNudge(); openResearch(); },
   home: () => { renderStart(); show('start', showing() === 'missions' ? 'scope-back' : undefined); },
   how: () => show('how'),
@@ -1144,6 +1163,7 @@ addEventListener('keydown', e => {
   }
   if (!game) return;
   if (hud?.open) { hud.close(); return; }
+  if (!$('rescue').hidden) { resume(); return; } // Esc is "Got it" on the out-of-air message
   if (hud?.usesOpen) { hud.showUses(false); return; } // the power list closes before the game pauses
   if (hud && $('pause').hidden) pause();
   else if (!$('pause').hidden) resume();

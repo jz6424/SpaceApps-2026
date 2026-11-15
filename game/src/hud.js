@@ -235,7 +235,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     const goalMark = sim.mission.goalType === 'dose' ? `<b class="goal-mark" style="left:${sim.goalValue}%" title="Goal"></b>` : '';
     // The little arrow on Power says the bar opens a list (see "Where your power goes" below).
     let html = meter('power', 'bolt', 'Power', sim.power, 100, `${Math.round(sim.power)}% · ${trend(net)}`, pState, '', '', `<span class="m-more">${icon(usesOpen !== isTouch ? 'down' : 'up', 14)}</span>`)
-      + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}%`, aState)
+      + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}% · ${trend(sim.airNet)}`, aState)
       + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} / 100`, dState, goalMark, sim.mission.goalType === 'dose' ? `Goal: finish at ${sim.goalValue} or less (the white mark)` : '');
     if (sim.where === 'outside') html += meter('suit', 'wind', 'Suit air', sim.suit, C.suit.seconds, `${Math.ceil(sim.suit)} s`, sim.suit < 20 ? 'bad' : sim.suit < 40 ? 'warn' : 'ok');
     // The button over the Power bar is as tall as the bar's own block, which grows with a Low sign.
@@ -436,7 +436,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     greenhouse: r2(C.power.greenhouse * ease), robot: r2(C.power.robot * ease),
   };
   const breathe = C.air.crewUse * sim.mode.crewDrain * ease;
-  const vs = made => made < breathe - 0.005 ? 'less than' : 'more than';
+  const vs = made => made < breathe + C.air.leak - 0.005 ? 'less than' : 'more than';
 
   const STATIONS = {
     Power: () => {
@@ -462,13 +462,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     LifeSupport: () => ({
       title: 'Life Support', icon: 'wind',
       body: `<p class="big">${Math.round(sim.air)}% air and water</p>
-      <p>You use about ${per(breathe, 'air')} while you are inside. Pick how hard the machine works:</p>
+      <p>You breathe about ${per(breathe, 'air')} while you are inside, and the base leaks ${per(C.air.leak, 'air')} through its seals: ${per(breathe + C.air.leak, 'air')} in all. Right now the air is <b>${sim.airNet > 0.02 ? 'filling' : sim.airNet < -0.02 ? 'draining' : 'steady'}</b>. Pick how hard the machine works:</p>
       <div class="opts">
-        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${per(P.lifeSupport.eco, 'power')}. Makes ${per(C.air.make.eco, 'air')}, ${vs(C.air.make.eco)} you breathe.` })}
-        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${per(P.lifeSupport.normal, 'power')}. Makes ${per(C.air.make.normal, 'air')}, ${vs(C.air.make.normal)} you breathe.` })}
+        ${btn('ls', 'Eco', { arg: 'eco', on: sim.ls === 'eco', note: `Uses ${per(P.lifeSupport.eco, 'power')}. Makes ${per(C.air.make.eco, 'air')}, ${vs(C.air.make.eco)} you use, so the air slowly runs down.` })}
+        ${btn('ls', 'Normal', { arg: 'normal', on: sim.ls === 'normal', note: `Uses ${per(P.lifeSupport.normal, 'power')}. Makes ${per(C.air.make.normal, 'air')}, about what you use.` })}
         ${btn('ls', 'Boost', { arg: 'boost', on: sim.ls === 'boost', note: `Uses ${per(P.lifeSupport.boost, 'power')} and moon dirt. Makes ${per(C.air.make.boost, 'air')}.` })}
       </div>
-      <p class="fine">If the battery runs empty, everything runs slowly, the base gets cold and the air goes stale faster.</p>`,
+      <p class="fine">Your spacesuit is filled from this air too: a full tank costs ${Math.round(C.suit.seconds * C.suit.refillAir)}% of Life Support, and running out of suit air outside costs half of it. If the battery runs empty, everything runs slowly, the base gets cold and the air goes stale faster.</p>`,
     }),
     Comms: () => ({
       title: 'Comms', icon: 'radio',
@@ -534,11 +534,11 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     },
     Airlock: () => {
       const status = sim.airlockStatus, words = { pressurized: 'Pressurized', cycling: 'Cycling...', vacuum: 'Vacuum' }[status];
-      const cost = `Each trip out costs ${C.airlock.cycleAir}% Life Support.`;
+      const cost = `Each trip out costs ${C.airlock.cycleAir}% Life Support, and refilling the suit afterwards uses base air too.`;
       const view = {
         pressurized: `<p class="big">Go on a moonwalk?</p>
           <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside. Standing in the airlock counts as outside too: its thin walls don't block much radiation.</p>
-          <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm' : `Suit air: ${Math.floor(sim.suit)} s. ${cost}` })}</div>`,
+          <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow || sim.suit < C.suit.minOut, note: sim.stormNow ? 'Not during a solar storm' : sim.suit < C.suit.minOut ? `Suit still filling with air from the base: ${Math.floor(sim.suit)} of ${C.suit.minOut} s needed.` : `Suit air: ${Math.floor(sim.suit)} s. ${cost}` })}</div>`,
         vacuum: `<p class="big">Ready to come in?</p>
           <p>The outer door closes, the air comes back, then the inner door opens.</p>
           <div class="opts">${btn('inside', 'Close up and come inside', { note: 'Takes a few seconds.' })}</div>`,
