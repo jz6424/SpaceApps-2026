@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { gameReady } from './ui.js';
 import { readSiteMaps } from './nasa.js';
+import { STRENGTH } from './sim.js';
 import { isTouch, setupTouch } from './touch.js';
 
 const GRID = 512;              // terrain samples per side
@@ -442,6 +443,61 @@ hull.expandByObject(colNodes.find(n => n.name === 'COL_AirlockBase'));
 const calloutLayer = document.createElement('div');
 calloutLayer.id = 'callouts';
 renderer.domElement.after(calloutLayer); // under the HUD and the menus, over the 3D view
+
+// --- Particle hits during a solar storm ---
+// The storm's particles can't be seen, and the Moon has no air for an aurora. But in a big storm,
+// cameras in space get speckled with white dots and streaks as particles strike their sensors
+// (NASA's SOHO telescope's pictures fill with "snow"), and astronauts see tiny flashes of light
+// when particles pass through their eyes (Apollo crews reported them). So the view gets specks:
+// as many as the dose you are taking, so outside is a blizzard, the shelter a few, and the
+// moon-dirt shield fewer still. With reduced motion they are dots only, no streaks.
+const hitLayer = document.createElement('canvas');
+hitLayer.id = 'particle-hits';
+hitLayer.setAttribute('aria-hidden', 'true');
+Object.assign(hitLayer.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none' });
+renderer.domElement.after(hitLayer);
+const hits = [];
+let hitDebt = 0, hitsDrawn = false;
+function stormHits(dt) {
+  const storm = state === 'play' ? sim?.stormNow : null;
+  const D = sim?.C.dose;
+  // Specks a second: in step with the extra storm dose where you are (strong storm, outside: ~60).
+  const rate = storm ? Math.min(60, 20 * D.storm[sim.where] * STRENGTH[storm.strength] * (sim.where === 'shelter' ? sim.shieldMult : 1)) : 0;
+  if (!rate && !hits.length) {
+    if (hitsDrawn) { hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); hitsDrawn = false; }
+    return;
+  }
+  const dpr = Math.min(devicePixelRatio || 1, 2), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  if (hitLayer.width !== w || hitLayer.height !== h) { hitLayer.width = w; hitLayer.height = h; }
+  if (rate && !sim.flags.hitsTold) {
+    sim.flags.hitsTold = true;
+    sim.say('Those white specks are the storm. You can\'t see its particles, but they speckle camera pictures in space, and astronauts see tiny flashes when particles pass through their eyes. More specks means more radiation: the shelter and its moon-dirt shield cut them down.', 'info');
+  }
+  for (hitDebt += rate * dt; hitDebt >= 1; hitDebt--) {
+    const streak = !stillLights && Math.random() < 0.35, turn = Math.random() * Math.PI;
+    hits.push({ x: Math.random() * w, y: Math.random() * h, life: 0.22 + Math.random() * 0.28, age: 0,
+      size: (streak ? 20 + Math.random() * 45 : 2.5 + Math.random() * 2.5) * dpr, dx: Math.cos(turn), dy: Math.sin(turn), streak });
+  }
+  const g = hitLayer.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  g.lineCap = 'round';
+  g.shadowColor = 'rgba(170, 215, 255, 1)'; // a blue-white glow round each hit
+  g.shadowBlur = 10 * dpr;
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const p = hits[i];
+    p.age += dt;
+    if (p.age >= p.life) { hits.splice(i, 1); continue; }
+    const a = 0.95 * (1 - p.age / p.life) ** 0.7;
+    g.strokeStyle = g.fillStyle = `rgba(245, 250, 255, ${a.toFixed(3)})`;
+    if (p.streak) {
+      g.lineWidth = 2.4 * dpr;
+      g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + p.dx * p.size, p.y + p.dy * p.size); g.stroke();
+    } else {
+      g.beginPath(); g.arc(p.x, p.y, p.size, 0, 7); g.fill();
+    }
+  }
+  hitsDrawn = true;
+}
 const callouts = [];
 // near/far: metres from the astronaut where it starts to fade and where it is gone.
 // faint: how visible it stays beyond far (0, gone, for all of them now). station: the station it opens when clicked.
@@ -2097,6 +2153,7 @@ renderer.setAnimationLoop(t => {
     hooks?.frame(nearNow);
   }
   hoverCheck();
+  stormHits(dt);
   placeCallouts();
   renderer.render(scene, camera);
 });
@@ -2262,7 +2319,7 @@ gameReady({
   goToStation,
   pause() { state = 'paused'; keys.clear(); touchPad?.letGo(); walkTo = null; },
   resume() { state = 'play'; },
-  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); hold(null); }, // nothing left in hand for the Scrapbook pictures
+  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); hold(null); hits.length = 0; hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); }, // nothing left in hand for the Scrapbook pictures
   // A still of the base for the start screen. Reading the canvas right after drawing keeps it filled.
   picture() {
     const spot = outsideSpot();

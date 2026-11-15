@@ -3,7 +3,7 @@
 // when the player uses a station. Messages for the player go in sim.messages.
 import { CONFIG as C, MODES } from './config.js';
 
-const STRENGTH = { Mild: 0.5, Moderate: 0.75, Strong: 1 };
+export const STRENGTH = { Mild: 0.5, Moderate: 0.75, Strong: 1 };
 const SIZES = ['Mild', 'Moderate', 'Strong'];
 
 // How big a real flare is, from its X-ray class. Each letter is ten times the one before
