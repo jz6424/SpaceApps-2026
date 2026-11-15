@@ -57,7 +57,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Scrapbook:** a ring binder with a page for each big part of the base (14 pages: Habitat, Life
   Support, solar panels, airlock, robot and so on; upgrades don't get their own page). A page is
   added the first time you use that part in a mission, and two (Regolith shielding, Greenhouse)
-  come from the Research Tree; until then the contents shows it with a padlock and how to open it.
+  come from the Research Tree. Until then the contents shows it with a padlock and how to unlock it,
+  and it opens as a locked page: the picture from the game, question marks for the other pictures,
+  the write-up covered over, and the same line on how to unlock it.
   Each page has a picture taken live from the game, our Blender model, a real NASA photograph, the
   science at two reading levels (Easy read for ages 7 to 9, Deep dive for 10 and up) and links to
   NASA pages. Reading a page for the first time pays 2 research points (`science.pageRP` in

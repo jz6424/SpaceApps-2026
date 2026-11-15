@@ -1,6 +1,8 @@
 // The Scrapbook screen. It opens on the contents, which lists every page (locked ones included)
 // across both pages of the open book.
 // Picking a page opens it as a two-page spread: pictures on the left, the write-up on the right.
+// A locked page opens too, but it only shows the picture from the game: the other pictures are
+// question marks, the write-up is covered, and it says how to unlock it.
 // The words and the rules for collecting pages are in scrapbook.js; this file only draws them.
 import './scrapbook.css';
 import { CONFIG } from './config.js';
@@ -57,16 +59,19 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     return stills.get(page.id);
   }
 
+  // How to unlock a page: the same words in the contents and on the locked page.
+  const unlockText = page => `To unlock: ${esc(page.hint)}`;
+
   // --- Contents ---
   function rowHtml(page) {
     const number = `<span class="sb-pg">p. ${pageNumber(page)}</span>`;
     if (!isOpen(page)) {
-      return `<li><div class="sb-row locked">
+      return `<li><button class="sb-row locked" data-do="page" data-id="${page.id}">
         <span class="sb-sticker">${glyph('lock', 20)}</span>
         <span class="sb-row-name">${esc(page.name)}</span><span class="sb-dots"></span>
         <span class="sb-tag">Locked</span>${number}
-        <span class="sb-hint">To unlock: ${esc(page.hint)}${page.needs ? ' <button class="sb-link" data-do="research">Open the Research Tree</button>' : ''}</span>
-      </div></li>`;
+        <span class="sb-hint">${unlockText(page)}</span>
+      </button></li>`;
     }
     const tag = isRead(page)
       ? `<span class="sb-tag read">${glyph('check', 14)} Read</span>`
@@ -122,7 +127,6 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     </article>`;
   }
 
-  // --- One page ---
   function photoHtml(tilt, label, src, alt, caption, credit = '', size = '') {
     return `<figure class="sb-photo ${tilt} ${size}">
       <img src="${src}" alt="${esc(alt)}" loading="lazy">
@@ -130,10 +134,61 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     </figure>`;
   }
 
+  // A picture that is still locked: the same taped frame with a question mark in it.
+  function mysteryHtml(tilt, label, size = '') {
+    return `<figure class="sb-photo ${tilt} ${size}">
+      <div class="sb-mystery" role="img" aria-label="A locked picture, shown as a question mark">?</div>
+      <figcaption><b>${label}</b> Locked. Unlock this page to see the picture.</figcaption>
+    </figure>`;
+  }
+
+  // Turning pages goes through the whole book, locked pages too.
+  function navHtml(page) {
+    const i = PAGES.indexOf(page), prev = PAGES[i - 1], next = PAGES[i + 1];
+    const lock = other => (isOpen(other) ? '' : `${glyph('lock', 16)}<span class="sr-only">Locked: </span> `);
+    return `
+    <nav class="sb-nav" aria-label="Scrapbook pages">
+      ${prev ? `<button class="btn small" data-do="page" data-id="${prev.id}">${glyph('left', 18)} ${lock(prev)}${esc(prev.name)}</button>` : '<span></span>'}
+      <button class="btn small" data-do="scrapbook">Contents</button>
+      ${next ? `<button class="btn small" data-do="page" data-id="${next.id}">${lock(next)}${esc(next.name)} ${glyph('right', 18)}</button>` : '<span></span>'}
+    </nav>`;
+  }
+
+  // A page that has not been collected yet. The picture from the game stays, so you know what to
+  // look for. Everything else waits until the page is unlocked.
+  function lockedHtml(page) {
+    const chapter = CHAPTERS.find(c => c.id === page.chapter).name, still = stillFor(page);
+    return `
+    <article class="sb-spread is-locked" aria-labelledby="sb-title">
+      <section class="sb-leaf sb-photos" aria-label="Pictures">
+        ${still ? photoHtml('tilt-l', 'In the game', still, `A picture from the game. ${page.shotCaption}`, page.shotCaption) : ''}
+        ${mysteryHtml('tilt-r', 'In real life', page.real.tall ? 'tall' : '')}
+        ${page.model ? mysteryHtml('tilt-l', 'Built in Blender', 'small') : ''}
+      </section>
+      <section class="sb-leaf sb-text">
+        <header class="sb-head">
+          <div>
+            <p class="sb-label">${esc(chapter)} · page ${pageNumber(page)} of ${PAGES.length + 1}</p>
+            <h2 id="sb-title" tabindex="-1">${esc(page.name)}</h2>
+          </div>
+          <p class="sb-stamp locked">${glyph('lock', 14)} Locked</p>
+        </header>
+        <div class="sb-covered">
+          <p class="sb-covered-title">${glyph('lock', 20)} This page is locked</p>
+          <p>The write-up, the real-life photo and the NASA links are hidden until you unlock it.</p>
+          <div class="sb-scribble" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <p class="sb-game"><b>How to unlock</b> ${unlockText(page)}${page.needs ? ' <button class="sb-link" data-do="research">Open the Research Tree</button>' : ''}</p>
+        <p class="sb-upgrades">When it is unlocked, reading it for the first time earns ${points(CONFIG.science.pageRP)}.</p>
+      </section>
+    </article>
+    ${navHtml(page)}`;
+  }
+
   function pageHtml(page) {
+    if (!isOpen(page)) return lockedHtml(page);
     const level = getSave().reading, pay = CONFIG.science.pageRP;
     const chapter = CHAPTERS.find(c => c.id === page.chapter).name;
-    const open = openPages(), i = open.indexOf(page), prev = open[i - 1], next = open[i + 1];
     const still = stillFor(page);
     const links = page.links.filter(link => link.for === level || link.for === 'both');
     const upgrades = (page.upgrades ?? []).map(id => nodeById(id)?.name).filter(Boolean);
@@ -169,11 +224,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
         ${upgrades.length ? `<p class="sb-upgrades"><b>In the Research Tree</b> ${upgrades.length > 1 ? 'Upgrades' : 'An upgrade'} for this: ${esc(upgrades.join(', '))}. <button class="sb-link" data-do="research">Open the Research Tree</button></p>` : ''}
       </section>
     </article>
-    <nav class="sb-nav" aria-label="Scrapbook pages">
-      ${prev ? `<button class="btn small" data-do="page" data-id="${prev.id}">${glyph('left', 18)} ${esc(prev.name)}</button>` : '<span></span>'}
-      <button class="btn small" data-do="scrapbook">Contents</button>
-      ${next ? `<button class="btn small" data-do="page" data-id="${next.id}">${esc(next.name)} ${glyph('right', 18)}</button>` : '<span></span>'}
-    </nav>`;
+    ${navHtml(page)}`;
   }
 
   function render() {
@@ -182,12 +233,12 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     $('scrapbook-book').innerHTML = page ? pageHtml(page) : contentsHtml();
   }
 
-  // Opens the contents, or one page. A page that is still locked opens the contents instead.
+  // Opens the contents, or one page. A locked page opens as a locked page, and pays nothing.
   function open(id) {
     const page = id && pageById(id), save = getSave();
-    at = page && isOpen(page) ? page.id : null;
+    at = page ? page.id : null;
     paid = null;
-    if (at && !save.read.includes(at)) {
+    if (page && isOpen(page) && !save.read.includes(at)) {
       save.read.push(at);
       save.points += CONFIG.science.pageRP;
       commit();
@@ -223,7 +274,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     if ($('scrapbook').hidden || !at || e.altKey || e.ctrlKey || e.metaKey) return;
     const step = { ArrowLeft: -1, ArrowRight: 1 }[e.code];
     if (!step) return;
-    const pages = openPages(), next = pages[pages.findIndex(page => page.id === at) + step];
+    const next = PAGES[PAGES.findIndex(page => page.id === at) + step];
     if (next) { e.preventDefault(); open(next.id); }
   });
 

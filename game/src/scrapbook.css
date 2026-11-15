@@ -99,11 +99,27 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
 .sb-tag.new { background: var(--yellow); padding: 2px 8px; transform: rotate(-2deg); }
 .sb-tag.read { color: var(--electric); }
 .sb-pg { min-width: 3.2em; text-align: right; font: 400 .9rem var(--mono); color: var(--pencil); font-variant-numeric: tabular-nums; }
-/* A locked page keeps its line in the contents: a padlock, its name in pencil, and how to open it. */
+/* A locked page keeps its line in the contents: a padlock, its name in pencil, and how to open it.
+   It can still be picked: it opens as a locked page. */
 .sb-row.locked { color: var(--pencil); }
 .sb-row.locked .sb-sticker { background: #fff; color: var(--pencil); border: 2px dashed #9FB0D0; box-sizing: border-box; }
 .sb-row.locked .sb-row-name { font-weight: 400; }
 .sb-hint { grid-column: 2 / -1; font-size: .9rem; line-height: 1.4; padding-bottom: 4px; }
+
+/* A locked page: question marks where the pictures will go, and the write-up covered over. */
+.sb-mystery { display: grid; place-items: center; aspect-ratio: 4 / 3; box-sizing: border-box; border: 2px dashed #9FB0D0; background: #EEF3FC; color: #7F93BA; font: 900 6rem/1 var(--head); user-select: none; }
+.sb-photo.tall .sb-mystery { aspect-ratio: 3 / 4; }
+.sb-photo.small .sb-mystery { font-size: 4rem; }
+.sb-stamp.locked { color: var(--pencil); transform: rotate(-4deg); }
+.sb-covered { width: 100%; box-sizing: border-box; display: grid; gap: 12px; padding: 20px; border: 2px dashed #9FB0D0; background: rgba(255, 255, 255, .85); }
+.sb-covered-title { display: flex; align-items: center; gap: 8px; font: 900 1.3rem/1.2 var(--head); }
+.sb-covered-title .ico { vertical-align: 0; }
+/* Rows of crossed-out writing, like text under a strip of marker pen. */
+.sb-scribble { display: grid; gap: 14px; padding-top: 4px; }
+.sb-scribble i { --words: 10; width: calc(var(--words) * 45px - 6px); max-width: 100%; height: 14px; background: repeating-linear-gradient(90deg, #C9D4EA 0 46px, transparent 46px 54px, #C9D4EA 54px 84px, transparent 84px 90px); }
+.sb-scribble i:nth-child(3n) { --words: 7; }
+.sb-scribble i:nth-child(4n) { --words: 9; }
+.sb-scribble i:last-child { --words: 4; }
 
 /* The write-up */
 .sb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; width: 100%; }
