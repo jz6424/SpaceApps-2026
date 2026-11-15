@@ -325,22 +325,32 @@ def CargoLander():
     lathe("TankCap", [(1.6, 0), (1.6, .35), (1.85, .2), (1.85, 0)], "Red", (.9, 1.1, T), sides=10)
     strut("Crane", (2.6, 2.2, T), (2.6, 2.2, T + 2.4), .12, "Yellow", 8)
     strut("CraneArm", (2.6, 2.2, T + 2.4), (.9, 1.1, T + 2.9), .09, "Yellow", 8)
-    # Ramp down to the surface on the +X side, for rovers.
-    d = math.atan2(T - .1, 3.6)
-    box("Ramp", (6.6, 1.9, .12), (3.3 + 2.6, 0, T / 2 - .05), "Grey", .03, (0, d, 0))
+    # Ramp down to the surface on the +X side, for rovers. The plank, its two rails and the lip all
+    # follow one line: from the deck's edge, just clear of the body's bulge, down to the ground.
+    x0, x1, top = 3.35, 10.0, T + .05
+    run, d = x1 - x0, math.atan2(T + .05, x1 - x0)
+    box("Ramp", (math.hypot(run, top), 1.9, .12), ((x0 + x1) / 2, 0, top / 2), "Grey", .03, (0, d, 0))
     for s in (-1, 1):
-        strut("RampEdge", (3, s * .95, T), (6.05 + 2.6, s * .95, 0), .08, "Yellow", 6)
-    box("RampLip", (.5, 2, .15), (3.1, 0, T + .02), "Dark", .03)
+        strut("RampEdge", (x0, s * .95, top + .1), (x1, s * .95, .1), .08, "Yellow", 6)
+    box("RampLip", (.4, 2, .12), (x0 - .15, 0, top - .02), "Dark", .03)
     # Antenna and sensor mast, and a star tracker with a dark lens.
     strut("Mast", (-2.6, -2, T), (-2.6, -2, T + 2.2), .08, "Grey", 6)
     lathe("MastDish", [(0, 0), (0, .3), (.2, .55), (.25, 0)], "White", (-2.6, -2, T + 2.2), (.5, -.3, 1), 10)
     lathe("Eye", [(0, 0), (0, .24), (.1, .24), (.1, 0)], "Dark", (3.35, 1.2, H + 1.15), (1, .33, 0), 10)
-    col("Body", -3.5, 3.5, -3.5, 3.5, 2.6, T + 1.5)
-    col("Engines", -2.2, 2.2, -2.2, 2.2, 0, 2.6)
-    col("Ramp", 3.1, 8.7, -.95, .95, 0, 1.0)
+    # Solid parts: the body from its underside up (you can walk under its rim, between the legs),
+    # the engines below it, each footpad and the low end of each leg, and the ramp only where it is
+    # low enough to bump into (three steps under it), so you can walk beneath its high end.
+    col("Body", -3.5, 3.5, -3.5, 3.5, H - .1, T + 1.5)
+    col("Engines", -2.2, 2.2, -2.2, 2.2, 0, H - .1)
+    low = 2.4                                   # ramp lower than this (m) blocks walking under it
+    xa = x1 - low * run / top
+    for k in range(3):
+        a, b = xa + k * (x1 - xa) / 3, xa + (k + 1) * (x1 - xa) / 3
+        col("Ramp%d" % (k + 1), a, b, -.95, .95, 0, top * (x1 - a) / run)
     for a, n in ((45, "NE"), (135, "NW"), (225, "SW"), (315, "SE")):
         c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
         col("Pad" + n, c * 5.2 - .8, c * 5.2 + .8, s * 5.2 - .8, s * 5.2 + .8, 0, .45)
+        col("Leg" + n, c * 4.5 - .45, c * 4.5 + .45, s * 4.5 - .45, s * 4.5 + .45, 0, 1.6)
 
 
 def Antenna():

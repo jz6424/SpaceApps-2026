@@ -173,18 +173,36 @@ scene.add(new THREE.Points(
 // its real 23.4 degree tilt and turns slowly. Until the picture arrives it is plain blue.
 const earth = new THREE.Group();
 const earthBall = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 24), new THREE.MeshBasicMaterial({ color: 0x2e96f5 }));
+// Soft shading so it reads as a ball: a little darker toward the edge, lighter on one side.
+earthBall.material.onBeforeCompile = shader => {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vEarthN;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEarthN = normalize(normalMatrix * normal);');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vEarthN;')
+    .replace('#include <map_fragment>', `#include <map_fragment>
+      float facing = clamp(vEarthN.z, 0.0, 1.0), side = clamp(dot(vEarthN, normalize(vec3(-0.45, 0.35, 0.82))), 0.0, 1.0);
+      diffuseColor.rgb *= (0.62 + 0.38 * sqrt(facing)) * (0.82 + 0.22 * side);`);
+};
 earth.rotation.z = THREE.MathUtils.degToRad(23.4);
 earth.add(earthBall);
 // The picture is redrawn in a few flat colours to match the game's low-poly look: each spot of
 // NASA's map becomes ocean, forest, desert, cloud or ice. It is sampled small (256 x 128) and then
 // smoothed, so the continents and clouds come out as soft cartoon shapes in the right places.
-const EARTH_COLOURS = [[38, 120, 222], [86, 168, 74], [214, 182, 112], [250, 252, 255], [236, 243, 252]]; // ocean, forest, desert, cloud, ice
+// Two shades of each: open sea and shallow coastal water, dense forest and grassland, darker
+// and paler sand. Clouds and ice stay one white each.
+const EARTH_SHADES = {
+  sea: [32, 106, 210], coast: [66, 148, 232], forest: [60, 138, 64], grass: [104, 176, 80],
+  sand: [198, 162, 100], dune: [228, 200, 136], cloud: [250, 252, 255], ice: [236, 243, 252],
+};
 function cartoonEarth(img) {
   const W = 256, H = 128, c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.drawImage(img, 0, 0, W, H);
   const px = g.getImageData(0, 0, W, H), d = px.data;
+  const lum = new Float32Array(W * H);
+  for (let j = 0; j < W * H; j++) lum[j] = (d[j * 4] + d[j * 4 + 1] + d[j * 4 + 2]) / 3;
   let kind = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = (y * W + x) * 4, r = d[i], gr = d[i + 1], b = d[i + 2];
@@ -204,7 +222,21 @@ function cartoonEarth(img) {
     }
     kind = next;
   }
-  for (let j = 0; j < W * H; j++) [d[j * 4], d[j * 4 + 1], d[j * 4 + 2]] = EARTH_COLOURS[kind[j]];
+  // Kind 0 ocean, 1 green land, 2 desert, 3 cloud, 4 ice. Sea within a few pixels of land is
+  // coastal water; land takes its darker or lighter shade from how bright NASA's picture is there.
+  const landNear = (x, y) => {
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const k = kind[Math.min(H - 1, Math.max(0, y + dy)) * W + (x + dx + W) % W];
+      if (k === 1 || k === 2) return true;
+    }
+    return false;
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const j = y * W + x, k = kind[j];
+    const shade = k === 0 ? (landNear(x, y) ? 'coast' : 'sea') : k === 1 ? (lum[j] < 70 ? 'forest' : 'grass')
+      : k === 2 ? (lum[j] > 150 ? 'dune' : 'sand') : k === 3 ? 'cloud' : 'ice';
+    [d[j * 4], d[j * 4 + 1], d[j * 4 + 2]] = EARTH_SHADES[shade];
+  }
   g.putImageData(px, 0, 0);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -217,7 +249,7 @@ new THREE.TextureLoader().load('earth/earth.jpg', tex => {
   earthBall.material.needsUpdate = true;
 });
 // A thin glow of air round the edge.
-const earthAir = new THREE.Mesh(new THREE.SphereGeometry(116, 48, 24), new THREE.MeshBasicMaterial({ color: 0x6fb4ff, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false }));
+const earthAir = new THREE.Mesh(new THREE.SphereGeometry(116, 48, 24), new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.5, side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending }));
 earth.add(earthAir);
 const earthDir = new THREE.Vector3(-0.85, 0.12, -0.5).normalize();
 scene.add(earth);
@@ -398,7 +430,22 @@ function boxCollider(mid, half) {
 function addBox(node) {
   const b = new THREE.Box3().setFromObject(node, true);
   if (b.isEmpty()) return null;
-  return boxCollider(b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).multiplyScalar(0.5));
+  const collider = boxCollider(b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).multiplyScalar(0.5));
+  // A model placed at an angle (the cargo lander) has its boxes turned with it. The box above is
+  // the world-aligned one round the turned box, which is much bigger (an invisible wall beside the
+  // lander's ramp), so the collider takes the box's own size and turn instead. The world-aligned
+  // bounds stay in navBoxes, where a little extra room does no harm.
+  const pos = new THREE.Vector3(), turn = new THREE.Quaternion(), scale = new THREE.Vector3();
+  node.matrixWorld.decompose(pos, turn, scale);
+  if (Math.abs(turn.x) + Math.abs(turn.y) + Math.abs(turn.z) > 1e-4 && node.geometry) {
+    node.geometry.computeBoundingBox();
+    const own = node.geometry.boundingBox, mid = own.getCenter(new THREE.Vector3()).applyMatrix4(node.matrixWorld);
+    const half = own.getSize(new THREE.Vector3()).multiply(scale).multiplyScalar(0.5);
+    collider.setHalfExtents({ x: Math.abs(half.x), y: Math.abs(half.y), z: Math.abs(half.z) });
+    collider.setTranslation(mid);
+    collider.setRotation(turn);
+  }
+  return collider;
 }
 const colliderOf = {};
 for (const node of colNodes) colliderOf[node.name] = addBox(node);
@@ -662,6 +709,50 @@ function labelSprite(text, icon, color = '#FFFFFF') {
 
 // --- The base outside ---
 const L = (dx, dz) => new THREE.Vector3(site.x + dx, groundAt(site.x + dx, site.z + dz), site.z + dz);
+// Surface detail for the base's machines, drawn by the shader from each model's own shape (they
+// have no texture maps): faint seams between panels every 60 cm, uneven grime so no colour is
+// perfectly flat, moon dust clinging to the lower parts (lunar dust sticks to everything), and a
+// crinkle in the gold insulation foil. Glowing and see-through parts are left alone.
+const WEAR_CHUNK = `
+  {
+    vec3 nrm = abs(normalize(vWearNormal)), at = vWearPos;
+    vec2 face = nrm.x > nrm.y && nrm.x > nrm.z ? at.yz : (nrm.y > nrm.z ? at.xz : at.xy);
+    vec2 cell = abs(fract(face / 0.6) - 0.5), fw = fwidth(face / 0.6);
+    float seam = max(1.0 - smoothstep(0.0, 1.5 * fw.x, 0.5 - cell.x), 1.0 - smoothstep(0.0, 1.5 * fw.y, 0.5 - cell.y));
+    float grime = wearNoise(at * 1.3) * 0.6 + wearNoise(at * 4.1) * 0.4;
+    float foil = wearNoise(at * 9.0);
+    vec3 tint = diffuseColor.rgb * (1.0 - 0.16 * seam) * (0.9 + 0.12 * grime) * (1.0 + WEAR_FOIL * (foil - 0.5));
+    float dust = (1.0 - smoothstep(0.0, 1.1, at.y)) * (0.35 + 0.3 * grime);
+    diffuseColor.rgb = mix(tint, vec3(0.5, 0.49, 0.46), 0.45 * dust);
+  }`;
+const WEAR_NOISE = `
+varying vec3 vWearPos, vWearNormal;
+float wearHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float wearNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(wearHash(i), wearHash(i + vec3(1, 0, 0)), f.x), mix(wearHash(i + vec3(0, 1, 0)), wearHash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(wearHash(i + vec3(0, 0, 1)), wearHash(i + vec3(1, 0, 1)), f.x), mix(wearHash(i + vec3(0, 1, 1)), wearHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}`;
+function wear(model) {
+  model.traverse(o => {
+    if (!o.isMesh || o.name.startsWith('COL_')) return;
+    const m = o.material;
+    if (!m || m.userData.worn || m.transparent || (m.emissive && m.emissive.getHex() !== 0) || !m.isMeshStandardMaterial) return;
+    m.userData.worn = true;
+    const foil = /Gold/.test(m.name) ? '0.22' : '0.0';
+    m.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWearPos, vWearNormal;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWearPos = position; vWearNormal = normal;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n#define WEAR_FOIL ${foil}\n${WEAR_NOISE}`)
+        .replace('#include <map_fragment>', `#include <map_fragment>\n${WEAR_CHUNK}`);
+    };
+    m.customProgramCacheKey = () => `wear${foil}`;
+    m.needsUpdate = true;
+  });
+}
+
 // solid: false for things that drive about (the robot), whose box would stay behind as an
 // invisible wall where it was parked.
 function place(name, at, rotY = 0, { solid = true } = {}) {
@@ -675,11 +766,14 @@ function place(name, at, rotY = 0, { solid = true } = {}) {
   scene.add(model);
   model.updateMatrixWorld(true);
   if (solid) model.traverse(o => { if (o.name.startsWith('COL_') && o.isMesh) addBox(o); });
+  wear(model);
   return model;
 }
 const panels = [-12, -4, 4].map((dx, i) => {
   const model = place('Solar', L(dx, -16));
   model.traverse(o => { if (o.isMesh) o.material = o.material.clone(); });
+  model.traverse(o => { if (o.isMesh) delete o.material.userData.worn; }); // the copies need the detail added again
+  wear(model);
   const spark = new THREE.PointLight(0xe43700, 0, 12, 1.5);
   spark.position.set(0, 3, 0);
   model.add(spark);
