@@ -1,6 +1,6 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
 import { CONFIG as C } from './config.js';
-import { flareLabel } from './sim.js';
+import { flareLabel, STRENGTH } from './sim.js';
 import { isTouch, forTouch } from './touch.js';
 import { stopReading } from './speak.js';
 import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound, buildSound } from './sound.js';
@@ -385,7 +385,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
   function hintText() {
     const f = sim.flags, next = sim.nextStorm, storm = sim.stormNow;
     if (storm && sim.where !== 'shelter') return 'Solar storm! Go to the Storm Shelter at the back of the Habitat.';
-    if (storm) return 'Stay in the shelter until the storm is over.';
+    if (storm) return waiting ? 'Waiting out the storm in the shelter (2x time).' : 'Stay in the shelter until the storm is over. Use the Storm Shelter to wait it out faster.';
     if (next?.warnedBy && !next.started) return sim.where === 'shelter' ? 'Wait here for the storm.' : 'Storm coming! Park the robot (Robot Map), then go to the Storm Shelter.';
     const lock = sim.airlockStep;
     if (lock?.waiting) return 'Step away from the door so it can close.';
@@ -524,11 +524,26 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       const shield = !has ? 'Research Regolith Shielding to get a Building tool. With it you can cover the shelter in moon dirt.'
         : cost === undefined ? 'The regolith shield is finished: the shelter is buried in moon dirt.'
         : `Regolith shield: level ${sim.shielding} of ${C.dose.shielding.length - 1}. Close this panel and ${isTouch ? 'tap the Building tool' : 'press 2 for the Building tool'} to build the next level (${cost} moon dirt).`;
+      // During a storm (or once one is on its way) the numbers are live, for this storm's strength.
+      const storm = sim.stormNow, next = sim.nextStorm, coming = !storm && next?.warnedBy;
+      const st = storm ?? (coming ? next : null), s = STRENGTH[st?.strength ?? 'Strong'];
+      const here = fixed(C.dose.storm.shelter * s * k), out = fixed(C.dose.storm.outside * s), hab = fixed(C.dose.storm.inside * s);
+      const head = storm ? `Storm now: ${Math.ceil(storm.at + storm.length - sim.t)} s to go. Stay here.`
+        : coming ? `A storm is on its way: ${Math.max(0, Math.ceil(next.at - sim.t))} s until it hits.`
+        : 'Hide here during solar storms';
+      const inside = sim.where === 'shelter';
+      const wait = btn('wait', waiting ? 'Waiting out the storm (2x time)' : 'Wait out the storm', {
+        on: waiting, disabled: !(storm || coming) || !inside,
+        note: !(storm || coming) ? 'Only when a solar storm is on or coming. You can speed up time as usual now.'
+          : !inside ? 'Step into the blue zone at the back first.'
+          : 'Time goes 2x as fast while you stay in the shelter, and goes back to normal when the storm has passed or you step out.',
+      });
       return {
         title: 'Storm Shelter', icon: 'shield',
-        body: `<p class="big">${sim.stormNow ? 'Storm now! Stay here.' : 'Hide here during solar storms'}</p>
-        <p>The shelter is the back of the Habitat, behind the water tanks and supplies. Extra dose per second in a strong storm:</p>
-        <dl class="facts"><dt>Outside</dt><dd>${fixed(C.dose.storm.outside)}</dd><dt>Rest of Habitat</dt><dd>${fixed(C.dose.storm.inside)}</dd><dt>Here in the shelter</dt><dd>${fixed(C.dose.storm.shelter * k)}</dd></dl>
+        body: `<p class="big">${head}</p>
+        <p>The shelter is the back of the Habitat, behind the water tanks and supplies. Extra dose per second ${st ? 'in this storm' : 'in a strong storm'}:</p>
+        <dl class="facts"><dt>Outside</dt><dd>${out}</dd><dt>Rest of Habitat</dt><dd>${hab}</dd><dt>Here in the shelter</dt><dd>${here}</dd></dl>
+        <div class="opts">${wait}</div>
         <p class="fine">${shield}</p>`,
       };
     },
@@ -656,6 +671,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     forecast: () => notice(sim.askForecast()),
     upload: () => notice(sim.sendData()),
     robot: arg => notice(sim.setRobot(arg)),
+    wait: () => {
+      if (waiting) return;
+      waiting = true;
+      setSpeed(2);
+      sim.say('Waiting out the storm in the shelter: time goes 2x as fast until it has passed.', 'info');
+      close();
+    },
     outside: () => { const no = sim.airlockStart('out'); if (no) notice(no); else close(); },
     inside: () => { const no = sim.airlockStart('in'); if (no) notice(no); else close(); },
   };
@@ -700,7 +722,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
   // The speed button in the top corner always shows the speed. It is yellow while time is fast,
   // and dimmed with a lock while a storm holds time at normal speed.
   function renderChip() {
-    const chip = $('speed-chip'), held = stormNear();
+    const chip = $('speed-chip'), held = stormNear() && !waiting;
     const html = `${icon(held ? 'alert' : 'ff', 16)}<b>${speed}x</b><span>speed</span>`;
     if (showing.get('speed-chip') !== html) { showing.set('speed-chip', html); chip.innerHTML = html; }
     chip.classList.toggle('fast', speed > 1);
@@ -712,8 +734,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
   $('speed-chip').addEventListener('click', chipBtn);
   // With a storm on or on its way time stays at normal speed, and T says why instead of doing nothing.
   const stormNear = () => !!(sim.stormNow || sim.nextStorm?.warnedBy);
+  // Waiting out a storm in the shelter (the Storm Shelter's button) is the one time the clock may
+  // run fast during a storm: you are in the safest spot. It ends when the storm has passed or you
+  // step out of the shelter.
+  let waiting = false;
   let toldWhy = -Infinity;
   function toggleSpeed() {
+    if (waiting) { waiting = false; return setSpeed(1); }
     if (stormNear()) {
       if (performance.now() - toldWhy > 6000) { toldWhy = performance.now(); sim.say('Time stays at normal speed until the solar storm has passed.', 'info'); }
       return setSpeed(1);
@@ -786,8 +813,11 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
   }
 
   function frame(near) {
-    // A storm forces normal speed, so nobody fast-forwards into danger.
-    if (speed > 1 && stormNear()) setSpeed(1);
+    // A storm forces normal speed, so nobody fast-forwards into danger, unless you are waiting it
+    // out in the shelter.
+    if (waiting && !stormNear()) { waiting = false; setSpeed(1); sim.say('The storm has passed. Time is back to normal speed.', 'good'); }
+    if (waiting && sim.where !== 'shelter') { waiting = false; setSpeed(1); sim.say('You left the shelter, so time is back to normal speed.', 'warn'); }
+    if (speed > 1 && stormNear() && !waiting) setSpeed(1);
     renderChip();
     const now = performance.now();
     renderFeed(now);
