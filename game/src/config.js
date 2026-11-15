@@ -81,6 +81,7 @@ export const CONFIG = {
 
   science: {
     sampleRP: 2,      // each rock sample brought back
+    rareRP: 3,        // each rare rock sample: they lie much further from the base
     uploadRP: 1,      // each data upload
     pageRP: 2,        // reading a Scrapbook page for the first time
     uploadCooldown: 20,
@@ -117,6 +118,11 @@ export const MODES = {
   },
 };
 
+// Where the base really is: the middle of the piece of NASA's LOLA map the game's ground is cut
+// from (Site01, Connecting Ridge), 16 km from the south pole. Every mission is flown from it, so
+// every mission's flag on the menu Moon stands here.
+export const BASE = { lat: -89.47, lon: 220.4 };
+
 // Missions in order. Times are game seconds. Goal values can be per mode.
 // Each storm lists the usual time and length, and the size of real flare it draws (planRun in
 // sim.js picks the flare and shifts the time for every playthrough).
@@ -125,7 +131,7 @@ export const MISSIONS = [
     id: 'FirstNight',
     name: 'First Night',
     short: 'Collect 5 rocks and last the night.',
-    place: { lat: -79, lon: 150 },  // where its flag stands on the menu Moon (see moon-menu.js)
+    place: BASE,  // where its flag stands on the menu Moon (see moon-menu.js)
     multiplier: 1,
     goal: 'Collect 5 glowing rock samples and survive the night.',
     brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the tour to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
@@ -137,14 +143,14 @@ export const MISSIONS = [
     storms: [{ at: 160, length: 25, strength: 'Mild' }],
     meteoroids: [],
     goalType: 'samples',
-    goalValue: 5, // rock samples to bring back; there are 5 around the base
+    goalValue: 5, // rock samples to bring back: any 5 of the 10 around the base
     tutorial: true,
   },
   {
     id: 'SolarStorm',
     name: 'Solar Storm',
     short: 'Hide from two solar storms.',
-    place: { lat: -74, lon: 262 },
+    place: BASE,
     multiplier: 1.5,
     requires: { id: 'Shielding', name: 'Regolith Shielding', about: 'Regolith is the science word for moon dirt.', cost: 10 },
     goal: 'Keep your radiation dose low through two solar storms.',
@@ -168,7 +174,7 @@ export const MISSIONS = [
     id: 'IceAndGreens',
     name: 'Ice and Greens',
     short: 'Grow food with crater ice.',
-    place: { lat: -81, lon: 30 },
+    place: BASE,
     multiplier: 2,
     requires: { id: 'Greenhouse', name: 'Greenhouse', cost: 20 },
     goal: 'Grow enough food to have meals left at sunrise.',

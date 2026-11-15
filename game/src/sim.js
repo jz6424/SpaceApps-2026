@@ -229,11 +229,13 @@ export class Sim {
     this.say('Panel fixed. Power is flowing again.', 'good');
     return null;
   }
-  collectSample(id) {
+  // rare: one of the samples that lie far from the base, which are worth more.
+  collectSample(id, rare = false) {
     if (this.samples.has(id)) return;
     this.samples.add(id);
-    this.rp += this.C.science.sampleRP;
-    this.say(`Rock sample collected. +${this.C.science.sampleRP} research points.`, 'good');
+    const worth = rare ? this.C.science.rareRP : this.C.science.sampleRP;
+    this.rp += worth;
+    this.say(`${rare ? 'Rare rock' : 'Rock'} sample collected. +${worth} research points.`, 'good');
   }
   sendData() {
     if (!this.comms) return 'Turn the antenna on first.';

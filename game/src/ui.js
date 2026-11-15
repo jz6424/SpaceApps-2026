@@ -777,7 +777,7 @@ function goalText(mission, mode) {
     ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
     : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
     : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.`
-    : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them.` : mission.goal;
+    : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them. Rare blue ones lie further out and are worth more.` : mission.goal;
 }
 
 // What each of a mission's three stars asks for in a mode, in full words.
@@ -849,7 +849,7 @@ function launch(id = chosen) {
   // If the live check hasn't answered yet, the storms come from NASA's archived flares instead.
   sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? PAST_FLARES), researchConfig(C, save.unlocks));
   sim.say(mission.brief, 'info');
-  hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false, points: save.points });
+  hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false });
   tour?.destroy();
   tour = null;
   game.enter(sim, {
@@ -1084,7 +1084,7 @@ export function gameReady(api) {
 }
 
 // Debug helpers for scripted checks: window.ui.launch('FirstNight').
-window.ui = { launch, scrapbook: openScrapbook, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; }, get cues() { return sound.cuesPlayed; } };
+window.ui = { launch, get moon() { return moonMenu; }, scrapbook: openScrapbook, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; }, get cues() { return sound.cuesPlayed; } };
 
 renderStart();
 show('start');

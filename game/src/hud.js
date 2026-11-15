@@ -1,5 +1,5 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
-import { CONFIG as C, MISSIONS } from './config.js';
+import { CONFIG as C } from './config.js';
 import { flareLabel } from './sim.js';
 import { isTouch, forTouch } from './touch.js';
 import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound, buildSound } from './sound.js';
@@ -47,7 +47,7 @@ const fixed = v => (Math.round(v * 100) / 100).toFixed(2);
 // Every rate in the game is written the same way: "0.42 power per second".
 const per = (v, what) => `${fixed(v)} ${what} per second`;
 
-export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
+export function createHud({ sim, site, unlocks, api, liveFlares }) {
   // The numbers this mission really runs on, research upgrades included, so every panel shows them.
   const C = sim.C;
   const hud = $('hud');
@@ -177,16 +177,18 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('build-go').addEventListener('click', buildBtn);
   renderHotbar();
 
-  // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
-  function renderRp() {
-    const total = points + sim.rp;
-    const next = MISSIONS.map(m => m.requires).filter(r => r && !unlocks.includes(r.id)).sort((a, b) => a.cost - b.cost)[0];
-    const goal = next?.cost ?? 0;
-    const pct = next ? Math.min(100, total / goal * 100) : 100;
+  // --- Samples bar, in the bottom corner: how many of the rock samples around the base are in ---
+  // First Night has a goal for them, shown as a white mark on the bar and in words under it.
+  const sampleTotal = site.samples ?? 10;
+  function renderSamples() {
+    const got = sim.samples.size, goal = sim.mission.goalType === 'samples' ? sim.goalValue : 0;
+    const mark = goal ? `<b class="goal-mark" style="left:${goal / sampleTotal * 100}%" title="Goal"></b>` : '';
+    const under = goal ? (got >= goal ? `Goal of ${goal} met. Extras earn more points.` : `Goal: ${goal} (the white mark)`)
+      : `+${C.science.sampleRP} research points each, +${C.science.rareRP} for the rare ones far out`;
     put('rp-bar', `
-      <div class="rp-top">${icon('star', 16)}<span>Research points</span><b>${next ? `${total} / ${goal}` : `${total} · MAX`}</b></div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      ${next ? `<div class="rp-next">Next unlock: ${next.name}</div>` : ''}`);
+      <div class="rp-top">${icon('star', 16)}<span>Samples picked up</span><b>${got} / ${sampleTotal}</b></div>
+      <div class="bar" role="meter" aria-label="Samples picked up" aria-valuemin="0" aria-valuemax="${sampleTotal}" aria-valuenow="${got}"><i style="width:${Math.min(100, got / sampleTotal * 100)}%"></i>${mark}</div>
+      <div class="rp-next">${under}</div>`);
   }
 
   // --- Low suit air alert ---
@@ -285,10 +287,9 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('pu-title').innerHTML = `${icon('bolt', 20)} Where your power goes`;
   $('pu-close').innerHTML = icon('x', 18);
 
-  // --- Supplies, in the corner above the research points ---
+  // --- Supplies, in the corner above the samples bar ---
   function renderSupplies() {
     const rows = [['box', 'Moon dirt', Math.floor(sim.regolith)]];
-    if (sim.mission.goalType === 'samples') rows.unshift(['star', 'Rock samples', `${sim.samples.size} <small>goal ${sim.goalValue}</small>`]);
     if (sim.food !== null) rows.push(['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`], ['droplet', 'Water', Math.floor(sim.water ?? 0)]);
     put('supplies', rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join(''));
   }
@@ -768,7 +769,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     renderBuild();
     renderSupplies();
     renderClock();
-    renderRp();
+    renderSamples();
     // The hint is read out by screen readers, so it is only written when the words change.
     const hint = forTouch(hintText());
     if ($('hint').textContent !== hint) $('hint').textContent = hint;

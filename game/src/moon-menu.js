@@ -11,8 +11,9 @@
 //  * public/moon/lroc_color_poles_1k.jpg: how bright the ground is, from the LROC camera.
 //  * public/moon/ldem_3_8bit.jpg: how high the ground is, from the LOLA laser altimeter.
 //
-// The flags stand close together near the south pole, because every mission is flown from the same
-// base on Connecting Ridge. They are spread a little so each can be seen and clicked.
+// Each flag stands where its mission is really flown from. Every mission so far is flown from the
+// same base on Connecting Ridge, 16 km from the south pole, so their flags are planted side by
+// side on that spot and lean apart like a bunch of flowers, so each can be seen and clicked.
 import * as THREE from 'three';
 
 const DEG = Math.PI / 180;
@@ -38,10 +39,11 @@ const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-m
 const onGlobe = (lat, lon, r = 1) => new THREE.Vector3(
   r * Math.cos(lat * DEG) * Math.cos(lon * DEG), r * Math.sin(lat * DEG), -r * Math.cos(lat * DEG) * Math.sin(lon * DEG));
 
-// The blue crater beside the base. It is our own marker laid over the real ground, and not from the
-// maps: it stands in for the permanently shadowed craters where the ice is, which are too small to
-// see from this far away.
-const ICE = { at: onGlobe(-84, 205), size: 9 * DEG };
+// The blue crater near the base. It is our own marker laid over the real ground, and not from the
+// maps: it stands in for the permanently shadowed craters where the ice is. It is where Cabeus is,
+// the crater NASA's LCROSS mission found water ice in (2009), drawn about four times Cabeus's real
+// size so it can be seen from this far away, and clear of the flags at the pole.
+const ICE = { at: onGlobe(-84.9, 324.5), size: 3.5 * DEG };
 // How much the blue crater moves the ground at `d` crater radii from its middle: a bowl with a raised rim.
 const iceBowl = d => (d < 1 ? -0.035 * ICE.size * 6 * (1 - d * d) : d < 1.3 ? 0.012 * ICE.size * 6 * (1 - (d - 1) / 0.3) : 0);
 
@@ -162,9 +164,24 @@ function numberSprite(n) {
   return sprite;
 }
 
-function buildFlag(place, number) {
+// Flags that share a spot are planted in a small ring round it and lean outward.
+const FAN = { out: 1 * DEG, lean: 40 * DEG };   // how far from the spot each foot is, and how far each flag leans
+
+// fan: null for a flag on its own, or { turn } in radians: which way round the shared spot this one stands and leans.
+function buildFlag(place, number, fan = null) {
   const flag = new THREE.Group();
-  const up = onGlobe(place.lat, place.lon).normalize();
+  const spot = onGlobe(place.lat, place.lon).normalize(), up = spot.clone(), lean = new THREE.Group();
+  if (fan) {
+    // Two directions along the ground at the spot, then this flag's own direction between them.
+    const ref = Math.abs(spot.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const t1 = ref.addScaledVector(spot, -ref.dot(spot)).normalize(), t2 = new THREE.Vector3().crossVectors(spot, t1);
+    const away = t1.multiplyScalar(Math.cos(fan.turn)).addScaledVector(t2, Math.sin(fan.turn));
+    up.multiplyScalar(Math.cos(FAN.out)).addScaledVector(away, Math.sin(FAN.out)).normalize();
+    // Lean away from the spot: a turn about the line along the ground that is square to `away`.
+    const hinge = new THREE.Vector3().crossVectors(up, away).normalize();
+    hinge.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(0, 1, 0)));
+    lean.quaternion.setFromAxisAngle(hinge, FAN.lean);
+  }
   // Where this spot sits when it faces the camera: a little below the middle of the picture.
   const face = new THREE.Vector3(0, up.y, Math.sqrt(1 - up.y * up.y)).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
   flag.position.copy(up).multiplyScalar(0.985);   // moved onto the real ground once the maps arrive
@@ -181,14 +198,16 @@ function buildFlag(place, number) {
   ring.renderOrder = 4;
   const badge = numberSprite(number);
   badge.position.y = 0.26;
-  // An unseen ball round the flag makes it easier to click or tap.
-  const reach = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
-  reach.position.y = 0.1;
+  // An unseen ball round the flag makes it easier to click or tap. On a leaning flag it is smaller
+  // and nearer the top, where the flags are furthest apart, so each has its own.
+  const reach = new THREE.Mesh(new THREE.SphereGeometry(fan ? 0.1 : 0.11, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+  reach.position.y = fan ? 0.2 : 0.1;
   // The pole and cloth turn on the spot to keep the cloth facing whoever is looking.
   const mast = new THREE.Group();
   mast.add(pole, cloth);
-  flag.add(mast, ring, badge, reach);
-  return { flag, mast, cloth, ring, badge, reach, up, face };
+  lean.add(mast, badge, reach);
+  flag.add(lean, ring);
+  return { flag, lean, mast, cloth, ring, badge, reach, up, face };
 }
 
 // missions: [{ id, place: { lat, lon } }]. onPick(id) is called when a flag is clicked, and
@@ -206,8 +225,11 @@ export function createMoonMenu(canvas, missions, onPick) {
   const moon = buildMoon();
   moon.rotation.x = TILT;
   scene.add(moon);
+  // Missions flown from the same place share a spot: their flags stand round it, evenly spaced.
+  const sameSpot = m => missions.filter(o => o.place.lat === m.place.lat && o.place.lon === m.place.lon);
   const flags = Object.fromEntries(missions.map((m, i) => {
-    const made = buildFlag(m.place, i + 1);
+    const group = sameSpot(m);
+    const made = buildFlag(m.place, i + 1, group.length > 1 ? { turn: (group.indexOf(m) / group.length + 0.25) * 2 * Math.PI } : null);
     made.reach.userData.id = m.id;
     moon.add(made.flag);
     return [m.id, made];
@@ -280,7 +302,7 @@ export function createMoonMenu(canvas, missions, onPick) {
     camera.lookAt(look);
     // Turn each flag's cloth to face the camera.
     for (const f of Object.values(flags)) {
-      f.flag.worldToLocal(seen.copy(camera.position));
+      f.lean.worldToLocal(seen.copy(camera.position));
       f.mast.rotation.y = Math.atan2(seen.x, seen.z);
     }
     if (diveDone) {
@@ -367,5 +389,7 @@ export function createMoonMenu(canvas, missions, onPick) {
       return new Promise(done => { diveDone = done; });
     },
     get picked() { return picked; },
+    // For scripted checks: which mission's flag is under a point of the page.
+    flagAt: (x, y) => flagAt({ clientX: x, clientY: y }),
   };
 }

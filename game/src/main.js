@@ -571,33 +571,42 @@ place('IceDrill', iceSpot);
 const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 12, far: 90, faint: 0 });
 iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 
-// Rock samples to collect on a moonwalk.
+// Rock samples to collect on a moonwalk. Ten in all: five ordinary ones a short walk from the
+// base, and five rare ones much further out, which are worth more research points. The rare ones
+// are a little bigger and glow blue, and their labels can be read from further away.
 const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a8f7f, emissive: 0xeafe07, emissiveIntensity: 0.25, roughness: 0.9 });
-// Five in all: two a short walk from the steps, three further out.
-const samples = [[12, 15], [17, -7], [24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
+const rareMat = new THREE.MeshStandardMaterial({ color: 0xaab4c8, emissive: 0x2e96f5, emissiveIntensity: 0.75, roughness: 0.6 });
+const SAMPLE_SPOTS = [
+  [12, 15], [17, -7], [24, 22], [-28, -30], [40, -32],            // near: where each sits if no better spot is found
+  [58, 30, true], [-50, 38, true], [62, -44, true], [-56, -48, true], [6, 72, true],   // rare, far out
+];
+const samples = SAMPLE_SPOTS.map(([dx, dz, rare = false], i) => {
   const at = L(dx, dz);
-  const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockMat);
+  const mesh = new THREE.Mesh(rare ? new THREE.IcosahedronGeometry(0.55, 0) : new THREE.DodecahedronGeometry(0.45, 0), rare ? rareMat : rockMat);
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
   mesh.castShadow = true;
   scene.add(mesh);
-  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 3, far: 20, faint: 0 });
+  const label = makeCallout(rare ? 'Rare rock sample' : 'Rock sample', { color: rare ? '#7FD4FF' : '#EAFE07', near: rare ? 8 : 3, far: rare ? 60 : 20, faint: 0 });
   label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
-  return { id: `rock${i}`, mesh, label, at, home: at.clone() };
+  return { id: `rock${i}`, rare, mesh, label, at, home: at.clone() };
 });
-// Every mission scatters the rocks afresh around the base: one in each fifth of the circle, 14 to
-// 40 m out (an easy trip on one tank of suit air), clear of anything solid, at least 6 m from the
-// Habitat (where the dirt shield may go) and 8 m from each other. A rock that finds no spot in 80
-// tries goes back to its old fixed place.
-const SAMPLE_NEAR = 14, SAMPLE_FAR = 40;
+// Every mission scatters the rocks afresh around the base, each kind in its own ring: the near
+// ones 14 to 40 m out (an easy trip on one tank of suit air), the rare ones 45 to 75 m out (a
+// run there and back, with little air to spare). Each ring has one rock in each fifth of the
+// circle. A spot must be clear of anything solid, at least 6 m from the Habitat (where the dirt
+// shield may go) and 8 m from other rocks. A rock that finds no spot in 80 tries goes back to its
+// old fixed place.
+const SAMPLE_RING = { near: [14, 40], far: [45, 75] };
 const gapTo = (b, x, z) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1));
 function scatterSamples(rnd = Math.random) {
   const placed = [];
   const hullBox = { x0: hull.min.x, x1: hull.max.x, z0: hull.min.z, z1: hull.max.z };
-  samples.forEach((s, i) => {
+  samples.forEach(s => {
+    const ring = samples.filter(o => o.rare === s.rare), k = ring.indexOf(s), [lo, hi] = s.rare ? SAMPLE_RING.far : SAMPLE_RING.near;
     let spot = null;
     for (let tries = 0; tries < 80 && !spot; tries++) {
-      const angle = (i + 0.1 + rnd() * 0.8) / samples.length * Math.PI * 2;
-      const dist = SAMPLE_NEAR + rnd() * (SAMPLE_FAR - SAMPLE_NEAR);
+      const angle = (k + (s.rare ? 0.6 : 0.1) + rnd() * 0.8) / ring.length * Math.PI * 2;
+      const dist = lo + rnd() * (hi - lo);
       const x = site.x + Math.cos(angle) * dist, z = site.z + Math.sin(angle) * dist;
       if (gapTo(hullBox, x, z) < 6 || navBoxes.some(b => gapTo(b, x, z) < 2.5)) continue;
       if (Math.hypot(x - digSpot.x, z - digSpot.z) < 5 || placed.some(p => Math.hypot(p.x - x, p.z - z) < 8)) continue;
@@ -1650,7 +1659,7 @@ function nearestUsable() {
     }
   } else if (sim) {
     panels.forEach((pn, i) => { if (!sim.panels[i]) consider(Math.hypot(here.x - pn.at.x, here.z - pn.at.z), { kind: 'panel', i, label: `fix solar panel ${i + 1}` }); });
-    samples.forEach(s => { if (!sim.samples.has(s.id)) consider(Math.hypot(here.x - s.at.x, here.z - s.at.z), { kind: 'sample', id: s.id, label: 'pick up the rock sample' }); });
+    samples.forEach(s => { if (!sim.samples.has(s.id)) consider(Math.hypot(here.x - s.at.x, here.z - s.at.z), { kind: 'sample', id: s.id, rare: s.rare, label: s.rare ? 'pick up the rare rock sample' : 'pick up the rock sample' }); });
   }
   for (const door of Object.values(doors)) {
     // The open door is not offered: walking through it is the point.
@@ -1663,7 +1672,7 @@ function useNearest() {
   if (!it || !sim) return;
   if (it.kind === 'station') openStation(it.id);
   if (it.kind === 'panel') hooks?.notice(sim.repairPanelByHand(it.i));
-  if (it.kind === 'sample') { hooks?.useTool?.('scoop'); sim.collectSample(it.id); }
+  if (it.kind === 'sample') { hooks?.useTool?.('scoop'); sim.collectSample(it.id, it.rare); }
   if (it.kind === 'door') useDoor(it.id);
 }
 function openStation(id) {
@@ -2043,7 +2052,7 @@ await document.fonts.ready;
 try { await renderer.compileAsync(scene, camera); } catch { /* older browsers: compiled on first use */ }
 
 gameReady({
-  site: { ...siteData, iceDistance, maps, worldX: site.x, worldZ: site.z, ice: iceSpot, robot: () => robot.position },
+  site: { ...siteData, iceDistance, maps, worldX: site.x, worldZ: site.z, ice: iceSpot, robot: () => robot.position, samples: samples.length },
   // Starts inside the Habitat, by the airlock.
   enter(newSim, newHooks) {
     sim = newSim;

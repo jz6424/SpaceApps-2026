@@ -25,9 +25,9 @@ const SCREEN_BOTTOM = [
   {
     target: ['#supplies', '#rp-bar'], side: 'left', title: 'What you have collected',
     lines: [
-      ['Rock samples', 'Tonight\'s goal: bring back 5 glowing rocks.'],
       ['Moon dirt', 'The robot digs it. For building, repairs and Boost.'],
-      ['Research points', '+2 for each rock, +1 for each data upload.'],
+      ['Samples picked up', 'Tonight\'s goal: bring back 5 glowing rocks.'],
+      ['Research points', '+2 for each rock, +3 for the rare blue ones far out.'],
     ],
   },
 ];
