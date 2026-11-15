@@ -358,7 +358,7 @@ for (const [id, node] of Object.entries(stationNodes)) {
   node.traverse(o => { if (o.isMesh && !o.name.endsWith('_Stand')) body.expandByObject(o); });
   const dot = body.isEmpty() ? pos.clone().add(new THREE.Vector3(0, 1.4, 0))
     : new THREE.Vector3((body.min.x + body.max.x) / 2, Math.min(body.min.y + (body.max.y - body.min.y) * 0.8, pos.y + 2.2), (body.min.z + body.max.z) / 2);
-  const marker = makeCallout(STATION_INFO[id].label, { near: 2.5, far: 10, faint: 0, station: id });
+  const marker = makeCallout(STATION_INFO[id].label, { near: 1.8, far: 6.5, faint: 0, station: id });
   marker.position.copy(dot);
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
 }
@@ -445,7 +445,7 @@ const panels = [-12, -4, 4].map((dx, i) => {
   const spark = new THREE.PointLight(0xe43700, 0, 12, 1.5);
   spark.position.set(0, 3, 0);
   model.add(spark);
-  const label = makeCallout(`Fix panel ${i + 1}`, { color: '#E43700', near: 6, far: 40, faint: 0 });
+  const label = makeCallout(`Fix panel ${i + 1}`, { color: '#E43700', near: 4, far: 24, faint: 0 });
   label.position.copy(model.position).add(new THREE.Vector3(0, 3.2, 0));
   label.visible = false;
   return { model, spark, label, at: model.position.clone().add(new THREE.Vector3(0, 0, 4.2)) };
@@ -465,7 +465,7 @@ const iceSpot = icePixel
 iceSpot.y = groundAt(iceSpot.x, iceSpot.z);
 const iceDistance = Math.round(Math.hypot(iceSpot.x - site.x, iceSpot.z - site.z));
 place('IceDrill', iceSpot);
-const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 20, far: 160, faint: 0 });
+const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 12, far: 90, faint: 0 });
 iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 
 // Rock samples to collect on a moonwalk.
@@ -477,7 +477,7 @@ const samples = [[12, 15], [17, -7], [24, 22], [-28, -30], [40, -32]].map(([dx, 
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
   mesh.castShadow = true;
   scene.add(mesh);
-  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 5, far: 35, faint: 0 });
+  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 3, far: 20, faint: 0 });
   label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
   return { id: `rock${i}`, mesh, label, at };
 });
@@ -1299,10 +1299,10 @@ function tick(dt) {
 
   // One camera everywhere, inside, outside and in the airlock: it keeps your zoom and angle, and
   // only ever comes in closer when a wall is in the way, easing back out once the way is clear.
-  // The camera's height is smoothed, and it rises only a third as far as a jump, so jumping or
-  // running over bumps doesn't heave the whole view up and down.
-  if (grounded) { camFloor = now.y; camY += (now.y - camY) * ease(14); }
-  else camY += (camFloor + (now.y - camFloor) * 0.35 - camY) * ease(7);
+  // The camera holds its height through a jump (only the astronaut goes up and down), and eases
+  // gently to new ground heights, so jumping, sprint-jumping or running over bumps keeps the view level.
+  if (grounded) { camFloor = now.y; camY += (now.y - camY) * ease(6); }
+  else camY += (Math.min(camFloor, now.y) - camY) * ease(6); // falling off a ledge still follows you down
   head.set(now.x, camY + 0.6, now.z);
   camDir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
   let camWant = camDist;
