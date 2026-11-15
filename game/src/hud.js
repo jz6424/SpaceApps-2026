@@ -560,13 +560,42 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     if (mapGround) return mapGround;
     mapGround = document.createElement('canvas');
     mapGround.width = mapGround.height = 200;
+    // NASA's sunlight and shadow maps have one value every 60 m, about 15 across this map. They are
+    // drawn smoothed rather than as hard squares: the sunlight is scaled smoothly and blurred a
+    // little, and the permanent-shadow patches (yes or no for each 60 m square) are blurred and then cut at the
+    // half-way line, so they come out as soft round shapes where the squares were.
     const ctx = mapGround.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(site.maps.sun.img, c0, r0, size, size, 0, 0, 200, 200);
-    const img = ctx.getImageData(0, 0, 200, 200);
-    for (let y = 0; y < 200; y++) for (let x = 0; x < 200; x++) {
-      const p = site.maps.psrAt(r0 + y * size / 200, c0 + x * size / 200);
-      if (p > 0.5) { const i = (y * 200 + x) * 4; img.data[i] = 46; img.data[i + 1] = 150; img.data[i + 2] = 245; }
+    const img = ctx.getImageData(0, 0, 200, 200), N = 200;
+    let shade = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) shade[y * N + x] = site.maps.psrAt(r0 + y * size / N, c0 + x * size / N) > 0.5 ? 1 : 0;
+    const blur = (src, R) => { // a box blur across, then down
+      const across = new Float32Array(N * N), out = new Float32Array(N * N);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        let sum = 0, n = 0;
+        for (let k = Math.max(0, x - R); k <= Math.min(N - 1, x + R); k++) { sum += src[y * N + k]; n++; }
+        across[y * N + x] = sum / n;
+      }
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        let sum = 0, n = 0;
+        for (let k = Math.max(0, y - R); k <= Math.min(N - 1, y + R); k++) { sum += across[k * N + x]; n++; }
+        out[y * N + x] = sum / n;
+      }
+      return out;
+    };
+    shade = blur(blur(shade, 5), 5);
+    // The sunlight itself still shows the steps of the 60 m squares, so it is softened the same way.
+    let sun = new Float32Array(N * N);
+    for (let j = 0; j < N * N; j++) sun[j] = img.data[j * 4];
+    sun = blur(blur(sun, 7), 7);
+    for (let j = 0; j < N * N; j++) img.data[j * 4] = img.data[j * 4 + 1] = img.data[j * 4 + 2] = sun[j];
+    for (let j = 0; j < N * N; j++) {
+      const t = Math.min(1, Math.max(0, (shade[j] - 0.35) / 0.3)), a = t * t * (3 - 2 * t) * 0.95, i = j * 4;
+      img.data[i] += (46 - img.data[i]) * a;
+      img.data[i + 1] += (150 - img.data[i + 1]) * a;
+      img.data[i + 2] += (245 - img.data[i + 2]) * a;
     }
     ctx.putImageData(img, 0, 0);
     return mapGround;

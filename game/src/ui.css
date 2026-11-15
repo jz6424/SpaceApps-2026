@@ -722,7 +722,7 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
 .opt-note { color: var(--soft); font-size: 14px; }
 .opt:disabled { opacity: .5; cursor: default; }
 .maprow { display: grid; grid-template-columns: 200px 1fr; gap: 16px; align-items: start; }
-#robot-map { border: 1px solid var(--line); image-rendering: pixelated; width: 200px; height: 200px; }
+#robot-map { border: 1px solid var(--line); width: 200px; height: 200px; }
 .legend { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; }
 .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--deep); vertical-align: -2px; }
 .dot.base { background: var(--yellow); } .dot.ice { background: #fff; } .dot.bot { background: var(--red); }
