@@ -51,6 +51,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 
 .screen {
   position: fixed; inset: 0; overflow-y: auto; font-size: 17px; line-height: 1.5;
+  /* Never a sideways scroll bar: decorations may hang off the edge. And where scroll bars are
+     always drawn, they are pale on the dark page, not a white strip. */
+  overflow-x: hidden; scrollbar-color: rgba(201, 216, 242, .4) transparent;
   background: linear-gradient(135deg, #0A1B4D 0%, #040A1E 45%, #02040B 100%);
 }
 /* Moving between screens (ui.js picks the move). While it plays, the screen that is leaving
@@ -84,6 +87,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .screen.leaving:is(.move-up, .move-down) .orbits { top: calc(var(--scrolled, 0px) - 120px); }
 @media (min-width: 901px) {
   .screen.leaving:is(.move-up, .move-down) #moon-view { top: var(--scrolled, 0px); bottom: calc(0px - var(--scrolled, 0px)); }
+  /* While it slides, the Moon's picture is measured from the screen's own edge, which already
+     stops short of the scroll bar. */
+  .screen:is(.leaving, .arriving):is(.move-up, .move-down) #moon-view { right: 0; }
 }
 /* Headings in Chakra Petch, the game's title in capitals. */
 .screen h1, .screen h2, .screen h3 { font-family: var(--head); margin: 0; line-height: 1.1; }
@@ -197,7 +203,10 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* The Moon's picture is everything to the right of the mission boxes, from the top of the window
    to the bottom, and it stays put while the boxes scroll. The left edge is where the boxes end:
    the page's side margin, its 24px padding, the 440px column and the 24px gap. */
-#moon-view { position: fixed; z-index: 0; top: 0; right: 0; bottom: 0; left: calc(max(0px, (100vw - 1288px) / 2) + 488px); }
+#moon-view { position: fixed; z-index: 0; top: 0; right: var(--bar, 0px); bottom: 0; left: calc(max(0px, (100vw - var(--bar, 0px) - 1288px) / 2) + 488px); }
+/* Room for a scroll bar is always kept (--bar is its width, set by ui.js; 0 where scroll bars float
+   over the page), so nothing shifts or resizes when one comes or goes, or while the screen slides. */
+#missions { scrollbar-gutter: stable; }
 #moon { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 #moon-notes { grid-column: 1; max-width: 34em; }
 /* Shown while zoomed in on a flag: goes back to the whole Moon. */

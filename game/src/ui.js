@@ -169,6 +169,14 @@ function renderMissions() {
     : '<button class="link" data-do="erase-ask">Erase my save</button>';
 }
 
+// How wide the mission menu's scroll bar is (0 where scroll bars float over the page). The Moon's
+// picture stops short of it: see #moon-view in ui.css.
+function measureBar() {
+  const screen = $('missions');
+  if (!screen.hidden) screen.style.setProperty('--bar', `${screen.offsetWidth - screen.clientWidth}px`);
+}
+addEventListener('resize', measureBar);
+
 // Coming back from the Research Tree the view tips back down from the sky; coming back from the
 // Scrapbook, the shut book fades away. From anywhere else it is a cut.
 function openMissions() {
@@ -180,6 +188,7 @@ function openMissions() {
   const from = showing();
   if (from === 'research') startPan(-1, MOVES.down / 1000);
   show('missions', { research: 'down', scrapbook: 'fade' }[from]);
+  measureBar();
   // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
   moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
   renderMissions();
