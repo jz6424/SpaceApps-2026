@@ -1,7 +1,7 @@
 // The in-mission screen: meters, the sun clock, messages, hints, and the station panels.
 import { CONFIG as C, MISSIONS } from './config.js';
 import { flareLabel } from './sim.js';
-import { airlockSound, messageCue, soundOn, setSound } from './sound.js';
+import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
 
@@ -71,6 +71,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
+  $('fullscreen').innerHTML = icon('expand', 26);
   $('fullscreen').addEventListener('click', fsBtn);
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
@@ -96,6 +97,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       t.className = level === 2 ? 'bad' : 'warn';
       t.hidden = false;
       t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+      warningSound(level);
     }
     airLevel = level;
   }
@@ -418,6 +420,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
 
   function openStation(id) {
     open = id;
+    hologramSound('open');
     sim.flags[`open_${id}`] = true;
     $('station').hidden = false;
     $('keys').hidden = true; // the keys do nothing while a panel is open
@@ -425,6 +428,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
   function close() {
+    if (open) hologramSound('close');
     open = null;
     $('station').hidden = true;
     $('keys').hidden = false;
@@ -452,15 +456,22 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     'open outer': ['Airlock', 'Opening the outer door', ''],
   };
   let lockShown = '';
+  let lockLast = ''; // what the airlock was doing a moment ago, for the "pressure ready" beep
   function renderAirlock() {
     const step = sim.airlockStep;
     $('airlock-panel').hidden = !step;
-    if (!step) { lockShown = ''; return; }
+    if (!step) { lockShown = ''; lockLast = ''; return; }
     const key = step.kind === 'pump' ? `pump ${step.dir}` : step.door ? `${step.kind} ${step.door}` : step.kind;
     if (key + step.waiting !== lockShown) {
       lockShown = key + step.waiting;
-      if (step.kind === 'pump') airlockSound('hiss', step.length / speed);
-      else if (step.door && !step.waiting) airlockSound('clunk');
+      const secs = step.length / speed;
+      if (step.kind === 'pump') airlockSound(step.dir === 'out' ? 'pump-out' : 'pump-in', secs);
+      else if (step.kind === 'prebreathe') airlockSound('prebreathe', secs);
+      else if (step.door && !step.waiting) {
+        if (lockLast === 'pump') airlockSound('done');   // the pump just finished
+        airlockSound(step.kind === 'open' ? 'door-open' : 'door-close', secs);
+      }
+      lockLast = step.kind;
       const [title, text, fact] = LOCK_STEPS[key];
       $('lock-title').innerHTML = `${icon('door', 20)} ${title}`;
       $('lock-text').textContent = step.waiting ? 'Step away from the door so it can close!' : text;
@@ -483,12 +494,31 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('sound').addEventListener('click', soundBtn);
   showSound();
 
+  // --- Sound cues: watch for things that just happened ---
+  const heard = { brownout: false, airLow: false, emergency: false, warned: 0, started: 0, done: 0, samples: 0, rp: sim.rp };
+  function watchSounds() {
+    const f = sim.flags;
+    if (f.brownout && !heard.brownout) lowPowerSound();
+    if ((f.airLow && !heard.airLow) || (f.emergency && !heard.emergency)) warningSound(f.emergency ? 2 : 1, 0.6);
+    heard.brownout = !!f.brownout; heard.airLow = !!f.airLow; heard.emergency = !!f.emergency;
+    const count = k => sim.storms.filter(s => s[k]).length;
+    const warned = count('warnedBy'), started = count('started'), done = count('done');
+    if (warned > heard.warned) stormSound('warning');
+    if (started > heard.started) stormSound('start');
+    if (done > heard.done) stormSound('end');
+    Object.assign(heard, { warned, started, done });
+    if (sim.samples.size > heard.samples) sampleSound();
+    else if (sim.rp > heard.rp) dataSentSound();
+    heard.samples = sim.samples.size; heard.rp = sim.rp;
+  }
+
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
     if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) toggleSpeed();
     const now = performance.now();
     renderFeed(now);
     checkSuitAir();
+    watchSounds();
     renderAirlock();
     if (now - lastRender < 200) return;
     lastRender = now;

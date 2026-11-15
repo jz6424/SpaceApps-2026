@@ -37,7 +37,8 @@ const EXPLAIN = {
     text: [
       '<b>This is your link to Mission Control on Earth.</b> With the <b>Antenna</b> on, and Earth above the horizon, Earth warns you before a solar storm hits.',
       'Messages take 1.3 seconds each way, because radio waves take that long to cross 384,400 km to Earth.',
-      '<b>Send science data</b> here for +1 research point. It costs 6 power, and you must wait 20 seconds between uploads. Earth sometimes sinks below the horizon, and then there is no signal.',
+      '<b>Ask for a forecast</b> (2 power) and the storm shows up on the Sun clock. <b>Send science data</b> for +1 research point (6 power, 20 seconds between uploads).',
+      'Earth sometimes sinks below the horizon, and then there is no signal.',
     ],
   },
   Food: {
@@ -70,9 +71,10 @@ const EXPLAIN = {
     target: '#station-body [data-act="outside"]', side: 'left',
     title: 'Airlock',
     text: [
-      '<b>This is the door to the Moon.</b> Outside you can fix broken solar panels and pick up glowing rock samples for research points.',
-      'Your suit tank holds 90 seconds of air (it refills when you are back inside), and radiation builds up about 3 times faster outside. A warning appears when your suit air gets low.',
-      '<b>You do not have to go outside in this mission.</b> To come back in, use the door at the top of the yellow steps.',
+      '<b>This is the door to the Moon.</b> It has two doors that are never open at the same time, so the base keeps its air.',
+      'To go out, the inner door closes, you breathe pure oxygen for 6 seconds (Cadets can skip this), the air is pumped out, then the outer door opens. Each trip out costs 1.5% Life Support.',
+      'Outside you can fix broken panels and pick up rock samples. Your suit holds 90 seconds of air, and radiation builds up about 3 times faster. You cannot go out during a solar storm.',
+      'To come back, press <b>Back to the airlock</b> at the bottom right.',
     ],
   },
 };
@@ -84,18 +86,22 @@ const SHORT = {
   'Life Support': ['The air in the base. You use it up while inside.', 'The Life Support machine refills it, using power.', 'At 0% you have 15 seconds before the mission ends.'],
   'Radiation dose': ['Radiation you have absorbed. It never goes down.', 'It rises faster outside and in solar storms.', 'At 100 the mission ends. Hide in the shelter.'],
   'Moon dirt': ['Building material the robot digs up.', 'Spend it on repairs, Boost and shielding.'],
-  'Research points': ['Rewards for science: +2 per rock sample, +1 per data upload.', 'Spend them in the Research Tree.'],
+  'Research points': ['Your points toward the next unlock.', '+2 per rock sample, +1 per data upload.'],
+  'Messages': ['Messages from the base computer and Mission Control.', 'Watch for storm warnings.'],
   'The Sun clock': ['The whole day. The white marker is now.', 'Yellow is sunlight. Blue is night, with no solar power.', 'Red is a solar storm. Dashes mean no Earth signal.'],
-  'Your missions box': ['Your next step is in the blue hint.', 'Above it: the target hides this box, the gear pauses and holds the settings.'],
-  'Research bar': ['Your points toward the next unlock.', 'Collect rock samples and send data to fill it.'],
+  'Your missions box': ['Your next step is in the blue hint.', 'The target hides this box. The gear opens settings. F fast-forwards.'],
   'Now the stations': ['7 stations, each with a floating label.', 'Click a label to walk there, or press E when close.'],
   'Power station': ['Your battery, and what charges or drains it.', 'See "What is using power right now" below.'],
   'Life Support station': ['Makes your air. Eco uses the least power, Boost makes the most air.', 'Battery draining? Pick Eco. Air falling? Pick higher.'],
-  'Comms station': ['With the antenna on, Earth warns you before storms.', 'Send science data here for +1 point.'],
+  'Comms station': ['With the antenna on, Earth warns you before storms.', 'Ask for a forecast, or send science data for +1 point.'],
   'Galley': ['The kitchen and greenhouse.', 'You have plenty of food tonight. It matters more later.'],
   'Robot Map': ['Control the robot outside. Dig moon dirt here.', 'Park it before a solar storm.'],
   'Storm Shelter': ['The safest spot: much less storm radiation.', 'The blue floor shows the protected zone.'],
-  'Airlock': ['The door to the Moon: fix panels, collect rocks.', 'Suit air is limited. You can skip this tonight.'],
+  'Airlock': ['The door to the Moon. Two doors keep the base air in.', 'Going out takes a few seconds and costs 1.5% Life Support.', 'Not allowed during a solar storm.'],
+  'Optional: practice a moonwalk': ['Try the airlock for real: out and back in.', 'It takes about a minute. You can skip it.'],
+  'Open the Airlock': ['Click the glowing Airlock label.'],
+  'Suit up': ['Press "Suit up and go outside".', 'When the outer door opens, walk out with WASD.'],
+  'You are on the Moon': ['Your suit air counts down on the meter.', 'Press "Back to the airlock" when ready.'],
   'You are ready': ['Survive until sunrise.', 'Turn on the antenna, and use the shelter in the storm.', 'Press F to speed up time.'],
 };
 
@@ -145,7 +151,8 @@ function buildSteps() {
     {
       title: 'Research points', target: '#rp-bar .rp-top', side: 'left', at: 'center', freeze: true,
       text: [
-        '<b>These points reward science.</b> On a moonwalk, each of the 3 glowing rock samples gives <b>+2</b>. At Comms, each data upload to Earth gives <b>+1</b>.',
+        '<b>These points reward science,</b> and this bar shows how close you are to your next unlock (saved points plus this mission).',
+        'On a moonwalk, each of the 3 glowing rock samples gives <b>+2</b>. At Comms, each data upload to Earth gives <b>+1</b>.',
         'You keep them after the mission and spend them in the Research Tree to unlock new missions.',
       ],
     },
@@ -154,21 +161,21 @@ function buildSteps() {
       text: [
         '<b>This bar shows the whole day.</b> The white marker is you, right now.',
         '<b>Yellow</b> is daylight, so the panels make power. <b>Blue</b> is night: no solar power, and the heaters switch on and use some battery.',
-        '<b>Red</b> marks are solar storms (they appear once you know one is coming). The <b>white dashes</b> show when Earth is below the horizon and you cannot talk to it.',
+        '<b>Red</b> marks are solar storms. They appear when Earth warns you, or when you ask Comms for a forecast. The <b>white dashes</b> show when Earth is below the horizon and you cannot talk to it.',
+      ],
+    },
+    {
+      title: 'Messages', target: '#feed', side: 'right', at: 'right', freeze: true,
+      text: [
+        '<b>Messages appear here</b> from the base computer and from Mission Control on Earth.',
+        'Mission Control\'s messages arrive about 1.3 seconds late, because radio takes that long to cross the distance. Watch for storm warnings.',
       ],
     },
     {
       title: 'Your missions box', target: '#mission-card', side: 'left', at: 'bottom', freeze: true,
       text: [
         '<b>This box tells you what to do next.</b> The blue hint changes as the situation changes.',
-        'Above it are two buttons. The <b>target</b> hides or shows this box. The <b>gear</b> pauses the game and opens the settings: game speed, sound and full screen. The <b>F</b> key fast-forwards time.',
-      ],
-    },
-    {
-      title: 'Research bar', target: '#rp-bar', side: 'above', at: 'right', freeze: true,
-      text: [
-        '<b>This bar shows your research points</b> (saved ones plus this mission) and how close you are to the next unlock.',
-        'It fills as you collect rock samples and send data.',
+        'Above it are two buttons. The <b>target</b> hides or shows this box. The <b>gear</b> pauses the game and opens the settings: game speed, sound, music and volume. The <b>F</b> key fast-forwards time. The square icon at the bottom right is <b>Fullscreen</b>.',
       ],
     },
     {
@@ -192,13 +199,51 @@ function buildSteps() {
     steps.push({ id: `explain-${id}`, title: ex.title, target: ex.target, side: ex.side, at: 'right', text: ex.text, stay: id });
   }
 
+  // Optional practice trip through the new airlock. Every step lets the player skip it.
+  const skipPractice = { label: 'Skip practice', to: 'ready' };
+  steps.push(
+    {
+      id: 'trip-offer', title: 'Optional: practice a moonwalk', at: 'center', freeze: true, alt: skipPractice, nextLabel: 'Let\'s try it',
+      text: [
+        'Want to try the airlock for real? It takes about a minute: go out, look around, and come back in.',
+        'Come back before your suit air runs low and nothing will go wrong. You can also skip this.',
+      ],
+    },
+    {
+      id: 'trip-open', title: 'Open the Airlock', target: { station: 'Airlock' }, side: 'above', at: 'right', alt: skipPractice,
+      hint: 'Click the Airlock label (or walk up and press E).',
+      text: ['Click the glowing <b>Airlock</b> label.'],
+      waitOpen: 'Airlock', noNext: true, closeStation: true,
+    },
+    {
+      id: 'trip-go', title: 'Suit up', target: '#station-body [data-act="outside"]', side: 'left', at: 'right', alt: skipPractice,
+      hint: 'Press "Suit up and go outside", then walk out when the outer door opens.',
+      text: [
+        'Press <b>Suit up and go outside</b>.',
+        'Watch the progress bar in the corner. The inner door closes, the air is pumped out, and then the outer door opens.',
+        '<b>When the outer door is open, walk out onto the Moon</b> with WASD.',
+      ],
+      until: sim => sim.where === 'outside', noNext: true,
+    },
+    {
+      id: 'trip-outside', title: 'You are on the Moon', target: '#back-in', side: 'above', at: 'right',
+      hint: 'Look around, then press "Back to the airlock".',
+      text: [
+        'You are outside! Your <b>suit air</b> now shows on the meter, and it counts down.',
+        'Look around, then press <b>Back to the airlock</b> when you are ready.',
+      ],
+      until: sim => sim.where !== 'outside' && sim.airlockStatus === 'pressurized', noNext: true,
+    },
+  );
+
   steps.push({
+    id: 'ready',
     title: 'You are ready', at: 'center', closeStation: true,
     hint: 'Make the battery last until sunrise. Press F to speed up time.',
     text: [
       '<b>That is every station.</b> Now you just have to survive the night.',
       '<b>Before sunset:</b> let the battery charge, and turn the Antenna on at Comms.',
-      '<b>Before sunset</b>, a <b>mild solar storm</b> will pass. With the Antenna on, Mission Control warns you early, so park the robot and go to the Storm Shelter. Without it, you only get a few seconds of warning.',
+      '<b>Before sunset</b>, a <b>solar storm</b> will pass, at a slightly different time each game. With the Antenna on, Mission Control warns you early, so park the robot and go to the Storm Shelter. Without it, you only get a few seconds of warning.',
       '<b>At night</b>, keep an eye on the battery. Eco saves power if it drains too fast.',
       'Press <b>F</b> to speed up time. Good luck, astronaut!',
     ],
@@ -236,7 +281,9 @@ export function createTour({ sim, game, hud }) {
     showMore = false;
     renderText(s);
     $('tour-next').hidden = !!s.noNext;
-    $('tour-next').textContent = s.last ? 'Start the night' : 'Next';
+    $('tour-next').textContent = s.last ? 'Start the night' : (s.nextLabel ?? 'Next');
+    $('tour-alt').hidden = !s.alt;
+    if (s.alt) $('tour-alt').textContent = s.alt.label;
     card.className = `panel at-${s.at ?? 'right'}`;
     if (s.closeStation) hud.close();
   }
@@ -295,6 +342,8 @@ export function createTour({ sim, game, hud }) {
   const skip = () => finish();
   $('tour-next').addEventListener('click', next);
   $('tour-skip').addEventListener('click', skip);
+  const alt = () => { const k = steps.findIndex(x => x.id === steps[i].alt?.to); if (k >= 0) enter(k); };
+  $('tour-alt').addEventListener('click', alt);
   const more = () => { showMore = !showMore; renderText(steps[i]); };
   $('tour-more').addEventListener('click', more);
 
@@ -308,6 +357,7 @@ export function createTour({ sim, game, hud }) {
       const s = steps[i];
       if (!s) return;
       if (s.waitOpen && hud.open === s.waitOpen) return next();
+      if (s.until?.(sim)) return next();
       if (s.stay && hud.open !== s.stay) return next(); // the player closed the station: move on
       place(s);
     },
@@ -318,6 +368,7 @@ export function createTour({ sim, game, hud }) {
       $('tour-next').removeEventListener('click', next);
       $('tour-skip').removeEventListener('click', skip);
       $('tour-more').removeEventListener('click', more);
+      $('tour-alt').removeEventListener('click', alt);
       root.hidden = true;
     },
   };
