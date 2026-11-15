@@ -73,113 +73,126 @@
 <main id="top">
 
 <section class="hero">
-  <!-- The view from Connecting Ridge: Earth low in the sky, the Habitat, a solar tower, the robot and you. -->
-  <svg class="scene" viewBox="0 0 1440 460" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">
-    <defs>
-      <linearGradient id="ground" gradientUnits="userSpaceOnUse" x1="0" y1="356" x2="0" y2="452">
-        <stop offset="0" stop-color="#17409F"/><stop offset="1" stop-color="#07173F"/>
-      </linearGradient>
-      <clipPath id="earth-clip"><circle cx="1180" cy="112" r="52"/></clipPath>
-      <clipPath id="hab-clip"><rect x="0" y="20" width="220" height="72" rx="36"/></clipPath>
-    </defs>
-    <g fill="#fff">
-      <circle cx="96" cy="62" r="1.4" opacity=".5"/><circle cx="212" cy="236" r="1.2" opacity=".4"/><circle cx="318" cy="38" r="2.2" fill="#2E96F5"/>
-      <circle cx="452" cy="268" r="1.4" opacity=".45"/><circle cx="566" cy="24" r="1.2" opacity=".5"/><circle cx="688" cy="92" r="2.4" fill="#EAFE07"/>
-      <circle cx="742" cy="214" r="1.4" opacity=".6"/><circle cx="806" cy="46" r="1.2" opacity=".6"/><circle cx="858" cy="152" r="2.2" fill="#2E96F5"/>
-      <circle cx="914" cy="258" r="1.2" opacity=".6"/><circle cx="962" cy="72" r="2.2" opacity=".9"/><circle cx="1018" cy="190" r="1.4" opacity=".7"/>
-      <circle cx="1052" cy="30" r="1.2" opacity=".6"/><circle cx="1096" cy="246" r="1.8" opacity=".8"/><circle cx="1122" cy="204" r="1.2" opacity=".6"/>
-      <circle cx="1268" cy="48" r="1.4" opacity=".7"/><circle cx="1296" cy="184" r="2.4" fill="#EAFE07"/><circle cx="1348" cy="104" r="1.2" opacity=".6"/>
-      <circle cx="1386" cy="232" r="1.6" opacity=".8"/><circle cx="1412" cy="36" r="1.8" opacity=".75"/><circle cx="1236" cy="226" r="1.2" opacity=".6"/>
-      <circle cx="632" cy="286" r="1.2" opacity=".45"/><circle cx="384" cy="150" r="1.2" opacity=".35"/><circle cx="1154" cy="20" r="1.2" opacity=".5"/>
-    </g>
-
-    <!-- Earth, with its night side on the lower left -->
-    <circle cx="1180" cy="112" r="52" fill="#0A3A8C"/>
-    <g clip-path="url(#earth-clip)">
-      <circle cx="1196" cy="104" r="52" fill="#2E96F5"/>
-      <path d="M1160 84c12-8 24-4 32 4s20 6 28 0 12-2 16 2v-34h-76z" fill="#0960E1"/>
-      <path d="M1170 150c12-8 22 0 32 0s18-8 30-6v26h-62z" fill="#0960E1"/>
-      <g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".9">
-        <path d="M1172 100h28"/><path d="M1186 126h32"/><path d="M1204 80h12"/>
-      </g>
-    </g>
-
-    <!-- The Sun, low on the horizon the way it is at the south pole -->
-    <g fill="none" stroke="#C9D8F2" stroke-width="2"><circle cx="470" cy="330" r="76" opacity=".3"/><circle cx="470" cy="330" r="108" opacity=".16"/></g>
-    <circle cx="470" cy="330" r="46" fill="#EAFE07"/>
-
-    <!-- Far ridge, lit along its top by the low Sun -->
-    <path d="M0 350C160 320 300 345 460 330S760 300 900 318s280-28 540-6v148H0z" fill="#1D4AB3"/>
-    <path d="M0 350C160 320 300 345 460 330S760 300 900 318s280-28 540-6" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".35"/>
-
-    <!-- Solar tower on the far ridge -->
-    <g transform="translate(1300 204)">
-      <path d="M-16 108h32l-10-12h-12z" fill="#8FA3C8"/>
-      <rect x="-3" y="0" width="6" height="98" fill="#C9D8F2"/>
-      <rect x="-30" y="-8" width="60" height="72" rx="4" fill="#0960E1" stroke="#2E96F5" stroke-width="2"/>
-      <path d="M-30 16h60M-30 40h60M-10-8v72M10-8v72" stroke="#2E96F5" stroke-width="1.5"/>
-    </g>
-
-    <!-- Near ground -->
-    <path d="M0 400C240 372 520 392 760 380s440-24 680 4v76H0z" fill="url(#ground)"/>
-    <path d="M0 400C240 372 520 392 760 380s440-24 680 4" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".5"/>
-    <g fill="#0E2C7A">
-      <ellipse cx="300" cy="418" rx="44" ry="7"/><ellipse cx="640" cy="406" rx="26" ry="4"/><ellipse cx="1376" cy="412" rx="34" ry="5"/><ellipse cx="96" cy="432" rx="20" ry="3"/>
-    </g>
-    <g fill="none" stroke="#C9D8F2" stroke-width="1.5" stroke-linecap="round" opacity=".4">
-      <path d="M258 416c10-6 74-6 84 0"/><path d="M615 405c6-4 44-4 50 0"/><path d="M1343 411c8-5 58-5 66 0"/>
-    </g>
-
-    <!-- The Habitat -->
-    <g transform="translate(948 276)">
-      <ellipse cx="96" cy="106" rx="150" ry="7" fill="#07173F" opacity=".55"/>
-      <path d="M34 88h12v16H34zM174 88h12v16h-12zM100 88h12v16h-12z" fill="#8FA3C8"/>
-      <path d="M110 20V2" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
-      <path d="M98 0a12 12 0 0 0 24 0z" fill="#C9D8F2"/>
-      <g clip-path="url(#hab-clip)">
-        <rect x="0" y="20" width="220" height="72" fill="#F2F6FC"/>
-        <rect x="0" y="64" width="220" height="28" fill="#C9D8F2"/>
-        <rect x="40" y="20" width="16" height="72" fill="#0960E1"/>
-        <rect x="60" y="20" width="6" height="72" fill="#E43700"/>
-        <rect x="170" y="20" width="16" height="72" fill="#0960E1"/>
-      </g>
-      <circle cx="90" cy="48" r="9" fill="#EAFE07" stroke="#0042A6" stroke-width="3"/>
-      <circle cx="118" cy="48" r="9" fill="#07173F" stroke="#0042A6" stroke-width="3"/>
-      <circle cx="146" cy="48" r="9" fill="#07173F" stroke="#0042A6" stroke-width="3"/>
-      <path d="M222 72h14v10h14v10h14v12h-42z" fill="#8FA3C8"/>
-      <path d="M222 56h8l34 26v10" fill="none" stroke="#EAFE07" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </g>
-
-    <!-- The robot, on its way back with moon dirt -->
-    <path d="M1290 416c50 4 100-2 150 4" fill="none" stroke="#C9D8F2" stroke-width="2" stroke-dasharray="2 10" stroke-linecap="round" opacity=".5"/>
-    <g transform="translate(1228 388)">
-      <ellipse cx="24" cy="30" rx="40" ry="4" fill="#07173F" opacity=".55"/>
-      <path d="M36 8V-14" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
-      <rect x="28" y="-24" width="20" height="12" rx="4" fill="#F2F6FC"/><circle cx="42" cy="-18" r="3" fill="#0960E1"/>
-      <rect x="0" y="6" width="50" height="14" rx="5" fill="#F2F6FC"/><rect x="4" y="-2" width="20" height="8" rx="2" fill="#8FA3C8"/>
-      <g fill="#07173F" stroke="#C9D8F2" stroke-width="2.5"><circle cx="6" cy="24" r="6"/><circle cx="25" cy="24" r="6"/><circle cx="44" cy="24" r="6"/></g>
-    </g>
-
-    <!-- You, in the game's own suit: white with a red visor -->
-    <g transform="translate(832 320)">
-      <ellipse cx="14" cy="86" rx="46" ry="5" fill="#07173F" opacity=".55"/>
-      <path d="M64 84V6" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
-      <path d="M66 8h30l-9 11 9 11H66z" fill="#EAFE07"/>
-      <rect x="-10" y="26" width="14" height="34" rx="6" fill="#8FA3C8"/>
-      <rect x="4" y="66" width="13" height="20" rx="6" fill="#C9D8F2"/><rect x="23" y="66" width="13" height="20" rx="6" fill="#C9D8F2"/>
-      <path d="M36 44l22-14" stroke="#F2F6FC" stroke-width="10" stroke-linecap="round"/>
-      <rect x="0" y="12" width="40" height="62" rx="20" fill="#F2F6FC"/>
-      <rect x="7" y="24" width="30" height="15" rx="7.5" fill="#E43700"/>
-      <path d="M13 30h8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
-      <rect x="12" y="48" width="14" height="9" rx="2" fill="#0960E1"/>
-    </g>
-  </svg>
-
   <div class="wrap wide">
-    <!-- The game. Before it starts this is its title screen; it loads into the frame when you press Play, and the whole box can go full screen. -->
+    <!-- The title band. The logo stands in open sky on the left; the base stands on the ridge to the right,
+         with the Sun and Earth low on the horizon the way they are at the south pole. The game's frame is
+         set into the ground just below, so nothing here covers it. -->
+    <div class="marquee">
+      <svg class="scene" viewBox="0 180 1440 232" aria-hidden="true">
+        <defs>
+          <linearGradient id="ground" gradientUnits="userSpaceOnUse" x1="0" y1="356" x2="0" y2="452">
+            <stop offset="0" stop-color="#17409F"/><stop offset="1" stop-color="#07173F"/>
+          </linearGradient>
+          <clipPath id="earth-clip"><circle cx="1180" cy="112" r="52"/></clipPath>
+          <clipPath id="hab-clip"><rect x="0" y="20" width="220" height="72" rx="36"/></clipPath>
+        </defs>
+        <g fill="#fff">
+          <circle cx="-420" cy="286" r="1.4" opacity=".6"/><circle cx="-330" cy="352" r="1.2" opacity=".5"/><circle cx="-236" cy="270" r="2.2" fill="#2E96F5"/>
+          <circle cx="-150" cy="330" r="1.2" opacity=".6"/><circle cx="-64" cy="282" r="1.6" opacity=".7"/><circle cx="34" cy="344" r="1.2" opacity=".5"/>
+          <circle cx="702" cy="268" r="1.2" opacity=".6"/><circle cx="792" cy="290" r="2.2" fill="#2E96F5"/><circle cx="880" cy="264" r="1.4" opacity=".7"/>
+          <circle cx="942" cy="300" r="1.2" opacity=".6"/><circle cx="986" cy="270" r="2.2" opacity=".9"/><circle cx="1104" cy="262" r="1.2" opacity=".6"/>
+          <circle cx="1150" cy="284" r="1.4" opacity=".7"/><circle cx="1196" cy="262" r="2.4" fill="#EAFE07"/><circle cx="1290" cy="268" r="1.2" opacity=".6"/>
+          <circle cx="1400" cy="276" r="1.6" opacity=".8"/><circle cx="1424" cy="318" r="1.2" opacity=".6"/><circle cx="1500" cy="290" r="1.8" opacity=".75"/>
+          <circle cx="1580" cy="336" r="1.2" opacity=".6"/><circle cx="1660" cy="272" r="2.4" fill="#EAFE07"/><circle cx="1750" cy="320" r="1.4" opacity=".6"/>
+        </g>
+
+        <!-- Earth, low over the ridge, with its night side on the lower left -->
+        <g transform="translate(1330 306) scale(.88) translate(-1180 -112)">
+          <circle cx="1180" cy="112" r="52" fill="#0A3A8C"/>
+          <g clip-path="url(#earth-clip)">
+            <circle cx="1196" cy="104" r="52" fill="#2E96F5"/>
+            <path d="M1160 84c12-8 24-4 32 4s20 6 28 0 12-2 16 2v-34h-76z" fill="#0960E1"/>
+            <path d="M1170 150c12-8 22 0 32 0s18-8 30-6v26h-62z" fill="#0960E1"/>
+            <g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".9">
+              <path d="M1172 100h28"/><path d="M1186 126h32"/><path d="M1204 80h12"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- The Sun, coming up behind the ridge -->
+        <g fill="none" stroke="#C9D8F2" stroke-width="2"><circle cx="740" cy="348" r="72" opacity=".3"/><circle cx="740" cy="348" r="96" opacity=".16"/></g>
+        <circle cx="740" cy="348" r="46" fill="#EAFE07"/>
+
+        <!-- Far ridge, lit along its top by the low Sun. It stays low on the left so the logo has open sky. -->
+        <path d="M-1600 398C-800 396 300 404 520 392S720 322 900 318s360-18 540 30S2200 380 3040 370V4000H-1600z" fill="#1D4AB3"/>
+        <path d="M-1600 398C-800 396 300 404 520 392S720 322 900 318s360-18 540 30S2200 380 3040 370" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".35"/>
+
+        <!-- Near ground. It runs on down behind the game's frame. -->
+        <path d="M-1600 396C-1000 380-240 428 0 400C240 372 520 392 760 380s440-24 680 4S2400 380 3040 400V4000H-1600z" fill="url(#ground)"/>
+        <path d="M-1600 396C-1000 380-240 428 0 400C240 372 520 392 760 380s440-24 680 4S2400 380 3040 400" fill="none" stroke="#C9D8F2" stroke-width="2" opacity=".5"/>
+        <g fill="#0E2C7A">
+          <ellipse cx="-190" cy="405" rx="30" ry="4"/><ellipse cx="640" cy="402" rx="26" ry="4"/><ellipse cx="1580" cy="405" rx="34" ry="4"/>
+        </g>
+        <g fill="none" stroke="#C9D8F2" stroke-width="1.5" stroke-linecap="round" opacity=".4">
+          <path d="M-218 404c8-4 48-4 56 0"/><path d="M615 401c6-4 44-4 50 0"/><path d="M1548 404c8-4 56-4 64 0"/>
+        </g>
+
+        <!-- Solar tower -->
+        <g transform="translate(1244 280) scale(.85)">
+          <path d="M-16 108h32l-10-12h-12z" fill="#8FA3C8"/>
+          <rect x="-3" y="0" width="6" height="98" fill="#C9D8F2"/>
+          <rect x="-30" y="-8" width="60" height="72" rx="4" fill="#0960E1" stroke="#2E96F5" stroke-width="2"/>
+          <path d="M-30 16h60M-30 40h60M-10-8v72M10-8v72" stroke="#2E96F5" stroke-width="1.5"/>
+        </g>
+
+        <!-- The Habitat -->
+        <g transform="translate(948 276)">
+          <ellipse cx="96" cy="106" rx="150" ry="7" fill="#07173F" opacity=".55"/>
+          <path d="M34 88h12v16H34zM174 88h12v16h-12zM100 88h12v16h-12z" fill="#8FA3C8"/>
+          <path d="M110 20V2" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
+          <path d="M98 0a12 12 0 0 0 24 0z" fill="#C9D8F2"/>
+          <g clip-path="url(#hab-clip)">
+            <rect x="0" y="20" width="220" height="72" fill="#F2F6FC"/>
+            <rect x="0" y="64" width="220" height="28" fill="#C9D8F2"/>
+            <rect x="40" y="20" width="16" height="72" fill="#0960E1"/>
+            <rect x="60" y="20" width="6" height="72" fill="#E43700"/>
+            <rect x="170" y="20" width="16" height="72" fill="#0960E1"/>
+          </g>
+          <circle cx="90" cy="48" r="9" fill="#EAFE07" stroke="#0042A6" stroke-width="3"/>
+          <circle cx="118" cy="48" r="9" fill="#07173F" stroke="#0042A6" stroke-width="3"/>
+          <circle cx="146" cy="48" r="9" fill="#07173F" stroke="#0042A6" stroke-width="3"/>
+          <path d="M222 72h14v10h14v10h14v12h-42z" fill="#8FA3C8"/>
+          <path d="M222 56h8l34 26v10" fill="none" stroke="#EAFE07" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+
+        <!-- The robot, on its way back with moon dirt -->
+        <path d="M1410 407c40 3 90-2 140 2" fill="none" stroke="#C9D8F2" stroke-width="2" stroke-dasharray="2 10" stroke-linecap="round" opacity=".5"/>
+        <g transform="translate(1344 378)">
+          <ellipse cx="24" cy="30" rx="40" ry="4" fill="#07173F" opacity=".55"/>
+          <path d="M36 8V-14" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
+          <rect x="28" y="-24" width="20" height="12" rx="4" fill="#F2F6FC"/><circle cx="42" cy="-18" r="3" fill="#0960E1"/>
+          <rect x="0" y="6" width="50" height="14" rx="5" fill="#F2F6FC"/><rect x="4" y="-2" width="20" height="8" rx="2" fill="#8FA3C8"/>
+          <g fill="#07173F" stroke="#C9D8F2" stroke-width="2.5"><circle cx="6" cy="24" r="6"/><circle cx="25" cy="24" r="6"/><circle cx="44" cy="24" r="6"/></g>
+        </g>
+
+        <!-- You, in the game's own suit: white with a red visor -->
+        <g transform="translate(832 320)">
+          <ellipse cx="14" cy="86" rx="46" ry="5" fill="#07173F" opacity=".55"/>
+          <path d="M64 84V6" stroke="#C9D8F2" stroke-width="3" stroke-linecap="round"/>
+          <path d="M66 8h30l-9 11 9 11H66z" fill="#EAFE07"/>
+          <rect x="-10" y="26" width="14" height="34" rx="6" fill="#8FA3C8"/>
+          <rect x="4" y="66" width="13" height="20" rx="6" fill="#C9D8F2"/><rect x="23" y="66" width="13" height="20" rx="6" fill="#C9D8F2"/>
+          <path d="M36 44l22-14" stroke="#F2F6FC" stroke-width="10" stroke-linecap="round"/>
+          <rect x="0" y="12" width="40" height="62" rx="20" fill="#F2F6FC"/>
+          <rect x="7" y="24" width="30" height="15" rx="7.5" fill="#E43700"/>
+          <path d="M13 30h8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+          <rect x="12" y="48" width="14" height="9" rx="2" fill="#0960E1"/>
+        </g>
+      </svg>
+
+      <div class="title-card">
+        <svg class="logo-mark" viewBox="0 0 96 96" aria-hidden="true"><use href="#logo"/></svg>
+        <div>
+          <h1 class="logo">Moon Base <span>Trainer</span></h1>
+          <p class="kicker">Made for the NASA Space Apps Challenge 2026</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- The game. It is in the frame as soon as the page opens, on its own start screen, and the whole box can go full screen. -->
     <div id="play" class="stage" tabindex="-1">
       <div class="stage-bar">
-        <p class="stage-name"><span class="dot" aria-hidden="true"></span><span id="stage-status">Ready to play</span></p>
+        <p class="stage-name"><span class="dot" aria-hidden="true"></span><span id="stage-status" role="status">Loading the game…</span></p>
         <div class="stage-tools">
           <a class="tool" href="play/" target="_blank" rel="noopener" title="Open the game in its own tab">
             <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-out"/></svg>
@@ -192,30 +205,13 @@
         </div>
       </div>
       <div class="stage-body">
-        <div id="poster" class="poster">
-          <div class="title-card">
-            <p class="kicker">Made for the NASA Space Apps Challenge 2026</p>
-            <h1 class="logo">
-              <svg class="logo-mark" viewBox="0 0 96 96" aria-hidden="true"><use href="#logo"/></svg>
-              <span>Moon Base <span>Trainer</span></span>
-            </h1>
-            <p class="lede">Run your own moon base at the real lunar south pole. Share your power, watch your air and hide from solar storms.</p>
-            <div class="hero-go">
-              <button class="btn primary big" data-do="play">
-                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-play"/></svg>
-                Play now
-              </button>
-              <button class="btn big" data-do="fullscreen">
-                <svg class="ico" width="16" height="16" aria-hidden="true"><use href="#i-max"/></svg>
-                Play full screen
-              </button>
-            </div>
-            <ul class="facts"><li>For ages 7 to 12</li><li>About 5 minutes a mission</li><li>No download, no account</li></ul>
-            <p class="fine">Works best with a keyboard and mouse. On a slow computer, <button class="link" data-do="low">start with simple graphics</button>. This browser saves your progress.</p>
-          </div>
-        </div>
-        <iframe id="game" title="Moon Base Trainer game" data-src="play/" allow="fullscreen" allowfullscreen hidden></iframe>
+        <iframe id="game" title="Moon Base Trainer game" src="play/" data-src="play/" allow="fullscreen" allowfullscreen></iframe>
       </div>
+    </div>
+
+    <div class="under">
+      <ul class="facts"><li>For ages 7 to 12</li><li>About 5 minutes a mission</li><li>No download, no account</li></ul>
+      <p class="fine">Works best with a keyboard and mouse. On a slow computer, <button class="link" id="low" data-do="low">restart with simple graphics</button>. This browser saves your progress.</p>
     </div>
   </div>
 </section>

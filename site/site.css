@@ -1,6 +1,6 @@
 /* NASA Space Apps brand (docs/space-apps-style-spec.md): blues lead, Neon Yellow only on links,
    buttons and highlights, body text only on Deep Blue or Electric Blue. Matches game/src/ui.css.
-   Loosened for kids: the top of the page is the game's own title screen on a drawn moonscape, and
+   Loosened for kids: the game is on the page from the start, under a drawn moonscape with its logo, and
    colour comes from things that mean something (the Sun, the three meters, the mission patches).
    Spacing is on a 4px grid. */
 :root {
@@ -13,7 +13,10 @@
   --head: "Fira Sans", system-ui, sans-serif;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --bar: 60px;
-  --stage-h: clamp(560px, calc(100vh - 156px), 860px);
+  /* The frame is as tall as the window allows once the header and the title band are counted. */
+  --stage-h: clamp(520px, calc(100vh - 240px), 820px);
+  /* The drawn scene shrinks on narrower windows so the base never runs into the logo. */
+  --scene-w: clamp(700px, calc(190vw - 925px), 1440px);
 }
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-padding-top: calc(var(--bar) + 16px); }
@@ -47,7 +50,6 @@ h3 { font-weight: 700; font-size: 1.25rem; }
 .btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--deep); }
 .btn.primary:hover { background: #fff; border-color: #fff; }
 .btn.small { font-size: .95rem; padding: 0 16px; height: 40px; }
-.btn.big { font-size: 1.2rem; height: 56px; padding: 0 32px; }
 /* Round colour chips behind icons. The colour says which thing it is: yellow power, blue air, red radiation. */
 .chip { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--deep); color: var(--text); flex: none; }
 .chip.power { background: var(--yellow); color: var(--deep); }
@@ -64,19 +66,27 @@ h3 { font-weight: 700; font-size: 1.25rem; }
 .site-head nav a { color: var(--soft); text-decoration: none; font-size: .95rem; transition: color .15s var(--ease); }
 .site-head nav a:hover { color: var(--text); }
 
-/* Hero: the whole first screen is the game's title screen. The logo and Play buttons sit in open sky on
-   the left and the scene stands on the ground to the right. Pressing Play swaps the title for the game,
-   in a frame that stays parked on the same ground. */
-.hero { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%); padding: 24px 0 48px; }
-.hero .wrap { position: relative; }
+/* Hero: the game is in its frame as soon as the page opens. Above it is a short title band: the logo in
+   open sky on the left, the base on the ridge to the right. The ground runs on down behind the frame,
+   so the game looks set into the Moon and the drawing never covers it. */
+.hero { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%); padding: 16px 0 40px; }
 .wrap.wide { max-width: 1360px; }
-.scene { position: absolute; right: 0; bottom: 0; width: max(100%, 1440px); height: 460px; pointer-events: none; }
+.marquee { position: relative; display: flex; align-items: flex-end; min-height: 144px; padding-bottom: 28px; }
+.scene { position: absolute; right: -24px; bottom: 0; width: var(--scene-w); height: calc(var(--scene-w) * 232 / 1440); overflow: visible; pointer-events: none; }
+.title-card { --logo: clamp(2rem, 4vw, 2.75rem); position: relative; display: flex; align-items: center; gap: 16px; }
+.logo { font-size: var(--logo); }
+.logo span { display: block; }
+.logo-mark { flex: none; width: calc(var(--logo) * 2.4); height: calc(var(--logo) * 2.4); }
+.kicker { font-size: .9rem; color: var(--soft); margin-top: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .title-card > * { animation: rise .45s var(--ease) backwards; }
+  .title-card > :nth-child(2) { animation-delay: 60ms; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 
-.stage { border: 1px solid transparent; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
-.stage.is-live { background: var(--deep); border-color: var(--yonder); }
+.stage { position: relative; z-index: 1; background: var(--deep); border: 1px solid var(--yonder); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
 .stage:focus { outline: none; }
-.stage-bar { flex: none; height: 48px; display: none; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); }
-.stage.is-live .stage-bar { display: flex; }
+.stage-bar { flex: none; height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); }
 .stage-name { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); flex: none; }
 .stage-tools { display: flex; gap: 4px; }
@@ -87,37 +97,21 @@ h3 { font-weight: 700; font-size: 1.25rem; }
 }
 .tool:hover { background: var(--raised); }
 .tool[aria-pressed="true"] { background: var(--yellow); color: var(--deep); font-weight: 700; }
-.stage-body { position: relative; flex: 1 1 auto; min-height: var(--stage-h); }
-.stage.is-live .stage-body { height: calc(var(--stage-h) - 48px); min-height: 0; }
+.stage-body { position: relative; flex: 1 1 auto; height: calc(var(--stage-h) - 48px); min-height: 0; }
 .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--deep); }
 
-/* The title screen */
-.poster { min-height: var(--stage-h); display: flex; align-items: center; padding: 24px 32px 128px; }
-.title-card { max-width: 620px; }
-.kicker { font-size: .95rem; color: var(--soft); margin-bottom: 20px; }
-.logo { display: flex; align-items: center; gap: 20px; }
-.logo-mark { flex: none; width: 2.3em; height: 2.3em; }
-.logo span span { display: block; }
-.lede { font-size: 1.25rem; margin-top: 24px; max-width: 30em; }
-.hero-go { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 32px; }
-.facts { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; font-size: .95rem; margin: 24px 0 8px; }
+/* Under the frame: who the game is for, and the small print. */
+.under { position: relative; z-index: 1; display: grid; gap: 8px; margin-top: 16px; }
+.facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; font-size: .95rem; }
 .facts li + li { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--line); }
-@media (prefers-reduced-motion: no-preference) {
-  .title-card > * { animation: rise .45s var(--ease) backwards; }
-  .title-card > :nth-child(2) { animation-delay: 50ms; }
-  .title-card > :nth-child(3) { animation-delay: 100ms; }
-  .title-card > :nth-child(4) { animation-delay: 150ms; }
-  .title-card > :nth-child(n+5) { animation-delay: 200ms; }
-}
-@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 
 /* Full screen: the bar stays as a thin strip so there is always a visible way out. */
-.stage:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; background: var(--deep); }
+.stage:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
 .stage:fullscreen .stage-body { height: auto; }
-.stage:-webkit-full-screen { width: 100vw; height: 100vh; border: 0; border-radius: 0; background: var(--deep); }
+.stage:-webkit-full-screen { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
 .stage:-webkit-full-screen .stage-body { height: auto; }
 /* Fallback for browsers with no full-screen support (iPhone): fill the window instead. */
-.stage.is-max { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; height: 100dvh; background: var(--deep); }
+.stage.is-max { position: fixed; inset: 0; z-index: 50; border: 0; border-radius: 0; height: 100dvh; }
 .stage.is-max .stage-body { height: auto; }
 html.no-scroll { overflow: hidden; }
 
@@ -198,39 +192,31 @@ kbd { font: 400 .8rem "Fira Code", monospace; color: var(--text); background: va
 .site-foot { position: relative; margin-top: 48px; background: var(--ridge); padding: 24px 0 40px; font-size: .9rem; color: var(--soft); }
 .site-foot .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
 
-/* Between phone and desktop the scene sits closer, so the copy column narrows to stay in open sky. */
-@media (max-width: 1100px) {
-  .title-card { max-width: 480px; }
-  .facts { display: grid; }
-  .facts li + li { margin-left: 0; padding-left: 0; border-left: 0; }
-}
 @media (max-width: 860px) {
   .site-head nav { display: none; }
   .site-head .wrap { justify-content: space-between; gap: 12px; }
   .two-col, .split { grid-template-columns: 1fr; gap: 32px; }
-  :root { --stage-h: clamp(520px, calc(100vh - 124px), 720px); }
+  /* On a phone the logo goes on top and the scene gets a strip of its own between it and the game. */
+  :root { --stage-h: clamp(520px, calc(100vh - 124px), 720px); --scene-w: max(100vw, 640px); }
+  .hero { padding: 12px 0 32px; }
+  .marquee { min-height: 0; padding-bottom: calc(var(--scene-w) * .1 + 12px); }
+  .title-card { gap: 12px; }
   .missions { grid-template-columns: 1fr; gap: 16px; }
   .m-art { padding: 16px 24px; }
   .patch { width: 80px; height: 80px; }
   .shots { grid-template-columns: 1fr; }
-  .hero { padding: 16px 0 32px; }
-  .scene { width: max(100%, 878px); height: 280px; }
-  .poster { align-items: flex-start; padding: 16px 8px 248px; }
-  .title-card { max-width: none; }
-  .logo { gap: 12px; }
   .band { padding: 56px 0; }
   .gap { margin-top: 56px; }
 }
 @media (max-width: 520px) {
   body { font-size: 16px; }
   .wrap { padding: 0 16px; }
+  .scene { right: -16px; }
   .tool-label { display: none; }
   .site-head .btn .ico { display: none; }
   .facts { display: grid; }
   .facts li + li { margin-left: 0; padding-left: 0; border-left: 0; }
   .tool { padding: 0 8px; }
-  .hero-go .btn { flex: 1 1 100%; }
-  .poster { padding-left: 0; padding-right: 0; }
 }
 @media (max-width: 400px) {
   .brand-mark { display: none; }
