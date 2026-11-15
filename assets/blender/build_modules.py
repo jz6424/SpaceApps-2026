@@ -90,6 +90,20 @@ def lathe(name, profile, mat, pos, direction=(0, 0, 1), sides=14):
     return add(name, bm, mat, axis_matrix(pos, direction))
 
 
+def ring(name, profile, mat, pos, direction=(0, 0, 1), sides=14):
+    """Like lathe, but the profile is a closed loop and there are no end caps: a ring or band
+    (lathe would close each end with a flat disc)."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x, r * math.cos(2 * math.pi * (i + .5) / sides),
+                            r * math.sin(2 * math.pi * (i + .5) / sides))) for i in range(sides)]
+             for x, r in profile]
+    for a, b in zip(rings, rings[1:] + rings[:1]):
+        for i in range(sides):
+            bm.faces.new((a[i], b[i], b[(i + 1) % sides], a[(i + 1) % sides]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return add(name, bm, mat, axis_matrix(pos, direction))
+
+
 def box(name, size, pos, mat, bevel=0.05, rot=(0, 0, 0)):
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1, matrix=Matrix.Diagonal((*size, 1)))
@@ -368,15 +382,54 @@ def Antenna():
     box("PackLight", (.03, .25, .14), (-.03, 0, 2.5), "Green", .01)
     lathe("Beacon", [(0, 0), (0, .15), (.2, .15), (.3, .08), (.3, 0)], "Red", (-.5, 0, 2.95), sides=8)
     lathe("Pivot", [(-.35, 0), (-.35, .3), (.35, .3), (.35, 0)], "Dark", (0, 0, 4.85), (0, 1, 0), 10)
-    # Dish, tilted low and pointing +X, with a yellow feed arm and gold receiver.
+    # Dish, tilted low and pointing +X: a real bowl (hollow at the front), its face in rings of
+    # panels (grey centre plate, blue panels, white outer band) with eight ribs across it, a raised
+    # rim, a frame of struts behind, and a yellow feed arm holding a gold receiver and a small
+    # white sub-reflector at the focus. Chunky, in the base's style, not every bolt.
     d = Vector((1, 0, .32)).normalized()
     p = Vector((.1, 0, 5))
-    lathe("Dish", [(0, 0), (0, .55), (.25, 1.2), (.55, 1.8), (.75, 2.15), (.8, 0)], "White", p, d, 18)
-    lathe("DishInner", [(.72, 0), (.72, 1.95), (.82, 1.98), (.82, 0)], "Sky", p, d, 18)
+    u = Vector((0, 1, 0))
+    v = d.cross(u)
+    face = [(0, .28), (.4, .3), (1.0, .42), (1.6, .62), (2.05, .82)]   # (radius, depth) of the bowl's front
+
+    def depth(r):
+        for (r0, a0), (r1, a1) in zip(face, face[1:]):
+            if r <= r1:
+                return a0 + (a1 - a0) * (r - r0) / (r1 - r0)
+        return face[-1][1]
+
+    def on_face(r, ang, lift=.03):   # a point just in front of the bowl's face
+        return p + d * (depth(r) + lift) + (u * math.cos(ang) + v * math.sin(ang)) * r
+
+    lathe("Dish", [(0, 0), (0, .55), (.25, 1.2), (.55, 1.8), (.75, 2.15), (.86, 2.2)]
+          + [(a, r) for r, a in reversed(face)], "White", p, d, 24)
+
+    def band(name, r0, r1, mat, steps=6):   # a thin ring of panel lying on the bowl's face
+        rs = [r0 + (r1 - r0) * k / steps for k in range(steps + 1)]
+        ring(name, [(depth(r) + .015, r) for r in rs] + [(depth(r) + .045, r) for r in reversed(rs)], mat, p, d, 24)
+
+    band("DishHub", .05, .62, "Grey", 3)
+    band("DishPanels", .66, 1.72, "Sky")
+    band("DishSeam", .62, .66, "Dark", 1)
+    band("DishSeam", 1.72, 1.77, "Dark", 1)
+    for k in range(8):
+        ang = k * math.pi / 4
+        strut("DishRib", on_face(.6, ang, .05), on_face(2.04, ang, .05), .035, "Grey", 5)
+    ring("DishRim", [(.8, 2.1), (.8, 2.3), (.93, 2.3), (.93, 2.1)], "Grey", p, d, 24)
+    # The frame behind: struts from a hub behind the pivot out to the back of the rim, clear of
+    # the bowl so they show.
+    lathe("DishBackHub", [(-.42, 0), (-.42, .32), (-.1, .32), (-.1, 0)], "Grey", p, d, 10)
+    for k in range(6):
+        ang = k * math.pi / 3 + math.pi / 6
+        out = u * math.cos(ang) + v * math.sin(ang)
+        strut("DishFrame", p - d * .3 + out * .28, p + d * .5 + out * 1.98, .05, "Grey", 6)
     for a in (90, 210, 330):
         o = Vector((0, math.cos(math.radians(a)), math.sin(math.radians(a)))) * 1.7
         strut("FeedArm", p + d * .7 + o, p + d * 2.1, .04, "Yellow", 6)
     lathe("Receiver", [(0, 0), (0, .22), (.3, .22), (.45, 0)], "Gold", p + d * 2, d, 10)
+    lathe("SubReflector", [(0, 0), (0, .36), (.08, .36), (.14, 0)], "White", p + d * 2.45, -d, 14)
+    # A cable from the equipment pack up the mast to the dish.
+    strut("Cable", (-.08, -.18, 2.95), (-.08, -.18, 4.75), .04, "Dark", 6)
     col("Base", -.75, .75, -.75, .75, 0, 3.4)
     col("Mast", -.3, .3, -.3, .3, 3.4, 5.2)
     col("Dish", .1, 1.2, -2.1, 2.1, 3, 7)
