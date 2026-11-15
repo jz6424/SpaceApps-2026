@@ -248,9 +248,12 @@ export function createMoonMenu(canvas, missions, onPick) {
     }
   }
 
+  // One loop at a time: stop() cancels the frame already queued, so a quick stop and start (Esc
+  // during a screen move) can't leave an old loop drawing alongside the new one.
+  let rafId = 0;
   function frame(now) {
     if (!running) return;
-    requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000 || 0);
     last = now;
     const ease = still ? 1 : 1 - Math.exp(-dt * 4.5);
@@ -357,8 +360,8 @@ export function createMoonMenu(canvas, missions, onPick) {
 
   paint();
   return {
-    start() { if (running) return; running = true; diving = 0; diveDone = null; fit(); last = performance.now(); requestAnimationFrame(frame); },
-    stop() { running = false; },
+    start() { if (running) return; running = true; diving = 0; diveDone = null; fit(); last = performance.now(); cancelAnimationFrame(rafId); rafId = requestAnimationFrame(frame); },
+    stop() { running = false; cancelAnimationFrame(rafId); },
     // Which flag to face and move in on. null lets the Moon turn freely again.
     pick(id) { picked = id && flags[id] ? id : null; diving = 0; paint(); },
     setLocked(ids) { locked = new Set(ids); paint(); },

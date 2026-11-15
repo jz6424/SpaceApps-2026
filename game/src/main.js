@@ -116,6 +116,18 @@ Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, n
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
+// The shadow camera's own sideways and up directions (as lookAt builds them), and the size of one
+// shadow-map pixel in metres, for snapToShadowTexel().
+const SHADOW_X = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), SUN_DIR).normalize();
+const SHADOW_Y = new THREE.Vector3().crossVectors(SUN_DIR, SHADOW_X);
+const SHADOW_TEXEL = (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x;
+const sunAt = new THREE.Vector3();
+function snapToShadowTexel(p, out) {
+  const snap = v => Math.round(v / SHADOW_TEXEL) * SHADOW_TEXEL;
+  return out.copy(SHADOW_X).multiplyScalar(snap(p.dot(SHADOW_X)))
+    .addScaledVector(SHADOW_Y, snap(p.dot(SHADOW_Y)))
+    .addScaledVector(SUN_DIR, p.dot(SUN_DIR));
+}
 
 const starPos = [];
 for (let i = 0; i < 3000; i++) {
@@ -284,7 +296,9 @@ const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roug
 // larger and offset, so the 64 m repeat doesn't show as a pattern from far away.
 terrainMat.onBeforeCompile = shader => {
   shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-    diffuseColor.rgb *= (0.6 + 0.8 * texture2D(normalMap, vNormalMapUv).a) * (0.85 + 0.3 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);`);
+    #ifdef USE_NORMALMAP
+    diffuseColor.rgb *= (0.6 + 0.8 * texture2D(normalMap, vNormalMapUv).a) * (0.85 + 0.3 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);
+    #endif`);
 };
 const terrain = new THREE.Mesh(terrainGeo, terrainMat);
 terrain.receiveShadow = true;
@@ -424,8 +438,12 @@ function placeCallouts() {
     // Steadily clearer with every step closer: a straight line from gone (at far) to full (at near).
     const fade = 1 - (1 - c.faint) * THREE.MathUtils.clamp((away - c.near) / (c.far - c.near), 0, 1);
     const size = THREE.MathUtils.clamp(9 / camera.position.distanceTo(c.position), 0.78, 1.08) * (1 + 0.12 * c.on);
-    c.el.style.opacity = Math.max(fade, c.on).toFixed(2);
-    c.el.style.transform = `translate(${((toScreen.x + 1) / 2 * w).toFixed(1)}px, ${((1 - toScreen.y) / 2 * h).toFixed(1)}px) scale(${size.toFixed(3)})`;
+    // Only touch the page when a label really moved or faded: writing the same style every frame
+    // still costs the browser a style recalculation for each label.
+    const opacity = Math.max(fade, c.on).toFixed(2);
+    const move = `translate(${((toScreen.x + 1) / 2 * w).toFixed(1)}px, ${((1 - toScreen.y) / 2 * h).toFixed(1)}px) scale(${size.toFixed(3)})`;
+    if (opacity !== c.opacity) { c.el.style.opacity = opacity; c.opacity = opacity; }
+    if (move !== c.move) { c.el.style.transform = move; c.move = move; }
     if (c.fadeOut !== (fade < 0.05 && c.on < 0.05)) { c.fadeOut = !c.fadeOut; c.el.classList.toggle('gone', c.fadeOut); } // nothing to click when faded out
   }
 }
@@ -609,7 +627,7 @@ function scatterSamples(rnd = Math.random) {
       const dist = lo + rnd() * (hi - lo);
       const x = site.x + Math.cos(angle) * dist, z = site.z + Math.sin(angle) * dist;
       if (gapTo(hullBox, x, z) < 6 || navBoxes.some(b => gapTo(b, x, z) < 2.5)) continue;
-      if (Math.hypot(x - digSpot.x, z - digSpot.z) < 5 || placed.some(p => Math.hypot(p.x - x, p.z - z) < 8)) continue;
+      if (Math.hypot(x - digSpot.x, z - digSpot.z) < 5 || Math.hypot(x - dock.x, z - dock.z) < 4 || placed.some(p => Math.hypot(p.x - x, p.z - z) < 8)) continue; // not where the robot digs or parks
       spot = new THREE.Vector3(x, groundAt(x, z), z);
     }
     spot ??= s.home;
@@ -943,7 +961,7 @@ const dirtShield = (() => {
   const COVER = 0.35, SLOPE = 1.43, STEEP = 1.6;            // dirt over the hull (m); how steeply the berm and the mound stand
   const BANK = 10.5 * U, SHELF = 1.6;                       // how high level 1 is banked, and how far its flat top reaches out from the hull
   const SPLIT = 19.6 * U - 0.02;                            // where the roof is cut away when you are inside
-  const CELL = 0.25, X0 = -12.75, X1 = 0.75, Z1 = 8.5;
+  const CELL = 0.25, X0 = -12.75, X1 = 3, Z1 = 8.5; // X1 leaves room for the level 2 mound to run out along the hull
   const cols = Math.round((X1 - X0) / CELL) + 1, rows = Math.round(2 * Z1 / CELL) + 1;
   const hullRadius = x => {
     if (x < PROFILE[0][0]) return 0;
@@ -968,27 +986,50 @@ const dirtShield = (() => {
   // How high the pile stands at every point of the grid. Beyond its foot the number keeps
   // falling below zero, so the skin meets the ground in a clean line.
   function pile(level) {
-    // The dirt lying on the hull itself, as [x, z, height]: `out` further out than the hull, no higher than `cap`.
+    // The dirt lying on the hull itself, as a height on each grid point it covers (NaN elsewhere):
+    // `out` further out than the hull, no higher than `cap`.
     const lying = (out, cap) => {
-      const seeds = [];
+      const top = new Float32Array(cols * rows).fill(NaN);
       for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
         const x = X0 + c * CELL, z = -Z1 + r * CELL;
         if (x > FRONT || x < PROFILE[0][0] - out) continue;
         const reach = hullRadius(Math.max(x, PROFILE[0][0])) + out;
         if (Math.abs(z) > reach) continue;
-        seeds.push([x, z, Math.min(AXIS + Math.sqrt(reach * reach - z * z), cap)]);
+        top[r * cols + c] = Math.min(AXIS + Math.sqrt(reach * reach - z * z), cap);
+      }
+      return top;
+    };
+    // Only some of those points shape the slopes around them, which makes this several times
+    // quicker with exactly the same result. A point is left out when a neighbour stands so much
+    // higher that its slope covers this one everywhere, or when it is ringed by points just as high
+    // (on a flat top, the edge points make the slope).
+    const shapers = (top, slope) => {
+      const seeds = [];
+      for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+        const t = top[r * cols + c];
+        if (Number.isNaN(t)) continue;
+        let covered = false, ringed = true;
+        for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
+          if (!dc && !dr) continue;
+          const inGrid = c + dc >= 0 && c + dc < cols && r + dr >= 0 && r + dr < rows;
+          const n = inGrid ? top[(r + dr) * cols + c + dc] : NaN;
+          if (!(n >= t)) ringed = false;
+          if (n - slope * CELL * Math.hypot(dc, dr) >= t) covered = true;
+        }
+        if (!covered && !ringed) seeds.push([X0 + c * CELL, -Z1 + r * CELL, t]);
       }
       return seeds;
     };
-    const berm = lying(SHELF, BANK), mound = level > 1 ? lying(COVER, Infinity) : [];
+    const bermTop = lying(SHELF, BANK), moundTop = level > 1 ? lying(COVER, Infinity) : null;
+    const berm = shapers(bermTop, SLOPE), mound = moundTop ? shapers(moundTop, STEEP) : [];
     const high = new Float32Array(cols * rows);
     for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
-      const x = X0 + c * CELL, z = -Z1 + r * CELL;
-      let h = -Infinity;
+      const x = X0 + c * CELL, z = -Z1 + r * CELL, k = r * cols + c;
+      let h = Math.max(bermTop[k] || -Infinity, moundTop?.[k] || -Infinity); // a point under the dirt is as high as the dirt on it
       for (const [sx, sz, top] of berm) h = Math.max(h, top - SLOPE * Math.hypot(x - sx, z - sz));
       for (const [sx, sz, top] of mound) h = Math.max(h, top - STEEP * Math.hypot(x - sx, z - sz));
       const rough = THREE.MathUtils.smoothstep(h, 0.1, 1.2);
-      high[r * cols + c] = h + rough * (0.3 * lump(x * 0.5 + level * 7, z * 0.5) + 0.12 * lump(x * 1.7, z * 1.7 + level * 3)) - 0.03;
+      high[k] = h + rough * (0.3 * lump(x * 0.5 + level * 7, z * 0.5) + 0.12 * lump(x * 1.7, z * 1.7 + level * 3)) - 0.03;
     }
     return high;
   }
@@ -1145,10 +1186,14 @@ float dirtHull(float x) {
     // little from the foot. The hull's own walls take over where the dirt meets them.
     const bound = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
     const half = hullRadius(0) + 0.1, inset = 0.9, tall = 1.6;
+    // The side blocks run forward as far as the dirt beside the hull is still knee high, which on
+    // level 2 is a good way past the shelter end (the mound slopes down along the hull).
+    let front = FRONT + 1.2;
+    for (let x = FRONT; x <= X1; x += CELL / 2) if (Math.max(heightAt(x, half + 0.3), heightAt(x, -half - 0.3)) > 0.5) front = Math.max(front, x);
     const blocks = [
       [bound.min.x + inset, PROFILE[0][0] - 0.2, -(bound.max.z - inset), bound.max.z - inset],
-      [PROFILE[0][0] - 0.2, FRONT + 1.2, half, bound.max.z - inset],
-      [PROFILE[0][0] - 0.2, FRONT + 1.2, -(bound.max.z - inset), -half],
+      [PROFILE[0][0] - 0.2, front, half, bound.max.z - inset],
+      [PROFILE[0][0] - 0.2, front, -(bound.max.z - inset), -half],
     ].map(([x0, x1, z0, z1]) => {
       const collider = world.createCollider(RAPIER.ColliderDesc.cuboid((x1 - x0) / 2, tall, (z1 - z0) / 2).setTranslation(site.x + (x0 + x1) / 2, site.y + tall, site.z + (z0 + z1) / 2));
       collider.setEnabled(false);
@@ -1174,6 +1219,9 @@ float dirtHull(float x) {
     }
   }
   return {
+    // Shows every level and plan for a moment, so their shaders can be built while the game loads
+    // rather than as a stutter the first time the Building tool comes out. sync() sets them right.
+    showAll(on) { levels.forEach(lv => { if (lv) lv.model.visible = lv.extras.visible = lv.plan.visible = on; }); },
     // level: what the rules say is built. plan: the level to outline in blue (0 for none).
     // inside: the astronaut is in the Habitat, so the top is cut away with the roof.
     sync(level, plan, dt, inside) {
@@ -1228,13 +1276,14 @@ scene.add(crew);
 // Hiding the astronaut hides only its meshes. Hiding the whole group would also switch off the
 // helmet glow and chest light, and a change in the number of lights makes three.js rebuild every
 // material's shader, which freezes the game for a moment.
-const crewMeshes = [];
-crew.traverse(o => { if (o.isMesh) crewMeshes.push(o); });
+// It walks the astronaut each time (only when this changes, not every frame), so the chest lamp
+// and the tools added to the hand later are hidden too. Tools still show only while held: hold()
+// hides each tool as a whole.
 let crewShown = true;
 function showCrew(on) {
   if (on === crewShown) return;
   crewShown = on;
-  crewMeshes.forEach(m => { m.visible = on; });
+  crew.traverse(o => { if (o.isMesh) o.visible = on; });
 }
 
 // The skeleton's joints, and how each one sits at rest, for the body language added in tick().
@@ -1570,7 +1619,14 @@ function pick(e, throughWalls = false) { // throughWalls: the old way, kept for 
   return what?.station || what?.door ? what : null; // { station } or { door }
 }
 let hovered = null;
-function hover(e) {
+// A mouse can report many moves per frame, and each check casts rays into the scene, so moves only
+// note where the pointer is and the check runs at most once a frame (in the render loop).
+let hoverAt = null;
+function hover(e) { hoverAt = { clientX: e.clientX, clientY: e.clientY }; }
+function hoverCheck() {
+  if (!hoverAt) return;
+  const e = hoverAt;
+  hoverAt = null;
   if (state !== 'play') { hovered = null; canvas.style.cursor = ''; return; }
   const what = pick(e);
   hovered = isInside(crewBody.translation()) ? what?.station ?? null : null;
@@ -1643,6 +1699,7 @@ function whereIs(p) {
 }
 
 // What's close enough to use with E, and what it does.
+let nearNow = null;
 function nearestUsable() {
   const p = crewBody.translation();
   const here = new THREE.Vector3(p.x, p.y - CREW_HEIGHT / 2, p.z);
@@ -1779,7 +1836,8 @@ function tick(dt) {
   // Cutaway: inside, the roof fades away and the camera looks down from above.
   // Not drawn, but still there for the Sun: the roof keeps shading the cabin.
   roofMeshes.forEach(m => { if (m.material) { m.material.colorWrite = m.material.depthWrite = !inside; } else m.visible = !inside; });
-  const closest = nearestUsable()?.id; // worked out once, not once per station
+  nearNow = nearestUsable(); // worked out once a frame: the labels here and the HUD's prompt both use it
+  const closest = nearNow?.id;
   Object.values(stations).forEach(s => {
     s.marker.visible = inside && !inLock; // from inside the airlock the cabin's labels would show through its walls
     const on = inside && (hovered === s.id || closest === s.id);
@@ -1822,8 +1880,11 @@ function tick(dt) {
   const fov = camera.fov + (fovWant - camera.fov) * ease(5);
   if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
-  sun.target.position.copy(head);
-  sun.position.copy(head).addScaledVector(SUN_DIR, 400);
+  // The sun's shadow box follows you, but only in whole shadow-map pixels, so shadow edges stay
+  // put as you walk instead of shimmering.
+  snapToShadowTexel(head, sunAt);
+  sun.target.position.copy(sunAt);
+  sun.position.copy(sunAt).addScaledVector(SUN_DIR, 400);
   earth.position.copy(camera.position).addScaledVector(earthDir, 5000);
   earthBall.rotation.y += dt * 0.06; // the Earth turns slowly: once around in under two minutes
 }
@@ -1910,6 +1971,9 @@ renderer.setAnimationLoop(t => {
       const rate = frames / ((t - slowSince) / 1000);
       if (rate < 24) lowGraphics();
       else if (rate < 45 && renderer.getPixelRatio() > 1) { renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() - 0.25)); fitWindow(); }
+      // Smooth again (the slow spell was a busy moment, not the computer): sharpen back up a step,
+      // never past the screen's own sharpness. The gap between 45 and 57 keeps it from flip-flopping.
+      else if (rate > 57 && renderer.getPixelRatio() < Math.min(devicePixelRatio, 2)) { renderer.setPixelRatio(Math.min(Math.min(devicePixelRatio, 2), renderer.getPixelRatio() + 0.25)); fitWindow(); }
       frames = 0; slowSince = t;
     }
   }
@@ -1935,8 +1999,9 @@ renderer.setAnimationLoop(t => {
     }
     syncWorld(dt);
     syncAirlock(dt);
-    hooks?.frame(nearestUsable());
+    hooks?.frame(nearNow);
   }
+  hoverCheck();
   placeCallouts();
   renderer.render(scene, camera);
 });
@@ -2049,7 +2114,9 @@ function snapshot(name) {
 await document.fonts.ready;
 // Build the materials' shaders now, while "Loading the Moon" shows (in parallel where the browser
 // can), instead of as a stutter in the first seconds of play.
+dirtShield.showAll(true); // compileAsync only builds what is visible
 try { await renderer.compileAsync(scene, camera); } catch { /* older browsers: compiled on first use */ }
+dirtShield.showAll(false);
 
 gameReady({
   site: { ...siteData, iceDistance, maps, worldX: site.x, worldZ: site.z, ice: iceSpot, robot: () => robot.position, samples: samples.length },
@@ -2099,7 +2166,7 @@ gameReady({
   goToStation,
   pause() { state = 'paused'; keys.clear(); touchPad?.letGo(); walkTo = null; },
   resume() { state = 'play'; },
-  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); },
+  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); hold(null); }, // nothing left in hand for the Scrapbook pictures
   // A still of the base for the start screen. Reading the canvas right after drawing keeps it filled.
   picture() {
     const spot = outsideSpot();

@@ -37,7 +37,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
   sunrise. After dark only the cabin is lit, and Eco dims it. **F** switches the chest light on the suit,
   **T** speeds up time.
 * **Airlock:** two sliding doors that never open together. Going out: the inner door closes, you
-  prebreathe pure oxygen (Cadets can skip it), pumps take the air out, then the outer door opens. Each
+  prebreathe pure oxygen (a few seconds here, hours in real life), pumps take the air out, then the outer door opens. Each
   trip out costs 1.5% Life Support (`airlock` in `src/config.js`). `npm run airlock` checks the rules.
 * **No free choices:** everything that helps costs power, moon dirt, suit air or radiation dose.
 * **Events:** sunset and a lunar night, solar storms, micrometeoroid hits on solar panels, Earth

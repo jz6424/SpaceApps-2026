@@ -114,7 +114,7 @@ export async function getFlares() {
       const seen = new Set();
       const raw = await source(end);
       const flares = raw
-        .filter(f => /^[MX]\d+(\.\d+)?$/.test(f.classType ?? '') &&(f.peakTime || f.beginTime) && !seen.has(f.flrID) && seen.add(f.flrID))
+        .filter(f => /^[MX]\d+(\.\d+)?$/.test(f.classType ?? '') &&(f.peakTime || f.beginTime) && !seen.has(f.flrID ?? f.peakTime ?? f.beginTime) && seen.add(f.flrID ?? f.peakTime ?? f.beginTime))
         .map(f => ({
           date: (f.peakTime || f.beginTime).slice(0, 10),
           classType: f.classType,
@@ -155,7 +155,7 @@ export function dataCard(kind, site) {
     },
     airlock: {
       title: 'Data card: the airlock',
-      body: 'On the Space Station, spacewalks start in the Quest airlock, which arrived in July 2001. A spacesuit holds pure oxygen at low pressure. If astronauts went straight from cabin air to the suit, nitrogen in their blood could form bubbles and give them the bends, like a diver who comes up too fast. So first they breathe pure oxygen to clear the nitrogen out. NASA calls this a prebreathe, and the real thing takes hours. The game squeezes it into a few seconds.',
+      body: 'On the Space Station, spacewalks in American suits start in the Quest airlock, which arrived in July 2001. A spacesuit holds pure oxygen at low pressure. If astronauts went straight from cabin air to the suit, nitrogen in their blood could form bubbles and give them the bends, like a diver who comes up too fast. So first they breathe pure oxygen to clear the nitrogen out. NASA calls this a prebreathe, and the real thing takes hours. The game squeezes it into a few seconds.',
       source: 'NASA Human Research Program, Risk of Decompression Sickness evidence report; NASA EVA Hardware and Operations Overview (NTRS 20120011735)',
     },
     air: {

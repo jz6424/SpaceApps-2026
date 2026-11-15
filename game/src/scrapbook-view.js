@@ -210,7 +210,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
       <section class="sb-leaf sb-photos" aria-label="Pictures">
         ${still ? photoHtml('tilt-l', 'In the game', still, `A picture from the game. ${page.shotCaption}`, page.shotCaption) : ''}
         ${photoHtml('tilt-r', 'In real life', `scrapbook/${page.real.src}`, page.real.alt, page.real.caption, page.real.credit, page.real.tall ? 'tall' : '')}
-        ${page.model ? photoHtml('tilt-l', 'Built in Blender', `scrapbook/${page.model.src}`, page.model.alt, page.model.caption, '', 'small') : ''}
+        ${page.model ? photoHtml('tilt-l', 'Built in Blender with SI help', `scrapbook/${page.model.src}`, page.model.alt, page.model.caption, '', 'small') : ''}
       </section>
       <section class="sb-leaf sb-text">
         <header class="sb-head">
@@ -373,6 +373,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
 
   return {
     open, close, setLevel, collect,
+    get page() { return at; },   // the page showing, or null on the contents
     // Pages in the book that have not been read yet.
     unread: () => openPages().filter(page => !isRead(page)).length,
   };

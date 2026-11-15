@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Junior Astronaut Moon Base Trainer</title>
+<title>Moon Base Trainer</title>
+<meta name="si-disclosure" content="Code, text and Blender model scripts were written with help from Claude (Anthropic), a Super Intelligence (SI) tool, and reviewed and tested by the team.">
 <meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
 <!-- The fonts are served with the game (public/fonts), so nothing is requested from a font server. -->
 <link rel="stylesheet" href="/fonts/fonts.css">
@@ -28,7 +29,7 @@
         <button class="mc-info" data-do="mission-info" aria-label="Mission details" title="Mission details">i</button>
       </div>
       <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
-      <p id="hint" role="status"></p>
+      <p id="hint"></p><p id="hint-say" class="sr-only" role="status"></p>
     </div>
   </aside>
   <!-- The meters are redrawn many times a second, so the button over the Power bar and the list
@@ -66,7 +67,7 @@
       <h3 id="build-title"></h3>
       <p id="build-text"></p>
       <div class="bar" id="build-bar" role="progressbar" aria-label="Moon dirt collected for this level" aria-valuemin="0"><i></i></div>
-      <p id="build-need" class="fine" aria-live="polite"></p>
+      <p id="build-need" class="fine"></p>
       <button class="btn small primary" id="build-go"></button>
     </section>
     <p id="hotbar-name" aria-live="polite"></p>
@@ -350,13 +351,13 @@
     <h2>Credits and NASA data</h2>
     <h3>Real NASA data in this game</h3>
     <ul id="sources" class="sources"></ul>
-    <p class="fine">Game rates (power, air, dose) are made simple and sped up so a lunar night fits in a few minutes. The data cards after each mission give the real numbers. Each solar storm is sized from a real solar flare: the flare's class sets how strong the storm is and how long it lasts. The flares come live from NASA DONKI (the past 12 months) when your browser can reach it, otherwise from a list of real past flares. The game always says which one you got. Not every real flare sends a particle storm toward the Moon; in the game each one does.</p>
+    <p class="fine">Game rates (power, air, dose) are made simple and sped up so a lunar night fits in a few minutes. The data cards after each mission give real NASA numbers, like how much oxygen an astronaut breathes and NASA's radiation limit. Each solar storm is sized from a real solar flare: the flare's class sets how strong the storm is and how long it lasts. The flares come live from NASA DONKI (the past 12 months) when your browser can reach it, otherwise from a list of real past flares. The game always says which one you got. Not every real flare sends a particle storm toward the Moon; in the game each one does.</p>
     <h3>Photographs in the Scrapbook</h3>
     <p class="fine">Every real-life photograph in the Scrapbook is from NASA. NASA does not endorse this game.</p>
     <ul id="photo-credits" class="sources"></ul>
     <h3>Made by</h3>
     <p>Team BaseRace for NASA Space Apps Challenge 2026: "Build a Junior Astronaut Mission Trainer". 3D models are our own designs, built in Blender and inspired by real NASA hardware like the Foundation Surface Habitat and VSAT solar towers.</p>
-    <h3>Use of AI</h3>
+    <h3>Use of AI (Super Intelligence tools)</h3>
     <p>We used Claude, an AI assistant made by Anthropic, to help write code, balance the game numbers, script the Blender models, check science facts and write text. Our team chose the design, directed the work and reviewed and tested the results.</p>
     <h3>Open-source tools</h3>
     <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Chakra Petch and Titillium Web (SIL Open Font License). Icons drawn in the style of Feather (MIT). Interface polish followed the unslop design checklist by Damir Sokolovsky (CC BY 4.0).</p>

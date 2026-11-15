@@ -7,6 +7,7 @@
 // Steps that only explain stop the game clock; steps that ask the player to do something let it run.
 
 import { isTouch, forTouch } from './touch.js';
+import { stopReading } from './speak.js';
 
 const $ = id => document.getElementById(id);
 
@@ -153,7 +154,7 @@ const HOWTOS = [
     steps: sim => [
       {
         title: 'Speed up time', at: 'right', target: '#speed-chip', side: 'left',
-        nextLabel: 'Set 2x speed', action: hud => hud.setSpeed(2), until: (s, hud) => hud.speed > 1,
+        nextLabel: 'Set 2x speed', action: hud => hud.toggleSpeed(), until: (s, hud) => hud.speed > 1, // toggleSpeed, like T: a storm keeps normal speed
         hint: isTouch ? 'Tap the speed button at the top of the screen to make time go faster.' : 'Press T to make time go 2x as fast.',
         text: [
           sim.samples.size >= sim.goalValue ? `All ${sim.goalValue} rocks are in. Now the base only has to last until sunrise.` : 'Night has fallen. Once the base is set for the night, sunrise is a long wait.',
@@ -270,6 +271,7 @@ export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
   }
 
   function enter(n) {
+    stopReading(); // a card that moves on (by itself too) stops reading the old one
     steps[i]?.leave?.(hud);
     i = n;
     const s = steps[i];
@@ -479,6 +481,9 @@ export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
       if (!active) return nextHowTo();
       const s = steps[i];
       if (!s) return;
+      // A storm warning holds time at normal speed, so the speed card can't be followed: it goes
+      // away and may come back once the storm has passed.
+      if (kind === 'speed' && !calm(sim)) { ran.delete('speed'); shown.delete('speed'); return finish(); }
       if (s.waitOpen && hud.open === s.waitOpen) return enter(i + 1);
       if (s.until?.(sim, hud)) return enter(i + 1);
       if (s.callouts) {

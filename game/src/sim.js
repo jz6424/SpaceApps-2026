@@ -308,7 +308,9 @@ export class Sim {
   // have stepped in, so it can't shut in their face.
   hatchBehind() {
     const lock = this.airlock;
-    if (this.inAirlock || this.doorway === 'outer') lock.passing = true;
+    // Only being inside the tube counts: the doorway reaches a little onto the landing, and stepping
+    // up to the open hatch from outside and back again must not shut it.
+    if (this.inAirlock) lock.passing = true;
     else if (this.where !== 'outside' || !lock.outer) lock.passing = false; // back in the cabin, or already shut
     else if (lock.passing && !lock.cycle) {
       lock.passing = false;

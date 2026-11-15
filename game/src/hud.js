@@ -2,6 +2,7 @@
 import { CONFIG as C } from './config.js';
 import { flareLabel } from './sim.js';
 import { isTouch, forTouch } from './touch.js';
+import { stopReading } from './speak.js';
 import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound, buildSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
@@ -50,6 +51,7 @@ const per = (v, what) => `${fixed(v)} ${what} per second`;
 export function createHud({ sim, site, unlocks, api, liveFlares }) {
   // The numbers this mission really runs on, research upgrades included, so every panel shows them.
   const C = sim.C;
+  let hintGist = '';
   const hud = $('hud');
   hud.hidden = false;
   let open = null;        // station id with its panel showing
@@ -151,9 +153,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       : `${level ? 'Bury the Storm Shelter in moon dirt, right over the top' : 'Bank moon dirt up the sides of the Storm Shelter'}. Storm dose in the shelter goes from ${pct(now)} to ${pct(next)}.`;
     const short = !done && have < cost;
     const digging = sim.robotWorking && sim.robot.task === 'dig';
-    const wait = Math.ceil((cost - sim.regolith) / (C.robot.dig * sim.share || 1));
+    const rate = C.robot.dig * sim.share; // nothing comes in while the battery is flat
+    const wait = rate > 0 ? Math.ceil((cost - sim.regolith) / rate) : null;
     const need = done ? 'Nothing more to build here.'
-      : `Needs ${cost} moon dirt. You have ${have}.${!short ? '' : digging ? ` The robot is digging: about ${wait} s to go.` : ' Send the robot to dig at the Robot Map.'}`;
+      : `Needs ${cost} moon dirt. You have ${have}.${!short ? '' : digging ? (wait ? ` The robot is digging: about ${wait} s to go.` : ' The robot has no power to dig: charge the battery.') : ' Send the robot to dig at the Robot Map.'}`;
     const go = short ? 'Not enough moon dirt yet' : isTouch ? 'Build it' : 'Build it <kbd>B</kbd>';
     if (showing.get('build-title') !== title) { showing.set('build-title', title); $('build-title').innerHTML = `${icon('shovel', 20)} ${title}`; }
     for (const [id, value] of [['build-text', text], ['build-need', need]]) {
@@ -520,7 +523,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       const cost = sim.shieldCost, k = sim.shieldMult;
       const shield = !has ? 'Research Regolith Shielding to get a Building tool. With it you can cover the shelter in moon dirt.'
         : cost === undefined ? 'The regolith shield is finished: the shelter is buried in moon dirt.'
-        : `Regolith shield: level ${sim.shielding} of 2. Close this panel and ${isTouch ? 'tap the Building tool' : 'press 2 for the Building tool'} to build the next level (${cost} moon dirt).`;
+        : `Regolith shield: level ${sim.shielding} of ${C.dose.shielding.length - 1}. Close this panel and ${isTouch ? 'tap the Building tool' : 'press 2 for the Building tool'} to build the next level (${cost} moon dirt).`;
       return {
         title: 'Storm Shelter', icon: 'shield',
         body: `<p class="big">${sim.stormNow ? 'Storm now! Stay here.' : 'Hide here during solar storms'}</p>
@@ -648,7 +651,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
   function close() {
-    if (open) hologramSound('close');
+    if (open) { hologramSound('close'); stopReading(); } // stop reading a panel that has gone
     open = null;
     $('station').hidden = true;
     $('hotbar-wrap').hidden = false;
@@ -770,9 +773,14 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     renderSupplies();
     renderClock();
     renderSamples();
-    // The hint is read out by screen readers, so it is only written when the words change.
+    // The hint on screen keeps its numbers up to date. Screen readers hear it (through #hint-say)
+    // only when the advice itself changes, not every time a countdown or a count ticks.
     const hint = forTouch(hintText());
-    if ($('hint').textContent !== hint) $('hint').textContent = hint;
+    if ($('hint').textContent !== hint) {
+      $('hint').textContent = hint;
+      const gist = hint.replace(/\d+(:\d+)?/g, '#');
+      if (gist !== hintGist) { hintGist = gist; $('hint-say').textContent = hint; }
+    }
     $('prompt').hidden = !near || !!open;
     if (near) $('prompt').innerHTML = isTouch ? `Tap <b>Use</b> to ${near.label}` : `Press <kbd>E</kbd> to ${near.label}`;
     $('touch-use').classList.toggle('ready', !!near && !open); // the Use button lights up when there is something to use
@@ -804,6 +812,9 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       $('power-btn').removeEventListener('click', usesBtn);
       $('pu-close').removeEventListener('click', usesClose);
       $('power-uses').hidden = true;
+      // The Power button starts the next mission closed, not still marked open.
+      $('power-btn').setAttribute('aria-expanded', 'false');
+      $('power-btn').title = 'See what is using power';
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       list.removeEventListener('pointerenter', enterFeed);

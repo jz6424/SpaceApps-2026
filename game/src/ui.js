@@ -13,7 +13,7 @@ import { createScrapbook } from './scrapbook-view.js';
 import * as sound from './sound.js';
 import { isTouch as isTouchScreen } from './touch.js';
 import { createMoonMenu } from './moon-menu.js';
-import './speak.js';
+import { stopReading } from './speak.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'success', 'debrief', 'how', 'credits'];
@@ -314,9 +314,25 @@ function mapLayout() {
 const SPOTS = mapLayout();
 const STATE_WORDS = { owned: 'researched', ready: 'ready to research', short: 'not enough points yet', locked: 'locked', soon: 'locked, coming soon' };
 const isShut = state => state === 'locked' || state === 'soon';
+// Why a circle can't be researched yet, in a few words under its name (shown in red).
+function whyNot(node, state) {
+  if (state === 'short') return `Need ${node.cost - save.points} more point${node.cost - save.points === 1 ? '' : 's'}`;
+  if (state === 'locked') return `Research ${nodeById(node.needs)?.name} first`;
+  return '';
+}
+// Until the player has researched something, one good first pick pulses: Regolith Shielding,
+// because it opens mission 2. If that is already open (the open-everything switch), the first of
+// a few cheap, useful upgrades that can be researched takes its place. After the first purchase
+// the choice is the player's, and nothing pulses.
+const FIRST_PICKS = ['Shielding', 'DishAntenna', 'HeatBlankets', 'Scrubber', 'DrumDigger'];
+function recommended() {
+  if (save.unlocks.length) return null;
+  return FIRST_PICKS.find(id => ['ready', 'short'].includes(nodeState(nodeById(id), unlocksNow(), save.points))) ?? null;
+}
 
 function mapHtml() {
   const state = node => nodeState(node, unlocksNow(), save.points);
+  const first = recommended();
   const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px;--ring:${SPOTS[id].ring}`;
   const line = (id, kind, from = SPOTS[id].parent) => {
     const a = SPOTS[from], b = SPOTS[id];
@@ -331,11 +347,11 @@ function mapHtml() {
   const nodes = BRANCHES.flatMap(branch => [
     `<div class="rt-branch" data-spot="branch-${branch.id}" style="${at(`branch-${branch.id}`)}"><span class="rt-dot">${glyph(branch.id, 24, branch.icon)}</span><span class="rt-name">${branch.name}</span></div>`,
     ...branch.nodes.map(node => {
-      const st = state(node);
-      return `<button class="rt-node is-${st}" id="node-${node.id}" data-spot="${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
-          aria-pressed="${picked === node.id}" aria-label="${node.name}, ${STATE_WORDS[st]}">
+      const st = state(node), why = whyNot(node, st), rec = first === node.id;
+      return `<button class="rt-node is-${st}${rec ? ' is-recommended' : ''}" id="node-${node.id}" data-spot="${node.id}" style="${at(node.id)}" data-do="pick" data-id="${node.id}"
+          aria-pressed="${picked === node.id}" aria-label="${node.name}, ${rec ? 'recommended first, ' : ''}${why || STATE_WORDS[st]}">
         <span class="rt-dot">${glyph(node.id, 24, node.icon)}${st === 'owned' ? `<span class="rt-badge">${glyph('check', 12)}</span>` : isShut(st) ? `<span class="rt-badge">${glyph('lock', 12)}</span>` : ''}</span>
-        <span class="rt-name">${node.name}</span>
+        <span class="rt-name">${rec ? '<span class="rt-rec">Recommended</span>' : ''}${node.name}${why ? `<span class="rt-why">${why}</span>` : ''}</span>
       </button>`;
     }),
   ]);
@@ -351,16 +367,18 @@ function panelHtml(node) {
   const status = {
     owned: `<p class="n-status done">${glyph('check', 16)} Researched</p>`,
     soon: `<p class="n-status">${glyph('lock', 16)} This upgrade is locked until a later update.</p>`,
-    locked: `<p class="n-status">${glyph('lock', 16)} Research ${nodeById(node.needs)?.name} first to unlock this.</p>`,
-    short: `<button class="btn small" disabled>Need ${node.cost - save.points} more points</button>`,
+    locked: `<p class="n-status no">${glyph('lock', 16)} Locked: research ${nodeById(node.needs)?.name} first to unlock this.</p>`,
+    short: `<p class="n-status no">${icon('alert', 16)} Not enough research points: you have ${save.points} and this needs ${node.cost}.</p>
+      <p class="n-earn">Earn more by finishing missions, picking up rock samples and sending science data home.</p>`,
     ready: `<button class="btn primary small" data-do="buy" data-id="${node.id}">Research for ${node.cost} points</button>`,
   }[state];
   return `
     <div class="n-head"><h3>${node.name}</h3><span class="n-cost">${state === 'owned' ? 'Owned' : `${node.cost} points`}</span></div>
     ${mission ? `<p class="n-opens">${icon('star', 16)} Opens mission ${MISSIONS.indexOf(mission) + 1}, ${mission.name}</p>` : ''}
+    ${recommended() === node.id ? `<p class="n-rec">${icon('star', 16)} Recommended first${node.mission ? `: it opens mission ${MISSIONS.indexOf(mission) + 1}` : ''}. After this, what to research is up to you.</p>` : ''}
+    ${status}
     <p class="n-science">${node.science}</p>
-    <p class="n-change"><b>In the game</b> ${node.change}</p>
-    ${status}`;
+    <p class="n-change"><b>In the game</b> ${node.change}</p>`;
 }
 
 // The whole screen is the map. Drag anywhere that isn't a circle or a button to move it; zoom with
@@ -904,6 +922,7 @@ function launch(id = chosen) {
 }
 
 function endMission() {
+  stopReading();
   tour?.destroy();
   tour = null;
   hud?.destroy();
@@ -954,6 +973,7 @@ function resume() {
 }
 
 function finish() {
+  stopReading(); // the mission is over: stop reading a panel that is about to go
   const o = sim.over, mission = sim.mission, mode = sim.modeName;
   const stars = o.won ? o.stars : 0;
   const best = save.best[mission.id]?.[mode] ?? 0;
@@ -1082,13 +1102,19 @@ document.addEventListener('click', e => {
 addEventListener('keydown', e => {
   if (e.code !== 'Escape' || e.repeat) return;
   // Between missions Esc is the Back button of whatever menu is showing.
+  // It closes the innermost thing first: a pinned Research Tree box, then the tree; a Scrapbook
+  // page goes back to the contents, then the book shuts.
   if (!hud) {
-    const back = { research: 'open-missions', scrapbook: 'open-missions', how: 'home', credits: 'home', success: 'success-next', missions: selected ? 'moon-out' : 'home' }[showing()];
+    const on = showing();
+    if (on === 'research' && picked) { e.preventDefault(); picked = null; showPanel(null); renderResearch(); return; }
+    if (on === 'scrapbook' && scrapbook.page) { e.preventDefault(); openScrapbook(); return; }
+    const back = { research: 'open-missions', scrapbook: 'open-missions', how: 'home', credits: 'home', success: 'success-next', missions: selected ? 'moon-out' : 'home' }[on];
     if (back && !diving) { e.preventDefault(); actions[back](); }
     return;
   }
   if (!game) return;
   if (hud?.open) { hud.close(); return; }
+  if (hud?.usesOpen) { hud.showUses(false); return; } // the power list closes before the game pauses
   if (hud && $('pause').hidden) pause();
   else if (!$('pause').hidden) resume();
 });

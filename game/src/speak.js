@@ -6,11 +6,14 @@ if (!voice) document.documentElement.classList.add('no-voice');
 
 let reading = null; // the button whose words are being read
 
-function stop() {
-  if (!voice) return;
-  speechSynthesis.cancel();
-  if (reading) reading.setAttribute('aria-pressed', 'false');
+// Stops reading. Also called by the HUD, the tour and the menus whenever what was being read goes
+// away (a panel closes, a card moves on, the mission ends).
+export function stop() {
+  if (!voice || !reading) return;
+  reading.setAttribute('aria-pressed', 'false');
   reading = null;
+  queue = [];
+  speechSynthesis.cancel();
 }
 
 // The words a player sees in a panel, in reading order, without the button labels around them
@@ -29,18 +32,29 @@ function wordsIn(box) {
   return text;
 }
 
+// Spoken a sentence at a time: some voices (the online ones on Chromebooks) stop after about 15
+// seconds of one long utterance. The utterances are kept in `queue` so the browser can't drop
+// them half way (a Chrome bug that also loses their "end" event).
+let queue = [];
 function read(button) {
   if (reading === button) { stop(); return; }
   stop();
   const box = button.closest(button.dataset.read);
   if (!box) return;
-  const say = new SpeechSynthesisUtterance(wordsIn(box));
-  say.lang = 'en-US';
-  say.rate = 0.95;
-  say.onend = say.onerror = () => { if (reading === button) stop(); };
+  const sentences = wordsIn(box).match(/[^.!?]+[.!?]*/g)?.map(t => t.trim()).filter(Boolean) ?? [];
+  if (!sentences.length) return;
+  queue = sentences.map(text => {
+    const say = new SpeechSynthesisUtterance(text);
+    say.lang = 'en-US';
+    say.rate = 0.95;
+    return say;
+  });
+  const last = queue.at(-1);
+  last.onend = () => { if (reading === button) stop(); };
+  queue.forEach(say => { say.onerror = () => { if (reading === button) stop(); }; });
   reading = button;
   button.setAttribute('aria-pressed', 'true');
-  speechSynthesis.speak(say);
+  queue.forEach(say => speechSynthesis.speak(say));
 }
 
 if (voice) {
