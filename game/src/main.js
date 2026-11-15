@@ -478,6 +478,13 @@ function boxCollider(mid, half) {
 function addBox(node) {
   const b = new THREE.Box3().setFromObject(node, true);
   if (b.isEmpty()) return null;
+  // COL_Round...: an upright cylinder that fits inside the box (for round or 8-sided parts).
+  if (node.name.startsWith('COL_Round')) {
+    const mid = b.getCenter(new THREE.Vector3()), size = b.getSize(new THREE.Vector3());
+    const collider = world.createCollider(RAPIER.ColliderDesc.cylinder(size.y / 2, Math.min(size.x, size.z) / 2).setTranslation(mid.x, mid.y, mid.z));
+    navBoxes.push({ collider, x0: b.min.x, x1: b.max.x, y0: b.min.y, y1: b.max.y, z0: b.min.z, z1: b.max.z });
+    return collider;
+  }
   const collider = boxCollider(b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).multiplyScalar(0.5));
   // A model placed at an angle (the cargo lander) has its boxes turned with it. The box above is
   // the world-aligned one round the turned box, which is much bigger (an invisible wall beside the

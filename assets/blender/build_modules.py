@@ -94,6 +94,23 @@ def lathe(name, profile, mat, pos, direction=(0, 0, 1), sides=14):
     return add(name, bm, mat, axis_matrix(pos, direction))
 
 
+def col_turned(name, mid, size, rot):
+    """An invisible collision box that keeps its own turn (the game reads the node's rotation), for
+    a slab that isn't level, like a ramp."""
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1, matrix=Matrix.Diagonal((*size, 1)))
+    me = bpy.data.meshes.new("COL_" + name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new("COL_" + name, me)
+    ob.matrix_world = Matrix.Translation(mid) @ Euler(rot).to_matrix().to_4x4()
+    ob.hide_render = True
+    ob.display_type = 'WIRE'
+    ob["col"] = True
+    coll.objects.link(ob)
+    return ob
+
+
 def ring(name, profile, mat, pos, direction=(0, 0, 1), sides=14):
     """Like lathe, but the profile is a closed loop and there are no end caps: a ring or band
     (lathe would close each end with a flat disc)."""
@@ -358,7 +375,7 @@ def CargoLander():
     strut("CraneArm", (2.6, 2.2, T + 2.4), (.9, 1.1, T + 2.9), .09, "Yellow", 8)
     # Ramp down to the surface on the +X side, for rovers. The plank, its two rails and the lip all
     # follow one line: from the deck's edge, just clear of the body's bulge, down to the ground.
-    x0, x1, top = 3.35, 10.0, T + .05
+    x0, x1, top = 3.35, 13.35, T + .05            # 10 m long: about 29 degrees, walkable
     run, d = x1 - x0, math.atan2(T + .05, x1 - x0)
     box("Ramp", (math.hypot(run, top), 1.9, .12), ((x0 + x1) / 2, 0, top / 2), "Grey", .03, (0, d, 0))
     for s in (-1, 1):
@@ -368,16 +385,24 @@ def CargoLander():
     strut("Mast", (-2.6, -2, T), (-2.6, -2, T + 2.2), .08, "Grey", 6)
     lathe("MastDish", [(0, 0), (0, .3), (.2, .55), (.25, 0)], "White", (-2.6, -2, T + 2.2), (.5, -.3, 1), 10)
     lathe("Eye", [(0, 0), (0, .24), (.1, .24), (.1, 0)], "Dark", (3.35, 1.2, H + 1.15), (1, .33, 0), 10)
-    # Solid parts: the body from its underside up (you can walk under its rim, between the legs),
-    # the engines below it, each footpad and the low end of each leg, and the ramp only where it is
-    # low enough to bump into (three steps under it), so you can walk beneath its high end.
-    col("Body", -3.5, 3.5, -3.5, 3.5, H - .1, T + 1.5)
+    # Solid parts. The ramp is one slab tilted with the plank, its top on the plank's top, so you
+    # can walk up it onto the deck. The body is solid from its underside to the deck (you can walk
+    # in under its rim, between the legs), and the cargo on the deck is solid too.
+    plank = Vector(((x0 + x1) / 2, 0, top / 2))
+    normal = Vector((math.sin(d), 0, math.cos(d)))
+    col_turned("Ramp", plank - normal * .1, (math.hypot(run, top), 1.9, .32), (0, d, 0))
+    # The body is 8-sided, so it gets a round collider (a COL_Round box becomes an upright cylinder
+    # in the game) between the octagon's flats and corners: the deck's edge is where it looks to be.
+    a = 3.2 * math.cos(math.pi / 8)
+    col("RoundBody", -3.08, 3.08, -3.08, 3.08, H - .1, T)
+    col("RampLip", a - .2, x0 + .3, -.95, .95, H - .1, T)   # the lip bridges the deck's edge and the ramp's top
     col("Engines", -2.2, 2.2, -2.2, 2.2, 0, H - .1)
-    low = 2.4                                   # ramp lower than this (m) blocks walking under it
-    xa = x1 - low * run / top
-    for k in range(3):
-        a, b = xa + k * (x1 - xa) / 3, xa + (k + 1) * (x1 - xa) / 3
-        col("Ramp%d" % (k + 1), a, b, -.95, .95, 0, max(.2, top * (x1 - b) / run))   # top at the step's low end: under the plank
+    col("CrateA", -2, -.2, -1.8, -.2, T, T + 1.4)
+    col("CrateB", .25, 1.55, -2.15, -.85, T, T + 1)
+    col("CrateC", -2.1, -.9, .5, 1.9, T, T + 1.1)
+    col("Tank", .15, 1.65, .35, 1.85, T, T + 1.7)
+    col("Mast", -2.75, -2.45, -2.15, -1.85, T, T + 2.2)
+    col("Crane", 2.45, 2.75, 2.05, 2.35, T, T + 2.4)
     for a, n in ((45, "NE"), (135, "NW"), (225, "SW"), (315, "SE")):
         c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
         col("Pad" + n, c * 5.2 - .8, c * 5.2 + .8, s * 5.2 - .8, s * 5.2 + .8, 0, .45)
