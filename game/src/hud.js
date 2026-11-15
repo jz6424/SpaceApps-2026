@@ -24,6 +24,8 @@ export const ICONS = {
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
+  left: '<path d="m15 5-7 7 7 7"/>',
+  right: '<path d="m9 5 7 7-7 7"/>',
   target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -50,20 +52,21 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('hud-title').textContent = sim.mission.name;
   $('hud-mode').textContent = `· ${sim.modeName} mode`;
   $('mc-pin').innerHTML = icon('target', 18);
-  $('settings').innerHTML = icon('gear', 22);
-  // The target button shows or hides the mission box. Every mission starts with it showing.
-  $('missions-toggle').innerHTML = icon('target', 22);
-  const showMission = on => { $('mission-card').hidden = !on; $('missions-toggle').setAttribute('aria-pressed', on); };
-  // The fly-in belongs to the start of the mission only, so it must not play again when the box is shown.
-  const settle = () => $('mission-card').classList.remove('intro');
-  $('mission-card').addEventListener('animationend', settle);
-  const missionBtn = () => { settle(); showMission($('mission-card').hidden); };
-  $('missions-toggle').addEventListener('click', missionBtn);
+  $('settings').innerHTML = icon('gear', 24);
+  // The mission is a drawer on the right edge. Its handle is an arrow: ">" pushes it away, "<" pulls
+  // it back. Every mission starts with it out.
+  const showMission = on => {
+    $('mission-drawer').classList.toggle('shut', !on);
+    $('mission-card').inert = !on; // nothing inside can be reached while it is tucked away
+    const handle = $('mission-handle'), say = on ? 'Hide the mission' : 'Show the mission';
+    handle.innerHTML = icon(on ? 'right' : 'left', 24);
+    handle.setAttribute('aria-expanded', on);
+    handle.setAttribute('aria-label', say);
+    handle.title = say;
+  };
+  const missionBtn = () => showMission($('mission-drawer').classList.contains('shut'));
+  $('mission-handle').addEventListener('click', missionBtn);
   showMission(true);
-  // The Missions box grows in the middle of the screen, then settles into its corner.
-  const card = $('mission-card');
-  card.classList.remove('intro');
-  if (!sim.mission.tutorial) { void card.offsetWidth; card.classList.add('intro'); } // First Night uses the centre for the tour
 
   // The speed, sound and full screen buttons live in the Game paused panel (the gear button, or Esc).
   // Full screen button (F11 works too).
@@ -71,7 +74,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
-  $('fullscreen').innerHTML = icon('expand', 26);
   $('fullscreen').addEventListener('click', fsBtn);
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
@@ -202,7 +204,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (lock?.waiting) return 'Step away from the door so it can close.';
     if (lock) return lock.kind === 'open' && lock.door === 'outer' ? 'The outer door is opening. Off you go!' : 'The airlock is working. Hang tight!';
     if (sim.inAirlock && sim.airlock.pressure === 'vacuum') return 'Step outside for your moonwalk, or use the Airlock panel to come back in.';
-    if (sim.where === 'outside' && sim.suit < 35) return 'Suit air low. Walk back to the airlock door (the yellow steps).';
     if (sim.where === 'outside') {
       const broken = sim.panels.indexOf(false);
       if (broken >= 0) return `Walk to solar panel ${broken + 1} (the red light) and press E to fix it.`;
@@ -423,7 +424,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     hologramSound('open');
     sim.flags[`open_${id}`] = true;
     $('station').hidden = false;
-    $('keys').hidden = true; // the keys do nothing while a panel is open
     renderStation(true);
     $('station').querySelector('button.opt:not([disabled])')?.focus();
   }
@@ -431,7 +431,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (open) hologramSound('close');
     open = null;
     $('station').hidden = true;
-    $('keys').hidden = false;
     document.activeElement?.blur?.();
   }
 
@@ -484,8 +483,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   }
   const skipBtn = () => sim.airlockSkip();
   $('lock-skip').addEventListener('click', skipBtn);
-  const backBtn = () => api.goInside();
-  $('back-in').addEventListener('click', backBtn);
   const showSound = () => {
     $('sound').setAttribute('aria-pressed', soundOn());
     $('sound').textContent = soundOn() ? 'Sound on' : 'Sound off';
@@ -526,13 +523,9 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     renderSupplies();
     renderClock();
     renderRp();
-    $('keys-tip').textContent = sim.where === 'outside'
-      ? 'Outside, walk up to a red light or a glowing rock and press E.'
-      : 'Inside, click a station label to walk there.';
     $('hint').textContent = hintText();
     $('prompt').hidden = !near || !!open;
     if (near) $('prompt').innerHTML = `Press <kbd>E</kbd> to ${near.label}`;
-    $('back-in').hidden = sim.where !== 'outside';
     if (open && now % 1000 < 220) renderStation();
   }
 
@@ -549,12 +542,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
-      $('missions-toggle').removeEventListener('click', missionBtn);
-      $('mission-card').removeEventListener('animationend', settle);
+      $('mission-handle').removeEventListener('click', missionBtn);
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       $('air-toast').hidden = true;
-      $('back-in').removeEventListener('click', backBtn);
       $('lock-skip').removeEventListener('click', skipBtn);
       $('airlock-panel').hidden = true;
     },

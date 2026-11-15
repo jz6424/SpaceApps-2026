@@ -16,17 +16,19 @@
   <ul id="feed" aria-live="polite" aria-label="Messages" tabindex="0"></ul>
   <section id="clock" class="panel" aria-label="Sun clock"></section>
   <div class="hud-icons">
-    <button class="icon-btn" id="missions-toggle" aria-pressed="true" aria-label="Show or hide your mission" title="Your mission"></button>
     <button class="icon-btn" id="settings" data-do="menu" aria-label="Settings and pause" title="Settings and pause"></button>
   </div>
-  <aside id="mission-card" class="panel" aria-label="Current mission">
-    <h2 class="mc-head"><span id="mc-pin"></span> Mission</h2>
-    <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
-    <p id="hint" role="status"></p>
+  <!-- The mission is a drawer on the right edge: the arrow slides it out of the way and back. -->
+  <aside id="mission-drawer" aria-label="Current mission">
+    <button id="mission-handle" aria-expanded="true" aria-controls="mission-card" aria-label="Hide the mission" title="Hide the mission"></button>
+    <div id="mission-card" class="panel">
+      <h2 class="mc-head"><span id="mc-pin"></span> Mission</h2>
+      <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
+      <p id="hint" role="status"></p>
+    </div>
   </aside>
   <section id="meters" class="panel" aria-label="Base meters"></section>
   <div id="corner">
-    <button id="back-in" class="btn primary" hidden>Back to the airlock</button>
     <section id="airlock-panel" class="panel" aria-label="Airlock" aria-live="polite" hidden>
       <h3 id="lock-title"></h3>
       <p id="lock-text"></p>
@@ -39,8 +41,6 @@
   </div>
   <p id="prompt" class="panel" hidden></p>
   <p id="air-toast" hidden role="alert"></p>
-  <p id="keys" class="panel fine"><kbd>WASD</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> jump · <kbd>drag</kbd> look · <kbd>E</kbd> use · <kbd>F</kbd> speed · <kbd>Esc</kbd> pause<br><span id="keys-tip">Inside, click a station label to walk there.</span></p>
-  <button id="fullscreen" class="fs-btn" aria-label="Fullscreen" data-tip="Fullscreen"></button>
   <div id="tour" hidden>
     <div id="tour-ring"></div>
     <div id="tour-arrow"><svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><path d="M20 2 38 24H27v26H13V24H2z" fill="#E43700" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg></div>
@@ -147,24 +147,44 @@
   <div class="dialog">
     <h2 id="pause-title">Game paused</h2>
     <p><b id="pause-mission"></b> Time is stopped. Take a breath.</p>
-        <div class="settings" role="group" aria-label="Settings">
-      <div class="setting"><span>Game speed</span><button class="btn small" id="speed" aria-pressed="false"></button></div>
-      <div class="setting"><span>Sound</span><button class="btn small" id="sound" aria-pressed="true">Sound on</button></div>
+    <div class="tabs" role="tablist" aria-label="Pause menu pages">
+      <button class="seg" role="tab" id="tab-settings" data-do="pause-tab" data-id="settings" aria-selected="true" aria-controls="page-settings">Settings</button>
+      <button class="seg" role="tab" id="tab-controls" data-do="pause-tab" data-id="controls" aria-selected="false" aria-controls="page-controls">Controls</button>
     </div>
-    <section class="volume" aria-label="Sound and music">
-      <h3>Sound and music</h3>
-      <div class="volume-row">
-        <label for="vol-music">Music</label>
-        <input id="vol-music" type="range" min="0" max="100" step="1" data-volume="music">
-        <output for="vol-music">80%</output>
-        <button class="btn small" data-music aria-pressed="true">Music on</button>
+    <div class="page" id="page-settings" role="tabpanel" aria-labelledby="tab-settings">
+      <div class="settings" role="group" aria-label="Settings">
+        <div class="setting"><span>Game speed</span><button class="btn small" id="speed" aria-pressed="false"></button></div>
+        <div class="setting"><span>Sound</span><button class="btn small" id="sound" aria-pressed="true">Sound on</button></div>
+        <div class="setting"><span>Screen</span><button class="btn small" id="fullscreen">Full screen</button></div>
       </div>
-      <div class="volume-row">
-        <label for="vol-sfx">Sound effects</label>
-        <input id="vol-sfx" type="range" min="0" max="100" step="1" data-volume="sfx">
-        <output for="vol-sfx">100%</output>
-      </div>
-    </section>
+      <section class="volume" aria-label="Sound and music">
+        <h3>Sound and music</h3>
+        <div class="volume-row">
+          <label for="vol-music">Music</label>
+          <input id="vol-music" type="range" min="0" max="100" step="1" data-volume="music">
+          <output for="vol-music">80%</output>
+          <button class="btn small" data-music aria-pressed="true">Music on</button>
+        </div>
+        <div class="volume-row">
+          <label for="vol-sfx">Sound effects</label>
+          <input id="vol-sfx" type="range" min="0" max="100" step="1" data-volume="sfx">
+          <output for="vol-sfx">100%</output>
+        </div>
+      </section>
+    </div>
+    <div class="page" id="page-controls" role="tabpanel" aria-labelledby="tab-controls" hidden>
+      <dl class="controls">
+        <div><dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows</dt><dd>Walk</dd></div>
+        <div><dt><kbd>Shift</kbd></dt><dd>Run</dd></div>
+        <div><dt><kbd>Space</kbd></dt><dd>Jump</dd></div>
+        <div><dt>Drag the mouse</dt><dd>Look around</dd></div>
+        <div><dt>Mouse wheel</dt><dd>Zoom in and out</dd></div>
+        <div><dt><kbd>E</kbd></dt><dd>Use what you are next to</dd></div>
+        <div><dt>Click a label</dt><dd>Walk there and open it</dd></div>
+        <div><dt><kbd>F</kbd></dt><dd>Speed up time</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Pause and settings</dd></div>
+      </dl>
+    </div>
     <div class="row">
       <button class="btn primary" data-do="resume">Keep playing</button>
       <button class="btn" data-do="restart">Start over</button>
@@ -208,7 +228,7 @@
       <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back. Every storm is sized from a real solar flare, and they change each time you play.</li>
       <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
     </ol>
-    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the speed, sound and full screen settings. The target button next to it shows or hides your mission.</p>
+    <p class="fine">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the settings and the list of controls. The arrow on the right edge slides your mission out of the way and back.</p>
     <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
   </div>
 </main>

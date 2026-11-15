@@ -74,7 +74,7 @@ const EXPLAIN = {
       '<b>This is the door to the Moon.</b> It has two doors that are never open at the same time, so the base keeps its air.',
       'To go out, the inner door closes, you breathe pure oxygen for 6 seconds (Cadets can skip this), the air is pumped out, then the outer door opens. Each trip out costs 1.5% Life Support.',
       'Outside you can fix broken panels and pick up rock samples. Your suit holds 90 seconds of air, and radiation builds up about 3 times faster. You cannot go out during a solar storm.',
-      'To come back, press <b>Back to the airlock</b> at the bottom right.',
+      'To come back, walk in through the open hatch at the top of the yellow steps. Between the two doors, press <b>E</b> to open the Airlock panel and choose <b>Close up and come inside</b>.',
     ],
   },
 };
@@ -89,7 +89,7 @@ const SHORT = {
   'Research points': ['Your points toward the next unlock.', '+2 per rock sample, +1 per data upload.'],
   'Messages': ['Messages from the base computer and Mission Control.', 'Watch for storm warnings.'],
   'The Sun clock': ['The whole day. The white marker is now.', 'Yellow is sunlight. Blue is night, with no solar power.', 'Red is a solar storm. Dashes mean no Earth signal.'],
-  'Your missions box': ['Your next step is in the blue hint.', 'The target hides this box. The gear opens settings. F fast-forwards.'],
+  'Your missions box': ['Your next step is in the blue hint.', 'The arrow slides this box away. The gear opens settings and controls.'],
   'Now the stations': ['7 stations, each with a floating label.', 'Click a label to walk there, or press E when close.'],
   'Power station': ['Your battery, and what charges or drains it.', 'See "What is using power right now" below.'],
   'Life Support station': ['Makes your air. Eco uses the least power, Boost makes the most air.', 'Battery draining? Pick Eco. Air falling? Pick higher.'],
@@ -101,7 +101,7 @@ const SHORT = {
   'Optional: practice a moonwalk': ['Try the airlock for real: out and back in.', 'It takes about a minute. You can skip it.'],
   'Open the Airlock': ['Click the glowing Airlock label.'],
   'Suit up': ['Press "Suit up and go outside".', 'When the outer door opens, walk out with WASD.'],
-  'You are on the Moon': ['Your suit air counts down on the meter.', 'Press "Back to the airlock" when ready.'],
+  'You are on the Moon': ['Your suit air counts down on the meter.', 'To come back: walk in through the hatch, press E, and choose "Close up and come inside".'],
   'You are ready': ['Survive until sunrise.', 'Turn on the antenna, and use the shelter in the storm.', 'Press F to speed up time.'],
 };
 
@@ -175,7 +175,7 @@ function buildSteps() {
       title: 'Your missions box', target: '#mission-card', side: 'left', at: 'bottom', freeze: true,
       text: [
         '<b>This box tells you what to do next.</b> The blue hint changes as the situation changes.',
-        'Above it are two buttons. The <b>target</b> hides or shows this box. The <b>gear</b> pauses the game and opens the settings: game speed, sound, music and volume. The <b>F</b> key fast-forwards time. The square icon at the bottom right is <b>Fullscreen</b>.',
+        'The <b>arrow</b> on its left edge slides this box out of the way and back. The <b>gear</b> in the top corner pauses the game and opens the settings (game speed, sound, music, full screen) and the list of controls. The <b>F</b> key fast-forwards time.',
       ],
     },
     {
@@ -226,11 +226,11 @@ function buildSteps() {
       until: sim => sim.where === 'outside', noNext: true,
     },
     {
-      id: 'trip-outside', title: 'You are on the Moon', target: '#back-in', side: 'above', at: 'right',
-      hint: 'Look around, then press "Back to the airlock".',
+      id: 'trip-outside', title: 'You are on the Moon', target: '#meters [data-m="suit"]', side: 'right', at: 'right',
+      hint: 'Look around, then walk back in through the hatch, press E and choose "Close up and come inside".',
       text: [
         'You are outside! Your <b>suit air</b> now shows on the meter, and it counts down.',
-        'Look around, then press <b>Back to the airlock</b> when you are ready.',
+        'Look around. <b>To come back, walk up the yellow steps and in through the open hatch.</b> Between the two doors, press <b>E</b> to open the Airlock panel and choose <b>Close up and come inside</b>. The hatch closes behind you, the air comes back, and the inner door opens.',
       ],
       until: sim => sim.where !== 'outside' && sim.airlockStatus === 'pressurized', noNext: true,
     },

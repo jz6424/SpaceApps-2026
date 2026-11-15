@@ -434,7 +434,16 @@ function pause() {
   hud.close();
   game.pause();
   $('pause-mission').textContent = `${sim.mission.name}, ${sim.modeName} mode.`;
+  pauseTab('settings');
   show('pause');
+}
+
+// The Game paused panel has two pages: the settings, and the list of controls.
+function pauseTab(id) {
+  for (const page of ['settings', 'controls']) {
+    $(`page-${page}`).hidden = page !== id;
+    $(`tab-${page}`).setAttribute('aria-selected', page === id);
+  }
 }
 
 function resume() {
@@ -509,6 +518,7 @@ const actions = {
   research: openResearch,
   pick,
   buy,
+  'pause-tab': pauseTab,
   'open-all': () => { save.openAll = true; commit(); renderMissions(); },
   resume,
   leave: openMissions,
