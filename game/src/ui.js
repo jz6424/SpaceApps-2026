@@ -53,17 +53,18 @@ function renderStart() {
 // --- Mission menu ---
 function missionCard(mission, index) {
   const open = isOpen(mission);
-  const best = save.best[mission.id]?.[save.mode] ?? 0;
+  // Difficulty is picked after the mission, so the card shows your best result in any mode.
+  const [bestMode, best] = Object.entries(save.best[mission.id] ?? {}).sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
   const need = mission.requires;
   let action;
-  if (open) action = `<button class="btn primary" data-do="brief" data-id="${mission.id}">Start mission</button>`;
+  if (open) action = `<button class="btn primary" data-do="brief" data-id="${mission.id}">Choose this mission</button>`;
   else action = '<button class="btn" data-do="research">Open Research Tree</button>';
   return `
     <article class="mission ${open ? '' : 'locked'}">
       <div class="num" aria-hidden="true">${index + 1}</div>
       <h3>${mission.name}</h3>
       <p>${mission.goal}</p>
-      ${open ? starsHtml(best)
+      ${open ? `<p>${starsHtml(best)}${best ? ` in ${MODES[bestMode].label} mode` : ''}</p>`
         : `<p class="need">${icon('shield', 16)} Unlock ${need.name} in Research Tree.${need.about ? ` ${need.about}` : ''}</p>`}
       ${action}
     </article>`;
@@ -71,9 +72,6 @@ function missionCard(mission, index) {
 
 function renderMissions() {
   $('points').textContent = save.points;
-  $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
-    `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}">${mode.label} · ${mode.level}</button>`).join('');
-  $('mode-about').textContent = MODES[save.mode].about;
   $('mission-list').innerHTML = MISSIONS.map(missionCard).join('');
   $('save-note').textContent = saveWorks
     ? 'Your stars and points save by themselves in this browser. No account needed.'
@@ -362,17 +360,28 @@ function spaceWeatherReport() {
     : `Space weather report: the live NASA feed could not be reached, so your storms are sized from ${list.length} real past flares in NASA's DONKI records. ${sizes} They change every time you play.`;
 }
 
+// The difficulty buttons on the briefing, and the parts of the briefing that depend on them.
+function renderBriefMode() {
+  const mission = missionById(chosen);
+  $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
+    `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}">${mode.label} · ${mode.level}</button>`).join('');
+  $('mode-about').textContent = MODES[save.mode].about;
+  const best = save.best[mission.id]?.[save.mode] ?? 0;
+  $('mode-best').innerHTML = `Your best in ${MODES[save.mode].label} mode: ${starsHtml(best)}`;
+  const probe = new Sim(mission, save.mode, game.site);
+  $('brief-goal').textContent = mission.goalType === 'dose'
+    ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
+    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
+    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.` : mission.goal;
+}
+
 async function brief(id) {
   chosen = id;
   const mission = missionById(id);
   const site = game.site;
   $('brief-title').textContent = mission.name;
   $('brief-text').textContent = mission.brief;
-  const probe = new Sim(mission, save.mode, site);
-  $('brief-goal').textContent = mission.goalType === 'dose'
-    ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
-    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
-    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.` : mission.goal;
+  renderBriefMode();
   $('brief-site').innerHTML = `
     <div>${icon('sun', 24)}<b>${Math.round(site.sun * 100)}%</b><span>of the time in sunlight at your base</span></div>
     <div>${icon('globe', 24)}<b>${Math.round(site.earth * 100)}%</b><span>of the time Earth is above the horizon</span></div>
@@ -492,7 +501,7 @@ const actions = {
   home: () => { renderStart(); show('start'); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },
-  mode: id => { save.mode = id; commit(); renderMissions(); $('mode-choice').querySelector(`[data-id=${id}]`).focus(); },
+  mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus(); },
   brief,
   launch: () => launch(),
   again: id => launch(id),

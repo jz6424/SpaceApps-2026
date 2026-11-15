@@ -131,6 +131,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
 .score { --fill: rgba(5, 14, 40, .5); --fl: 8px; padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
+#brief-mode { display: grid; gap: 8px; width: 100%; }
+#brief-mode h3 { font-size: 1.1rem; }
 #mode-choice { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg {
   font: 700 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
@@ -139,7 +141,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 }
 .seg:hover { --fr: var(--yellow); color: var(--yellow); }
 .seg[aria-pressed="true"] { --fr: var(--yellow); --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
-#mode-about { min-height: 1.5em; margin-top: 8px; }
+#mode-about { min-height: 3em; }
 #mission-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; }
 .mission { --fill: rgba(5, 14, 40, .55); --fl: 16px; padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
 .mission.locked { --fr: rgba(201, 216, 242, .45); --fill: rgba(5, 14, 40, .3); }
