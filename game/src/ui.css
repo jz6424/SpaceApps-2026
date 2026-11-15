@@ -300,7 +300,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .rt-hub .rt-dot { left: -31px; top: -31px; width: 62px; height: 62px; background: #fff; border-color: #fff; color: #000; outline: 1px solid rgba(255, 255, 255, .5); outline-offset: 5px; }
 .rt-hub .rt-dot .ico { width: 28px; height: 28px; }
 .rt-hub .rt-name { top: 42px; }
-.rt-branch .rt-dot { left: -24px; top: -24px; width: 48px; height: 48px; border-color: #fff; outline: 1px solid rgba(255, 255, 255, .4); outline-offset: 4px; }
+/* The five branches are always open, so they are filled white like Your Base (locked circles are dark). */
+.rt-branch .rt-dot { left: -24px; top: -24px; width: 48px; height: 48px; background: #fff; border-color: #fff; color: #000; outline: 1px solid rgba(255, 255, 255, .4); outline-offset: 4px; }
 .rt-branch .rt-name { top: 36px; }
 /* Pointing at a circle fills it with a see-through white. */
 .rt-node .rt-dot:hover, .rt-node:focus-visible .rt-dot { background: rgba(255, 255, 255, .26); border-color: #fff; }
