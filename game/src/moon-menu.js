@@ -12,7 +12,8 @@ const DEG = Math.PI / 180;
 const TILT = -66 * DEG;        // tips the south pole toward the camera, since that is where the base is
 const SPIN = 0.1;              // radians a second about its own axis while nothing is picked
 const SLOP = 6;                // pixels the pointer may wander and still count as a click
-const HOME = new THREE.Vector3(0, 0.05, 3.95);  // where the camera rests
+const HOME = new THREE.Vector3(0, 0.05, 4.7);   // where the camera rests: far enough back that no flag is cut off
+const REACH = 1.34;            // how far the flags and the axis line stick out, in Moon radii from the middle
 const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // A point on the globe from latitude and longitude in degrees. y is up, so the south pole is -y.
@@ -80,7 +81,7 @@ function buildMoon() {
   const dash = new THREE.CylinderGeometry(0.007, 0.007, 0.07, 6), edge = new THREE.CylinderGeometry(0.0115, 0.0115, 0.079, 6);
   const white = new THREE.MeshBasicMaterial({ color: 0xf2f6fc, transparent: true, opacity: 0.5, depthWrite: false });
   const dark = new THREE.MeshBasicMaterial({ color: 0x07173f, side: THREE.BackSide, transparent: true, opacity: 0.22, depthWrite: false });
-  for (const end of [1, -1]) for (let y = 1.07; y < 1.4; y += 0.11) {
+  for (const end of [1, -1]) for (let y = 1.07; y < 1.3; y += 0.11) {
     const piece = new THREE.Mesh(dash, white), rim = new THREE.Mesh(edge, dark);
     piece.position.y = end * y;
     rim.renderOrder = 1; piece.renderOrder = 2;
@@ -236,6 +237,11 @@ export function createMoonMenu(canvas, missions, onPick) {
     // On a tall, narrow canvas pull back so the whole Moon still fits.
     camera.fov = camera.aspect < 1 ? 32 / camera.aspect : 32;
     camera.updateProjectionMatrix();
+    // On a wide canvas the Moon sits to the right of the middle, away from the mission boxes,
+    // but never so far that a flag on its edge would be cut off.
+    const radius = h / 2 / Math.tan(camera.fov * DEG / 2) / HOME.length();
+    const shift = Math.round(Math.max(0, Math.min(w * 0.1, w / 2 - REACH * radius)));
+    if (shift) camera.setViewOffset(w, h, -shift, 0, w, h); else camera.clearViewOffset();
   }
   new ResizeObserver(fit).observe(canvas);
 
