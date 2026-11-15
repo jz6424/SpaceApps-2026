@@ -578,6 +578,41 @@ place('CargoLander', L(20, 18), -0.4);
 const dock = L(14, 6);
 const robot = place('Digger', dock.clone(), 0, { solid: false });
 const digSpot = L(34, -12);
+// The dig site: a patch of freshly turned regolith that grows the longer the robot digs (darker
+// churned dirt in the middle, a lighter rim of thrown-out dirt), and a label while it works there.
+const digPatch = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d'), grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  // Freshly dug regolith is darker than the sun-weathered top layer, and the dirt thrown out
+  // round it is brighter, like the bright rays round young craters.
+  grad.addColorStop(0, 'rgba(26, 25, 24, .92)');
+  grad.addColorStop(0.5, 'rgba(48, 46, 44, .85)');
+  grad.addColorStop(0.62, 'rgba(225, 220, 208, .8)');
+  grad.addColorStop(0.82, 'rgba(215, 210, 198, .45)');
+  grad.addColorStop(1, 'rgba(215, 210, 198, 0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 180; i++) { // clods: dark ones in the dug middle, bright ones in the thrown-out rim
+    const a = Math.random() * Math.PI * 2, r = Math.random() ** 0.8 * 52, rim = r > 32;
+    const v = rim ? 190 + Math.random() * 50 | 0 : 18 + Math.random() * 40 | 0;
+    g.fillStyle = `rgba(${v},${v},${v - 4},.75)`;
+    g.fillRect(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 1 + Math.random() * 2.5, 1 + Math.random() * 2.5);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+  mesh.position.copy(digSpot).y += 0.03;
+  mesh.receiveShadow = true;
+  mesh.visible = false;
+  scene.add(mesh);
+  return mesh;
+})();
+const digLabel = makeCallout('Dig site', { color: '#E8D9B0', near: 6, far: 60, faint: 0 });
+digLabel.position.copy(digSpot).y += 1.8;
+digLabel.visible = false;
+let dug = 0, nextDigDust = 0; // seconds of digging this mission, and when the next puff of dust flies
 
 // The ice drill sits at the nearest ground NASA's map says never sees sunlight.
 const iceSpot = icePixel
@@ -1351,7 +1386,7 @@ function hold(id) {
 // --- Moon dust: small puffs kicked up by running feet and by landings ---
 // With no air, dust on the Moon doesn't hang in a cloud: every grain flies in an arc and drops
 // straight back, in the Moon's weak gravity. Each puff is a handful of grains that do just that.
-const PUFFS = 12, GRAINS = 22;
+const PUFFS = 20, GRAINS = 22; // enough for running feet and a digging robot at once
 const dustDot = (() => {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
@@ -1891,6 +1926,7 @@ function tick(dt) {
 
 // Things in the world that follow the game rules: daylight, broken panels, the robot.
 let robotPhase = 0;
+const digDrum = new THREE.Vector3();
 let crewIn = false; // the astronaut is in the Habitat (worked out in tick)
 function syncWorld(dt) {
   if (!sim) return;
@@ -1936,6 +1972,21 @@ function syncWorld(dt) {
     robot.rotation.y += Math.sin(robotPhase) * dt * 0.6; // busy wiggle while working
   }
   r.y = groundAt(r.x, r.z);
+  // At work on site (digging, or hauling ice at the crater): the bucket drums at each end throw up
+  // dust a few times a second. Digging also leaves a growing patch of turned-up dirt.
+  const atWork = (task === 'dig' || task === 'ice') && d <= 0.5 && sim.share > 0;
+  const now = performance.now();
+  if (atWork && now >= nextDigDust) {
+    nextDigDust = now + 140 + Math.random() * 120;
+    const end = Math.random() < 0.5 ? -1 : 1;
+    const drum = robot.localToWorld(digDrum.set(end * 1.85, 0.15, (Math.random() - 0.5) * 1.2));
+    const awayX = drum.x - r.x, awayZ = drum.z - r.z;
+    kickDust({ x: drum.x, y: groundAt(drum.x, drum.z), z: drum.z }, 1.1 + Math.random() * 0.5, -awayX * 0.9, -awayZ * 0.9);
+  }
+  if (atWork && task === 'dig') dug += dt;
+  digPatch.visible = dug > 0;
+  digPatch.scale.setScalar(2 + 2.5 * Math.min(1, dug / 40)); // 4 m across at the first scoop, 9 m after 40 s
+  digLabel.visible = task === 'dig';
 }
 
 // Slow computers (school Chromebooks) get simpler graphics: no shadows and fewer pixels.
@@ -2130,6 +2181,7 @@ gameReady({
     teleport(startSpot());
     facing = crew.rotation.y;
     scatterSamples();
+    dug = 0; // a new mission starts with untouched ground at the dig site
     robot.position.copy(dock);
     yaw = Math.PI / 2;
     pitch = 1;
