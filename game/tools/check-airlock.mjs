@@ -67,6 +67,28 @@ for (const [mode, skips] of [['Explorer', false], ['Cadet', true]]) {
   s.airlockTick(0.05);
   if ((s.airlockStep.kind !== 'prebreathe') !== skips) fail(`prebreathe skip wrong for ${mode}`, s);
 }
+// The hatch shuts behind someone who walks out, and they can open it again from the Moon side.
+// Opened from outside, it stays open until they have stepped through.
+{
+  const s = new Sim(MISSIONS[0], 'Explorer');
+  s.inAirlock = true;
+  s.airlockStart('out'); settle(s);
+  if (!s.airlock.outer) fail('hatch did not open for the trip out', s);
+  Object.assign(s, { inAirlock: false, doorway: 'outer', where: 'outside' }); settle(s, 3);
+  if (!s.airlock.outer) fail('hatch shut on someone standing in it', s);
+  s.doorway = null; settle(s, 3);
+  if (s.airlock.outer || s.airlock.pressure !== 'vacuum') fail('hatch did not shut behind the astronaut', s);
+  if (s.airlockDoor('outer')) fail('hatch would not open again from outside', s);
+  settle(s, 5);
+  if (!s.airlock.outer) fail('hatch shut again before anyone came through', s);
+  Object.assign(s, { inAirlock: true, where: 'inside' }); settle(s, 3);
+  if (!s.airlock.outer) fail('hatch shut on someone coming in', s);
+  s.airlockStart('in'); settle(s);
+  if (!s.airlock.inner || s.airlock.outer || s.airlock.pressure !== 'pressurized') fail('could not get back in after the hatch shut', s);
+  // Walking from the airlock into the cabin never shuts anything.
+  Object.assign(s, { inAirlock: false, where: 'inside' }); settle(s, 3);
+  if (!s.airlock.inner) fail('inner door shut by itself', s);
+}
 // Someone outside can always get the hatch open, even with the cabin door open and a storm on.
 {
   const s = new Sim(MISSIONS[0], 'Explorer');

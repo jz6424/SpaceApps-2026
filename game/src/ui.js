@@ -53,15 +53,10 @@ const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} an
 //   down  the way back: the stars rush up as the new screen rises over the sky
 //   fade  the old screen fades away over the new one
 //
-// Between the title screen and the mission menu there are three moves to choose from. Add
-// ?move=doors or ?move=fly to the game's address to try the others; scope is used otherwise.
-//   scope  the ring round the title's picture opens out until the menu fills the screen
-//   doors  two airlock doors slide shut over the old screen and open on the new one
-//   fly    the title rushes past and the Moon comes in from far away
-// Each has its way back: scope-back, doors again, fly-back.
-const MOVES = { up: 1100, down: 1000, fade: 350, scope: 850, 'scope-back': 700, doors: 1000, fly: 700, 'fly-back': 450 };
-const TITLE_MOVE = ['scope', 'doors', 'fly'].find(m => m === new URLSearchParams(location.search).get('move')) ?? 'scope';
-const TITLE_BACK = { scope: 'scope-back', doors: 'doors', fly: 'fly-back' }[TITLE_MOVE];
+//   scope       title screen to mission menu: the ring round the title's picture opens out
+//               until the menu fills the screen
+//   scope-back  the way back: the ring closes down onto the picture again
+const MOVES = { up: 1100, down: 1000, fade: 350, scope: 850, 'scope-back': 700 };
 const ALL_MOVES = Object.keys(MOVES).map(m => `move-${m}`);
 
 // Tells ui.css where the ring round the title's picture is, how big, and how far it must open
@@ -72,15 +67,6 @@ function aimScope() {
   const r1 = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 8;
   for (const [name, value] of [['x', `${x}px`], ['y', `${y}px`], ['r0', `${r0}px`], ['r1', `${r1}px`], ['grow', r1 / r0]]) root.style.setProperty(`--scope-${name}`, value);
 }
-// Runs the airlock doors across the screen: shut, a beat, open.
-function runDoors() {
-  const doors = $('doors');
-  doors.classList.remove('run');
-  void doors.offsetWidth;   // lets the doors run again straight after a run
-  doors.classList.add('run');
-  sound.airlockSound('door-close', 0.36);
-  setTimeout(() => { if (doors.classList.contains('run')) sound.airlockSound('door-open', 0.4); }, 580);
-}
 const showing = () => SCREENS.find(key => !$(key).hidden && !$(key).classList.contains('leaving'));
 let moving = null;   // { from, to, timer } while a move is playing
 function settle() {
@@ -89,7 +75,6 @@ function settle() {
   const { from, to } = moving;
   moving = null;
   for (const key of [from, to]) $(key).classList.remove('leaving', 'arriving', ...ALL_MOVES);
-  $('doors').classList.remove('run');
   $(from).hidden = true;
   if (to !== 'missions') moonMenu?.stop();
 }
@@ -103,7 +88,6 @@ function show(name, move) {
     old.hidden = false;
     old.style.setProperty('--scrolled', `${old.scrollTop}px`);
     if (move.startsWith('scope')) aimScope();
-    if (move === 'doors') runDoors();
     old.classList.add('leaving', `move-${move}`);
     $(name).classList.add('arriving', `move-${move}`);
     moving = { from, to: name, timer: setTimeout(settle, MOVES[move] + 40) };
@@ -221,14 +205,13 @@ function openMissions() {
   $('dive').classList.remove('on');
   const from = showing();
   if (from === 'research') startPan(-1, MOVES.down / 1000);
-  show('missions', { research: 'down', scrapbook: 'fade', start: TITLE_MOVE }[from]);
+  show('missions', { research: 'down', scrapbook: 'fade', start: 'scope' }[from]);
   measureBar();
   makeMoon();
   renderMissions();
   // The menu starts on its first mission, so Enter opens that and doesn't go back to the title.
   $('mission-list').querySelector('.m-head')?.focus({ preventScroll: true });
   moonMenu.start();
-  if (from === 'start' && TITLE_MOVE === 'fly' && !calm) moonMenu.approach();
 }
 // The Moon is made once, as soon as the game has loaded, so that its maps of the real Moon have
 // arrived by the time the menu opens. It sizes itself to its place on the page when it starts.
@@ -988,7 +971,7 @@ function renderCredits() {
 const actions = {
   // Leaving the Scrapbook, the book shuts first.
   'open-missions': () => (showing() === 'scrapbook' ? scrapbook.close(openMissions) : openMissions()),
-  home: () => { renderStart(); show('start', showing() === 'missions' ? TITLE_BACK : undefined); },
+  home: () => { renderStart(); show('start', showing() === 'missions' ? 'scope-back' : undefined); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },
   mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus({ preventScroll: true }); },

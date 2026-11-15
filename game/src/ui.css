@@ -79,12 +79,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 @keyframes screen-fade { to { opacity: 0; } }
 @keyframes screen-sink { to { transform: translateY(100%); } }
 @keyframes screen-soften { from { -webkit-mask-position: 0 calc(0px - var(--soft)); mask-position: 0 calc(0px - var(--soft)); } }
-/* Title screen <-> mission menu: three moves to choose from (ui.js picks one; see MOVES there).
-   While any of them plays the title screen can't grow a scroll bar, which would shift it. */
+/* Title screen <-> mission menu (the scope move, see MOVES in ui.js). While it plays the title
+   screen can't grow a scroll bar, which would shift it. */
 #start { scrollbar-gutter: stable; }
 #start:is(.leaving, .arriving) { overflow-y: hidden; }
 
-/* 1. Scope. The ring round the title's picture opens out: the mission menu shows through a round
+/* The ring round the title's picture opens out: the mission menu shows through a round
    hole where the picture was, and the hole and the ring grow together until the menu fills the
    screen. ui.js measures the ring (--scope-x, -y, -r0), how far it must open (-r1) and how many
    times bigger that is (-grow). The way back closes it again. */
@@ -97,46 +97,6 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
   to { clip-path: circle(var(--scope-r1) at var(--scope-x) var(--scope-y)); }
 }
 @keyframes scope-ring { to { transform: scale(var(--scope-grow)); } }
-
-/* 2. Doors. Two airlock doors slide in from the sides and meet in the middle, the screens swap
-   behind them, and the doors slide open again. */
-#doors { position: fixed; inset: 0; z-index: 58; pointer-events: none; visibility: hidden; overflow: hidden; }
-#doors.run { visibility: visible; pointer-events: auto; }
-#doors i {
-  position: absolute; top: 0; bottom: 0; left: 0; width: 50%; box-sizing: border-box; transform: translateX(-102%);
-  background: linear-gradient(90deg, #06143A, #0B2260 70%, #0E2A75);
-  border-right: 3px solid var(--yonder); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
-}
-#doors i:last-child { left: 50%; transform: translateX(102%) scaleX(-1); }
-/* A raised panel on each door, and a striped edge where the two meet. */
-#doors i::before { content: ""; position: absolute; inset: 9% 16% 9% 12%; border: 2px solid rgba(255, 255, 255, .14); border-radius: 10px; background: rgba(255, 255, 255, .03); }
-#doors i::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 18px; background: repeating-linear-gradient(-45deg, var(--yonder) 0 12px, #07173F 12px 24px); opacity: .85; }
-#doors.run i { animation: door-left 1s both; }
-#doors.run i:last-child { animation-name: door-right; }
-@keyframes door-left {
-  0% { transform: translateX(-102%); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
-  36%, 58% { transform: none; animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
-  100% { transform: translateX(-102%); }
-}
-@keyframes door-right {
-  0% { transform: translateX(102%) scaleX(-1); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
-  36%, 58% { transform: scaleX(-1); animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
-  100% { transform: translateX(102%) scaleX(-1); }
-}
-/* The old screen goes while the doors are shut. */
-.screen.leaving.move-doors { animation: screen-vanish 1s linear both; }
-@keyframes screen-vanish { 0%, 46% { visibility: visible; } 47%, 100% { visibility: hidden; } }
-
-/* 3. Fly. The title rushes toward you and fades, as if flown past; behind it the Moon comes in
-   from far away (moon-menu.js) and the menu's words slide into place. The way back is a plain
-   fade with the title settling. */
-.screen.leaving.move-fly { animation: screen-fade .5s ease-in both; }
-.screen.leaving.move-fly .inner { animation: fly-past .5s ease-in both; }
-.screen.arriving.move-fly :is(.topbar, h2, #mission-list, #moon-notes) { animation: fly-settle .5s var(--ease) .3s backwards; }
-.screen.leaving.move-fly-back { animation: screen-fade .4s ease both; }
-.screen.arriving.move-fly-back .inner { animation: fly-past .45s ease-out reverse both; }
-@keyframes fly-past { to { transform: scale(1.6); } }
-@keyframes fly-settle { from { opacity: 0; transform: translateX(-32px); } }
 
 /* The Research Tree's title bar and buttons fade in once the sky has slowed, and out as it leaves. */
 #research.arriving.move-up :is(.rt-top, .rt-zoom) { animation: screen-fade .5s ease .55s reverse backwards; }

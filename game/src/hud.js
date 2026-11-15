@@ -542,7 +542,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         title: 'Airlock', icon: 'door',
         body: `${view}
         <dl class="facts"><dt>Air in the airlock</dt><dd>${words}</dd><dt>Inner door</dt><dd>${sim.airlock.inner ? 'Open' : 'Closed'}</dd><dt>Outer door</dt><dd>${sim.airlock.outer ? 'Open' : 'Closed'}</dd></dl>
-        <p class="fine">Only one door opens at a time, so the cabin never loses its air. Come back in through the door at the top of the yellow steps.</p>`,
+        <p class="fine">Only one door opens at a time, so the cabin never loses its air. The hatch shuts behind you when you walk out. To come back, open it again at the top of the yellow steps.</p>`,
       };
     },
   };

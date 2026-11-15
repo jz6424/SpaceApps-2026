@@ -121,10 +121,10 @@ function buildSteps() {
     },
     {
       id: 'trip-outside', title: 'You are on the Moon', target: '#meters [data-m="suit"]', side: 'right', at: 'right',
-      hint: 'Pick up a glowing rock with E, then walk back in through the hatch, press E and choose "Close up and come inside".',
+      hint: 'Pick up a glowing rock with E. Then go back up the yellow steps, press E to open the hatch, walk in, and press E again to choose "Close up and come inside".',
       text: [
         'Walk to a <b>glowing rock</b> and press <b>E</b> to pick it up. Your <b>suit air</b> counts down on the meter.',
-        '<b>To come back:</b> walk up the yellow steps and in through the open hatch. Between the two doors, press <b>E</b> and choose <b>Close up and come inside</b>.',
+        'The hatch shuts behind you. <b>To come back:</b> walk up the yellow steps and press <b>E</b> at the hatch to open it. Walk in, and between the two doors press <b>E</b> again and choose <b>Close up and come inside</b>.',
       ],
       until: sim => sim.where !== 'outside' && sim.airlockStatus === 'pressurized', noNext: true,
     },

@@ -94,7 +94,8 @@ export class Sim {
     // The airlock: two doors that are never open together, and the air between them.
     // inner faces the cabin, outer faces the Moon. pressure is 'pressurized' or 'vacuum'.
     // cycle is the job in progress: { dir, steps: [{ kind, door, length }], i, t }.
-    this.airlock = { inner: true, outer: false, pressure: 'pressurized', cycle: null, uses: 0 };
+    // passing: the astronaut is in the airlock or its outer doorway (see hatchBehind).
+    this.airlock = { inner: true, outer: false, pressure: 'pressurized', cycle: null, uses: 0, passing: false };
     this.inAirlock = false; // set by the 3D world: the astronaut is standing between the doors
     this.doorway = null;    // set by the 3D world: 'inner' or 'outer' while standing in that doorway
 
@@ -290,7 +291,20 @@ export class Sim {
   airlockSet(pressure) {
     Object.assign(this.airlock, { inner: pressure === 'pressurized', outer: pressure === 'vacuum', pressure, cycle: null });
   }
+  // The hatch shuts by itself behind an astronaut who walks out onto the Moon. It only does so
+  // for someone who came through it: a hatch opened from the Moon side stays open until they
+  // have stepped in, so it can't shut in their face.
+  hatchBehind() {
+    const lock = this.airlock;
+    if (this.inAirlock || this.doorway === 'outer') lock.passing = true;
+    else if (this.where !== 'outside' || !lock.outer) lock.passing = false; // back in the cabin, or already shut
+    else if (lock.passing && !lock.cycle) {
+      lock.passing = false;
+      lock.cycle = { dir: null, steps: [{ kind: 'close', door: 'outer', length: C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
+    }
+  }
   airlockTick(dt) {
+    this.hatchBehind();
     const lock = this.airlock, cy = lock.cycle;
     if (!cy) return;
     const step = cy.steps[cy.i];
