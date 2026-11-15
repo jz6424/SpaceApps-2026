@@ -155,8 +155,23 @@ scene.add(new THREE.Points(
   starSky,
 ));
 
-// The Earth hangs low in the sky to the north (the base is at the south pole).
-const earth = new THREE.Mesh(new THREE.SphereGeometry(110, 32, 16), new THREE.MeshBasicMaterial({ color: 0x2e96f5 }));
+// The Earth hangs low in the sky to the north (the base is at the south pole). It wears NASA's
+// whole-Earth picture (land, sea and clouds, from the Scientific Visualization Studio), leans on
+// its real 23.4 degree tilt and turns slowly. Until the picture arrives it is plain blue.
+const earth = new THREE.Group();
+const earthBall = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 24), new THREE.MeshBasicMaterial({ color: 0x2e96f5 }));
+earth.rotation.z = THREE.MathUtils.degToRad(23.4);
+earth.add(earthBall);
+new THREE.TextureLoader().load('earth/earth.jpg', tex => {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  earthBall.material.map = tex;
+  earthBall.material.color.set(0xffffff);
+  earthBall.material.needsUpdate = true;
+});
+// A thin glow of air round the edge.
+const earthAir = new THREE.Mesh(new THREE.SphereGeometry(116, 48, 24), new THREE.MeshBasicMaterial({ color: 0x6fb4ff, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false }));
+earth.add(earthAir);
 const earthDir = new THREE.Vector3(-0.85, 0.12, -0.5).normalize();
 scene.add(earth);
 
@@ -187,6 +202,72 @@ function regolithTexture() {
   return tex;
 }
 
+// Small craters and rough ground, too small for NASA's 5 m height grid to show: made here as one
+// 64 m tile. Its colour channels are a normal map (the bumps the light picks out, strong at the
+// pole's low sun) and its alpha is a brightness pattern (fresh rims lighter, floors darker), which
+// the ground's shader multiplies in. The real terrain underneath is unchanged.
+const DETAIL_TILE = 64; // metres
+function groundDetail() {
+  const N = 1024, perM = N / DETAIL_TILE;
+  let seed = 4721;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const h = new Float32Array(N * N), tone = new Float32Array(N * N);
+  // Rolling, lumpy ground: smooth noise at five sizes, each half as tall as the last. It wraps, so
+  // the tile repeats without a seam.
+  let amp = 0.14;
+  for (const cells of [8, 16, 32, 64, 128]) {
+    const g = Float32Array.from({ length: cells * cells }, () => rnd() * 2 - 1), step = N / cells;
+    for (let y = 0; y < N; y++) {
+      const fy = y / step, y0 = fy | 0, ty = fy - y0, sy = ty * ty * (3 - 2 * ty);
+      const r0 = (y0 % cells) * cells, r1 = ((y0 + 1) % cells) * cells;
+      for (let x = 0; x < N; x++) {
+        const fx = x / step, x0 = fx | 0, tx = fx - x0, sx = tx * tx * (3 - 2 * tx), c0 = x0 % cells, c1 = (x0 + 1) % cells;
+        const a = g[r0 + c0], b = g[r0 + c1], c = g[r1 + c0], d = g[r1 + c1];
+        const v = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+        h[y * N + x] += amp * v;
+        if (cells === 16) tone[y * N + x] += 0.06 * v; // broad light and dark patches
+      }
+    }
+    amp *= 0.5;
+  }
+  // Craters: many small, a few big (0.3 to 6 m radius). A bowl a fifth as deep as it is wide
+  // (shallower when old and worn), a raised rim, and a brighter ring of thrown-out dirt.
+  for (let k = 0; k < 230; k++) {
+    const r = 0.3 * Math.pow(20, Math.pow(rnd(), 2.4)), fresh = rnd();
+    const depth = 2 * r * (0.07 + 0.13 * fresh), rim = 2 * r * (0.02 + 0.03 * fresh);
+    const cx = rnd() * N, cy = rnd() * N, rp = r * perM, reach = Math.ceil(rp * 1.8);
+    for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+      const q = Math.hypot(dx, dy) / rp;
+      if (q > 1.8) continue;
+      const x = ((Math.floor(cx) + dx) % N + N) % N, y = ((Math.floor(cy) + dy) % N + N) % N, i = y * N + x;
+      const bowl = q < 1 ? depth * (q * q - 1) : 0, ring = Math.exp(-(((q - 1) / 0.28) ** 2));
+      h[i] += bowl + rim * ring;
+      tone[i] += (0.05 + 0.1 * fresh) * ring * (q > 1 ? 1 : 0.6) - (q < 0.8 ? 0.05 * fresh : 0);
+    }
+  }
+  // Slopes to normals: x along u, rows along v (a DataTexture is not flipped).
+  const data = new Uint8Array(N * N * 4), span = 2 / perM;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x;
+    const gx = (h[y * N + (x + 1) % N] - h[y * N + (x + N - 1) % N]) / span;
+    const gy = (h[((y + 1) % N) * N + x] - h[((y + N - 1) % N) * N + x]) / span;
+    const len = Math.hypot(gx, gy, 1);
+    data[i * 4] = (-gx / len * 0.5 + 0.5) * 255;
+    data[i * 4 + 1] = (-gy / len * 0.5 + 0.5) * 255;
+    data[i * 4 + 2] = (1 / len * 0.5 + 0.5) * 255;
+    data[i * 4 + 3] = Math.max(0, Math.min(255, (0.5 + tone[i]) * 255));
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(SPAN / DETAIL_TILE, SPAN / DETAIL_TILE);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.needsUpdate = true;
+  return tex;
+}
+
 const terrainGeo = new THREE.PlaneGeometry(SPAN, SPAN, GRID - 1, GRID - 1).rotateX(-Math.PI / 2);
 const posAttr = terrainGeo.attributes.position;
 for (let i = 0; i < posAttr.count; i++) posAttr.setY(i, heights[i]);
@@ -198,7 +279,14 @@ for (let i = 0; i < posAttr.count; i++) {
   tint.set([1 - 0.35 * ice, 1 - 0.2 * ice, 1 + 0.1 * ice], i * 3);
 }
 terrainGeo.setAttribute('color', new THREE.BufferAttribute(tint, 3));
-const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true }));
+const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true, normalMap: groundDetail(), normalScale: new THREE.Vector2(1.5, 1.5) });
+// The detail tile's alpha lightens and darkens the ground: once at its own size, and once much
+// larger and offset, so the 64 m repeat doesn't show as a pattern from far away.
+terrainMat.onBeforeCompile = shader => {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    diffuseColor.rgb *= (0.6 + 0.8 * texture2D(normalMap, vNormalMapUv).a) * (0.85 + 0.3 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);`);
+};
+const terrain = new THREE.Mesh(terrainGeo, terrainMat);
 terrain.receiveShadow = true;
 scene.add(terrain);
 
@@ -494,8 +582,34 @@ const samples = [[12, 15], [17, -7], [24, 22], [-28, -30], [40, -32]].map(([dx, 
   scene.add(mesh);
   const label = makeCallout('Rock sample', { color: '#EAFE07', near: 3, far: 20, faint: 0 });
   label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
-  return { id: `rock${i}`, mesh, label, at };
+  return { id: `rock${i}`, mesh, label, at, home: at.clone() };
 });
+// Every mission scatters the rocks afresh around the base: one in each fifth of the circle, 14 to
+// 40 m out (an easy trip on one tank of suit air), clear of anything solid, at least 6 m from the
+// Habitat (where the dirt shield may go) and 8 m from each other. A rock that finds no spot in 80
+// tries goes back to its old fixed place.
+const SAMPLE_NEAR = 14, SAMPLE_FAR = 40;
+const gapTo = (b, x, z) => Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1));
+function scatterSamples(rnd = Math.random) {
+  const placed = [];
+  const hullBox = { x0: hull.min.x, x1: hull.max.x, z0: hull.min.z, z1: hull.max.z };
+  samples.forEach((s, i) => {
+    let spot = null;
+    for (let tries = 0; tries < 80 && !spot; tries++) {
+      const angle = (i + 0.1 + rnd() * 0.8) / samples.length * Math.PI * 2;
+      const dist = SAMPLE_NEAR + rnd() * (SAMPLE_FAR - SAMPLE_NEAR);
+      const x = site.x + Math.cos(angle) * dist, z = site.z + Math.sin(angle) * dist;
+      if (gapTo(hullBox, x, z) < 6 || navBoxes.some(b => gapTo(b, x, z) < 2.5)) continue;
+      if (Math.hypot(x - digSpot.x, z - digSpot.z) < 5 || placed.some(p => Math.hypot(p.x - x, p.z - z) < 8)) continue;
+      spot = new THREE.Vector3(x, groundAt(x, z), z);
+    }
+    spot ??= s.home;
+    placed.push(spot);
+    s.at.copy(spot);
+    s.mesh.position.copy(spot).y += 0.3;
+    s.label.position.copy(spot).y += 0.6;
+  });
+}
 
 // --- Airlock: the tube between the cabin and the surface, with a door at each end ---
 // The Habitat was drawn in design units (x toward the door, y to the north side, z up).
@@ -1493,7 +1607,10 @@ const TURN = 13;       // how quickly the body turns to face its direction
 const TURN_MAX = 12;
 const AIR_STEER = 9;   // how quickly the keys turn you in mid-air (a little gentler than on the ground)
 let airCap = WALK;     // the fastest you may go in the air: your speed when you left the ground
-const FOV = 60, FOV_RUN = 68; // the view widens a little while sprinting    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
+// The view widens for speed: a little in any jump, more while sprinting on the ground. A
+// sprint-jump keeps the sprint view until you land, so the view doesn't pulse in and out.
+const FOV = 60, FOV_AIR = 67, FOV_RUN = 73;
+let fovWant = FOV;
 let velX = 0, velZ = 0, facing = 0;
 const camRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
 const head = new THREE.Vector3(), camDir = new THREE.Vector3();
@@ -1610,7 +1727,7 @@ function tick(dt) {
     velX += (mx / unit * airCap - velX) * pull;
     velZ += (mz / unit * airCap - velZ) * pull;
   }
-  // Sprinting (Shift, or the joystick pushed all the way) widens the view a little, in the air too.
+  // Sprinting (Shift, or the joystick pushed all the way) widens the view: see FOV.
   const sprinting = len > 0 && speedWalk === RUN;
 
   if (grounded && (keys.has('Space') || jumpAsked)) vy = JUMP;
@@ -1690,13 +1807,16 @@ function tick(dt) {
     camera.position.copy(head).addScaledVector(camDir, camShown);
     camera.lookAt(head);
   }
-  // The view eases a little wider while sprinting.
-  const fov = camera.fov + ((sprinting ? FOV_RUN : FOV) - camera.fov) * ease(6);
+  // The view eases wider in the air and while sprinting (see FOV above).
+  if (grounded) fovWant = sprinting ? FOV_RUN : FOV;
+  else fovWant = Math.max(fovWant, FOV_AIR);
+  const fov = camera.fov + (fovWant - camera.fov) * ease(5);
   if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
 
   sun.target.position.copy(head);
   sun.position.copy(head).addScaledVector(SUN_DIR, 400);
   earth.position.copy(camera.position).addScaledVector(earthDir, 5000);
+  earthBall.rotation.y += dt * 0.06; // the Earth turns slowly: once around in under two minutes
 }
 
 // Things in the world that follow the game rules: daylight, broken panels, the robot.
@@ -1933,6 +2053,7 @@ gameReady({
     fitWindow();
     teleport(startSpot());
     facing = crew.rotation.y;
+    scatterSamples();
     robot.position.copy(dock);
     yaw = Math.PI / 2;
     pitch = 1;

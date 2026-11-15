@@ -172,6 +172,7 @@ export const SOURCES = [
   ['Terrain', 'LRO LOLA 5 m elevation model of Connecting Ridge (Site01), NASA Goddard Planetary Geodesy Data Archive (PGDA)', 'https://pgda.gsfc.nasa.gov/products/78'],
   ['Sunlight, Earth view, permanent shadow', 'LRO LOLA south pole illumination maps, NASA PGDA', 'https://pgda.gsfc.nasa.gov/products/69'],
   ['The Moon on the mission menu', 'CGI Moon Kit: whole-Moon brightness map (LROC camera) and height map (LOLA laser altimeter), NASA\'s Scientific Visualization Studio', 'https://svs.gsfc.nasa.gov/4720/'],
+  ['The Earth in the sky', 'Whole-Earth map with clouds, "Equirectangular Projected Earth", NASA\'s Scientific Visualization Studio', 'https://svs.gsfc.nasa.gov/3615/'],
   ['Solar flares and storm sizes', 'NASA DONKI space weather database, Community Coordinated Modeling Center (CCMC)', 'https://ccmc.gsfc.nasa.gov/tools/DONKI/'],
   ['Radiation limit', 'NASA-STD-3001 Volume 1, crew health standard', 'https://www.nasa.gov/ochmo/human-spaceflight-standards/'],
   ['Life support numbers', 'Ewert and Stromgren (2019), NASA Technical Reports Server 20190027563', 'https://ntrs.nasa.gov/citations/20190027563'],
