@@ -284,8 +284,8 @@ const calloutLayer = document.createElement('div');
 calloutLayer.id = 'callouts';
 renderer.domElement.after(calloutLayer); // under the HUD and the menus, over the 3D view
 const callouts = [];
-// near/far: metres from the astronaut where it starts to fade and where it is faintest.
-// faint: how visible it stays when far (0 = gone). station: the station it opens when clicked.
+// near/far: metres from the astronaut where it starts to fade and where it is gone.
+// faint: how visible it stays beyond far (0, gone, for all of them now). station: the station it opens when clicked.
 function makeCallout(text, { color = '#FFFFFF', near = 6, far = 14, faint = 0.2, station = null } = {}) {
   const el = document.createElement('div');
   el.className = 'callout';
@@ -320,7 +320,8 @@ function placeCallouts() {
     if (show !== c.shown) { c.el.style.display = show ? '' : 'none'; c.shown = show; }
     if (!show) continue;
     const away = Math.hypot(c.position.x - me.x, c.position.y - me.y, c.position.z - me.z);
-    const fade = 1 - (1 - c.faint) * THREE.MathUtils.smoothstep(away, c.near, c.far);
+    // Steadily clearer with every step closer: a straight line from gone (at far) to full (at near).
+    const fade = 1 - (1 - c.faint) * THREE.MathUtils.clamp((away - c.near) / (c.far - c.near), 0, 1);
     const size = THREE.MathUtils.clamp(9 / camera.position.distanceTo(c.position), 0.78, 1.08) * (1 + 0.12 * c.on);
     c.el.style.opacity = Math.max(fade, c.on).toFixed(2);
     c.el.style.transform = `translate(${((toScreen.x + 1) / 2 * w).toFixed(1)}px, ${((1 - toScreen.y) / 2 * h).toFixed(1)}px) scale(${size.toFixed(3)})`;
@@ -357,7 +358,7 @@ for (const [id, node] of Object.entries(stationNodes)) {
   node.traverse(o => { if (o.isMesh && !o.name.endsWith('_Stand')) body.expandByObject(o); });
   const dot = body.isEmpty() ? pos.clone().add(new THREE.Vector3(0, 1.4, 0))
     : new THREE.Vector3((body.min.x + body.max.x) / 2, Math.min(body.min.y + (body.max.y - body.min.y) * 0.8, pos.y + 2.2), (body.min.z + body.max.z) / 2);
-  const marker = makeCallout(STATION_INFO[id].label, { near: 5, far: 13, faint: 0.22, station: id });
+  const marker = makeCallout(STATION_INFO[id].label, { near: 2.5, far: 10, faint: 0, station: id });
   marker.position.copy(dot);
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
 }
@@ -444,7 +445,7 @@ const panels = [-12, -4, 4].map((dx, i) => {
   const spark = new THREE.PointLight(0xe43700, 0, 12, 1.5);
   spark.position.set(0, 3, 0);
   model.add(spark);
-  const label = makeCallout(`Fix panel ${i + 1}`, { color: '#E43700', near: 25, far: 90, faint: 0.45 });
+  const label = makeCallout(`Fix panel ${i + 1}`, { color: '#E43700', near: 6, far: 40, faint: 0 });
   label.position.copy(model.position).add(new THREE.Vector3(0, 3.2, 0));
   label.visible = false;
   return { model, spark, label, at: model.position.clone().add(new THREE.Vector3(0, 0, 4.2)) };
@@ -464,7 +465,7 @@ const iceSpot = icePixel
 iceSpot.y = groundAt(iceSpot.x, iceSpot.z);
 const iceDistance = Math.round(Math.hypot(iceSpot.x - site.x, iceSpot.z - site.z));
 place('IceDrill', iceSpot);
-const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 60, far: 420, faint: 0.4 });
+const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 20, far: 160, faint: 0 });
 iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 
 // Rock samples to collect on a moonwalk.
@@ -476,7 +477,7 @@ const samples = [[12, 15], [17, -7], [24, 22], [-28, -30], [40, -32]].map(([dx, 
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
   mesh.castShadow = true;
   scene.add(mesh);
-  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 14, far: 60, faint: 0 });
+  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 5, far: 35, faint: 0 });
   label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
   return { id: `rock${i}`, mesh, label, at };
 });
@@ -1158,15 +1159,22 @@ function nearestUsable() {
   const here = new THREE.Vector3(p.x, p.y - CREW_HEIGHT / 2, p.z);
   let best = null;
   const consider = (dist, item) => { if (dist < USE_RANGE && (!best || dist < best.dist)) best = { dist, ...item }; };
+  // While the airlock is closing, pumping or opening, its panel and doors have nothing to offer.
+  const cycling = !!sim?.airlockStep;
   if (isInside(p)) {
-    for (const s of Object.values(stations)) consider(here.distanceTo(s.stand), { kind: 'station', id: s.id, label: `use ${s.label}` });
+    // In the airlock with the air pumped out, its panel is the way back in, so the prompt says so.
+    const back = sim?.airlock.pressure === 'vacuum';
+    for (const s of Object.values(stations)) {
+      if (cycling && s.id === 'Airlock') continue;
+      consider(here.distanceTo(s.stand), { kind: 'station', id: s.id, label: s.id === 'Airlock' && back ? 'close the airlock and come back inside' : `use ${s.label}` });
+    }
   } else if (sim) {
     panels.forEach((pn, i) => { if (!sim.panels[i]) consider(Math.hypot(here.x - pn.at.x, here.z - pn.at.z), { kind: 'panel', i, label: `fix solar panel ${i + 1}` }); });
     samples.forEach(s => { if (!sim.samples.has(s.id)) consider(Math.hypot(here.x - s.at.x, here.z - s.at.z), { kind: 'sample', id: s.id, label: 'pick up the rock sample' }); });
   }
   for (const door of Object.values(doors)) {
     // The open door is not offered: walking through it is the point.
-    if (sim && !sim.airlock[door.which]) consider(here.distanceTo(door.at) + 0.6, { kind: 'door', id: door.which, label: door.which === 'outer' ? 'open the hatch' : 'open the inner door' });
+    if (sim && !cycling && !sim.airlock[door.which]) consider(here.distanceTo(door.at) + 0.6, { kind: 'door', id: door.which, label: door.which === 'outer' ? 'open the hatch' : 'open the inner door' });
   }
   return best;
 }
