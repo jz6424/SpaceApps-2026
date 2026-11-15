@@ -812,8 +812,8 @@ moves.Idle.play();
 crewMixer.update(0);
 function setMove(name) {
   if (name === move) return;
-  moves[move].fadeOut(0.3);
-  moves[name].reset().setEffectiveTimeScale(MOVE_RATE[name]).fadeIn(0.3).play();
+  moves[move].fadeOut(0.18);
+  moves[name].reset().setEffectiveTimeScale(MOVE_RATE[name]).fadeIn(0.18).play();
   move = name;
 }
 
@@ -907,7 +907,7 @@ function bodyLanguage(dt, pace, outside) {
   const ease = rate => 1 - Math.exp(-rate * dt);
   poseClock += dt;
   // Follow the clip softly.
-  const follow = ease(move === 'Idle' ? 30 : 13);
+  const follow = ease(move === 'Idle' ? 30 : 20);
   for (const name of BONES) bones[name].quaternion.copy(smoothed[name].slerp(bones[name].quaternion, follow));
 
   const running = move === 'Run' && grounded;
@@ -999,15 +999,12 @@ addEventListener('blur', () => keys.clear());
 
 const DRAG_SPEED = 0.005; // radians the view turns per pixel of mouse drag
 let yaw = Math.PI / 2, pitch = 0.2, camDist = 7;
-// Zoom, like Roblox: the wheel (or a pinch) moves the camera in and out behind the astronaut, and
-// all the way in it becomes first person. Out from first person it starts again at CLOSEST.
-const CLOSEST = 1.2, FARTHEST = 60;
+// Zoom: the wheel (or a pinch) moves the camera in and out behind the astronaut, between CLOSEST
+// and FARTHEST metres. Your zoom is kept wherever you go.
+const CLOSEST = 3, FARTHEST = 18;
 function zoomBy(factor) {
-  if (camDist === 0) { if (factor > 1.0001) camDist = CLOSEST; return; }
-  const next = camDist * factor;
-  camDist = next < CLOSEST * 0.92 ? 0 : Math.min(FARTHEST, Math.max(CLOSEST, next));
+  camDist = Math.min(FARTHEST, Math.max(CLOSEST, camDist * factor));
 }
-const firstPerson = () => camDist === 0;
 const canvas = renderer.domElement;
 let down = null;
 // Fingers (phones and tablets): one finger drags the view, two pinch to zoom, a tap is a click.
@@ -1022,7 +1019,7 @@ function fingerMove(e) {
   Object.assign(f, { x: e.clientX, y: e.clientY, moved: f.moved + Math.abs(dx) + Math.abs(dy) });
   if (fingers.size === 1) {
     yaw -= dx * DRAG_SPEED * 1.4;
-    pitch = THREE.MathUtils.clamp(pitch + dy * DRAG_SPEED * 1.4, firstPerson() ? -1.3 : -0.6, 1.3);
+    pitch = THREE.MathUtils.clamp(pitch + dy * DRAG_SPEED * 1.4, -0.6, 1.3);
   } else if (fingers.size === 2) {
     const [a, b] = [...fingers.values()], apart = Math.hypot(a.x - b.x, a.y - b.y);
     if (pinch && apart > 0) zoomBy(pinch / apart);
@@ -1057,7 +1054,7 @@ canvas.addEventListener('pointermove', e => {
     if (down) down.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
     // Same turn per pixel sideways and up/down. Raise DRAG_SPEED to turn faster, lower it to turn slower.
     yaw -= e.movementX * DRAG_SPEED;
-    pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, firstPerson() ? -1.3 : -0.6, 1.3);
+    pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, -0.6, 1.3);
   } else hover(e);
 });
 canvas.addEventListener('pointerup', e => {
@@ -1126,13 +1123,14 @@ const touchPad = isTouch ? setupTouch({
   light: () => { if (state === 'play' && !hooks?.busy()) setTorch(!torch.visible); },
 }) : null;
 let camShown = 7; // how far the camera actually is: pulled in at once by walls, eased back out
+let camY = 0, camFloor = 0; // the height the camera follows (smoothed), and the ground height before a jump
 // The astronaut eases into a walk and swings round to face the way they are going, instead of
 // snapping. Higher numbers are snappier, lower ones are floatier.
-const ACCEL = 7;       // how quickly the walking speed catches up with the keys
-const BRAKE = 10;      // how quickly they stop when you let go
-const TURN = 7;        // how quickly the body turns to face its direction
-const TURN_MAX = 7;
-const AIR_STEER = 5;   // how quickly the keys turn you in mid-air (a little gentler than on the ground)
+const ACCEL = 18;      // how quickly the walking speed catches up with the keys (90% in about 0.13 s)
+const BRAKE = 22;      // how quickly they stop when you let go
+const TURN = 13;       // how quickly the body turns to face its direction
+const TURN_MAX = 12;
+const AIR_STEER = 9;   // how quickly the keys turn you in mid-air (a little gentler than on the ground)
 let airCap = WALK;     // the fastest you may go in the air: your speed when you left the ground
 const FOV = 60, FOV_RUN = 68; // the view widens a little while sprinting    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
 let velX = 0, velZ = 0, facing = 0;
@@ -1143,6 +1141,7 @@ function teleport(p) {
   crewBody.setTranslation(p, true);
   crewBody.setNextKinematicTranslation(p);
   vy = velX = velZ = 0;
+  camY = camFloor = p.y; // the camera jumps with a teleport instead of drifting there
 }
 
 function isInside(p) {
@@ -1209,7 +1208,7 @@ function tick(dt) {
     while (w.leg < w.path.length - 1 && Math.hypot(w.path[w.leg].x - p.x, w.path[w.leg].z - p.z) < 0.25) w.leg++;
     const next = w.path[w.leg];
     const d = Math.hypot(w.target.x - p.x, w.target.z - p.z);
-    if (d < 0.5 || (d < 1.3 && w.leg === w.path.length - 1 && w.stuck > 0.3)) { walkTo = null; w.arrive(); mx = mz = 0; }
+    if (d < 0.2 || (d < 1.3 && w.leg === w.path.length - 1 && w.stuck > 0.3)) { walkTo = null; w.arrive(); mx = mz = 0; }
     else if (w.since > w.limit || w.stuck > 0.8) {
       // Held up. A closed door in the way gets one try at opening. After that, a station brings
       // the astronaut to it (reading the position again, or the move below would undo the hop);
@@ -1292,7 +1291,11 @@ function tick(dt) {
 
   // One camera everywhere, inside, outside and in the airlock: it keeps your zoom and angle, and
   // only ever comes in closer when a wall is in the way, easing back out once the way is clear.
-  head.set(now.x, now.y + 0.6, now.z);
+  // The camera's height is smoothed, and it rises only a third as far as a jump, so jumping or
+  // running over bumps doesn't heave the whole view up and down.
+  if (grounded) { camFloor = now.y; camY += (now.y - camY) * ease(14); }
+  else camY += (camFloor + (now.y - camFloor) * 0.35 - camY) * ease(7);
+  head.set(now.x, camY + 0.6, now.z);
   camDir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
   let camWant = camDist;
   if (camWant > 0) {
@@ -1305,7 +1308,7 @@ function tick(dt) {
   }
   camShown = camWant < camShown ? camWant : camShown + (camWant - camShown) * ease(5);
   if (camShown < 0.7) {
-    // First person (zoomed all the way in, or squeezed there by walls): the camera is the visor.
+    // Squeezed right up to the astronaut by a wall: look from the visor rather than from inside the suit.
     crew.visible = false;
     camera.position.copy(head).addScaledVector(camDir, -0.1);
     camera.lookAt(camera.position.x - camDir.x, camera.position.y - camDir.y, camera.position.z - camDir.z);
