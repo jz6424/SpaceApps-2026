@@ -239,8 +239,13 @@ for (const [id, node] of Object.entries(stationNodes)) {
     }
   });
   const pos = stand.getWorldPosition(new THREE.Vector3());
-  const marker = labelSprite(STATION_INFO[id].label, STATION_INFO[id].icon);
-  marker.position.copy(pos).add(new THREE.Vector3(0, 2.6, 0));
+  // The callout's dot goes on the machine: the middle of it, most of the way up.
+  const body = new THREE.Box3();
+  node.traverse(o => { if (o.isMesh && !o.name.endsWith('_Stand')) body.expandByObject(o); });
+  const dot = body.isEmpty() ? pos.clone().add(new THREE.Vector3(0, 1.4, 0))
+    : new THREE.Vector3((body.min.x + body.max.x) / 2, Math.min(body.min.y + (body.max.y - body.min.y) * 0.8, pos.y + 2.2), (body.min.z + body.max.z) / 2);
+  const marker = calloutSprite(STATION_INFO[id].label, STATION_INFO[id].icon);
+  marker.position.copy(dot);
   marker.userData.station = id;
   scene.add(marker);
   pickables.push(marker);
@@ -288,7 +293,63 @@ function iconPath(ctx, name, x, y, s, width = 2) {
   ctx.restore();
 }
 
-// A floating tag over something you can use: a dark see-through plate with a sharp outline and
+// A callout: a ring with a dot sits on the thing itself, a thin line leads up and away from it,
+// and the name is at the end of the line on a faint see-through plate (no border). The sprite is
+// pinned by its dot, so the dot stays on the object from every angle. Stations get a white line
+// and a yellow icon; a coloured line marks something special (red = broken, blue = ice).
+function calloutSprite(text, icon, color = '#FFFFFF') {
+  const CALLOUT = 0.0056; // metres of sprite per pixel of drawing
+  const H = 128, AX = 22, AY = H - 22, EX = 68, EY = 60, LX = 94, RING = 12; // dot, elbow, where the name starts
+  const ICON = 40, GAP = 10, PAD = 14, FONT = '700 40px "Fira Sans", system-ui, sans-serif';
+  const label = text.toUpperCase();
+  const canvas = document.createElement('canvas');
+  let ctx = canvas.getContext('2d');
+  ctx.font = FONT;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  const textW = Math.ceil(ctx.measureText(label).width);
+  const W = LX + PAD + ICON + GAP + textW + PAD + 12;
+  canvas.width = W * 2; canvas.height = H * 2; // drawn at twice the size so the lines stay crisp up close
+  ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.font = FONT;
+  ctx.textBaseline = 'middle';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+  // The plate behind the name.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, .45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 2;
+  ctx.fillStyle = 'rgba(5, 14, 40, .58)';
+  ctx.beginPath(); ctx.roundRect(LX, EY - 30, W - LX - 10, 60, 6); ctx.fill();
+  ctx.restore();
+  // The line, the ring and the dot: a dark edge first so they show on pale walls, then the colour.
+  const k = Math.SQRT1_2;
+  const lines = () => {
+    ctx.beginPath(); ctx.moveTo(AX + RING * k, AY - RING * k); ctx.lineTo(EX, EY); ctx.lineTo(LX, EY); ctx.stroke();
+    ctx.beginPath(); ctx.arc(AX, AY, RING, 0, Math.PI * 2); ctx.stroke();
+  };
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(3, 8, 24, .6)'; ctx.lineWidth = 6; lines();
+  ctx.strokeStyle = color; ctx.lineWidth = 3; lines();
+  ctx.fillStyle = 'rgba(3, 8, 24, .6)'; ctx.beginPath(); ctx.arc(AX, AY, 6.6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(AX, AY, 4.4, 0, Math.PI * 2); ctx.fill();
+  // Icon and name.
+  ctx.strokeStyle = color === '#FFFFFF' ? '#EAFE07' : '#FFFFFF';
+  iconPath(ctx, icon, LX + PAD, EY - ICON / 2, ICON, 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(label, LX + PAD + ICON + GAP, EY + 3);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.center.set(AX / W, (H - AY) / H); // pinned by the dot
+  sprite.scale.set(W * CALLOUT, H * CALLOUT, 1);
+  sprite.userData.size = sprite.scale.clone(); // its resting size; it grows a little when pointed at
+  // Where the middle of the name is, measured from the dot, as a share of the sprite's size.
+  sprite.userData.nameAt = { x: ((LX + W - 10) / 2 - AX) / W, y: (AY - EY) / H };
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
+// A floating tag (used for the airlock's status sign): a dark see-through plate with a sharp outline and
 // two clipped corners, a line icon, spaced capitals, and a small pointer down to the thing it names.
 // A soft shadow lifts it off the pale Habitat walls. Station tags have a white outline and a
 // yellow icon; a coloured outline marks something special (red = broken, blue = ice).
@@ -353,8 +414,8 @@ const panels = [-12, -4, 4].map((dx, i) => {
   const spark = new THREE.PointLight(0xe43700, 0, 12, 1.5);
   spark.position.set(0, 3, 0);
   model.add(spark);
-  const label = labelSprite(`Fix panel ${i + 1}`, 'wrench', '#E43700');
-  label.position.copy(model.position).add(new THREE.Vector3(0, 4.5, 3));
+  const label = calloutSprite(`Fix panel ${i + 1}`, 'wrench', '#E43700');
+  label.position.copy(model.position).add(new THREE.Vector3(0, 3.2, 0));
   label.visible = false;
   scene.add(label);
   return { model, spark, label, at: model.position.clone().add(new THREE.Vector3(0, 0, 4.2)) };
@@ -374,8 +435,8 @@ const iceSpot = icePixel
 iceSpot.y = groundAt(iceSpot.x, iceSpot.z);
 const iceDistance = Math.round(Math.hypot(iceSpot.x - site.x, iceSpot.z - site.z));
 place('IceDrill', iceSpot);
-const iceLabel = labelSprite('Crater ice', 'rock', '#2E96F5');
-iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 9, 0));
+const iceLabel = calloutSprite('Crater ice', 'rock', '#2E96F5');
+iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 iceLabel.scale.multiplyScalar(4);
 scene.add(iceLabel);
 
@@ -387,8 +448,8 @@ const samples = [[24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
   mesh.castShadow = true;
   scene.add(mesh);
-  const label = labelSprite('Rock sample', 'rock', '#EAFE07');
-  label.position.copy(at).add(new THREE.Vector3(0, 2, 0));
+  const label = calloutSprite('Rock sample', 'rock', '#EAFE07');
+  label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
   scene.add(label);
   return { id: `rock${i}`, mesh, label, at };
 });
@@ -993,7 +1054,10 @@ gameReady({
   stationScreen(id) {
     const s = stations[id];
     if (!s) return null;
-    const v = s.marker.position.clone().project(camera);
+    // The middle of the name: out from the dot along the screen's own right and up.
+    const m = s.marker, at = m.userData.nameAt;
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    const v = m.position.clone().addScaledVector(right, at.x * m.scale.x).addScaledVector(up, at.y * m.scale.y).project(camera);
     if (v.z > 1) return null;
     return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
   },

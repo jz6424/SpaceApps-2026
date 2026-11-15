@@ -1,7 +1,9 @@
-/* The game's look: a see-through instrument console.
-   - Panels are dark glass you can see the Moon through. Instead of a full border, each one is
-     marked by four corner brackets, so the lines never join up.
-   - Things you can press have the same brackets and a faint fill; they light up yellow.
+/* The game's look: a quiet see-through console.
+   - The instruments you glance at all the time (meters, supplies, research points, the sun clock,
+     the two corner buttons) float on their own: no plate, no border, only a soft shadow behind
+     them so they read over anything.
+   - Everything else (messages, the mission box, station panels, menus) is dark glass with no
+     border, see-through enough to show the Moon behind it.
    - Labels are small spaced capitals, numbers are in a fixed-width face, bars are cut into segments.
    - Colours are the Space Apps palette (docs/space-apps-style-spec.md): blues, white, Neon Yellow
      for the thing to press or look at, Rocket Red for danger.
@@ -11,7 +13,7 @@
   --yellow: #EAFE07; --red: #E43700; --martian: #8E1100;
   --text: #fff; --soft: #C9D8F2;
   --line: rgba(201, 216, 242, .24);
-  --glass: rgba(5, 14, 40, .4);         /* over the 3D view, with the view behind it blurred and dimmed */
+  --glass: rgba(5, 14, 40, .3);        /* over the 3D view, with the view behind it blurred and dimmed */
   --glass-solid: rgba(5, 14, 40, .84);  /* where the browser can't blur, or simple graphics is on */
   --head: "Fira Sans", system-ui, sans-serif;
   --body: Overpass, system-ui, sans-serif;
@@ -24,31 +26,18 @@ html, body { margin: 0; height: 100%; background: var(--deep); color: var(--text
 canvas { display: block; touch-action: none; cursor: grab; }
 canvas:active { cursor: grabbing; }
 
-/* Everything framed by brackets shares this. */
-.panel, .dialog, .card, .mission, .score, .sitefacts div, .setting, .opt, .btn, .seg, .icon-btn, .fs-btn, #research-panel {
-  --fr: rgba(255, 255, 255, .9); --fl: 12px; --fw: 1.5px; --fill: transparent;
-  /* Four corner brackets, drawn as eight short lines: --fr is the line colour, --fl how long each
-     leg is, --fw how thick, --fill what is behind. */
-  --frame:
-    linear-gradient(var(--fr), var(--fr)) 0 0 / var(--fl) var(--fw) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 0 0 / var(--fw) var(--fl) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 100% 0 / var(--fl) var(--fw) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 100% 0 / var(--fw) var(--fl) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 0 100% / var(--fl) var(--fw) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 0 100% / var(--fw) var(--fl) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 100% 100% / var(--fl) var(--fw) no-repeat,
-    linear-gradient(var(--fr), var(--fr)) 100% 100% / var(--fw) var(--fl) no-repeat;
-  border: 0; border-radius: 0; box-sizing: border-box;
-  background: var(--frame), var(--fill);
+/* Everything that is a plate of glass shares this: no border, slightly softened corners. */
+.panel, .dialog, .card, .mission, .score, .sitefacts div, .setting, .opt, .btn, .seg, #research-panel {
+  --fill: transparent; border: 0; border-radius: 4px; box-sizing: border-box; background: var(--fill);
 }
 .panel {
   position: fixed; padding: 12px 16px; --fill: var(--glass);
-  -webkit-backdrop-filter: blur(10px) brightness(.6); backdrop-filter: blur(10px) brightness(.6);
+  -webkit-backdrop-filter: blur(10px) brightness(.68); backdrop-filter: blur(10px) brightness(.68);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .panel { --fill: var(--glass-solid); } }
 /* Simple graphics (slow computers): no blur, so the glass is made darker instead. */
 .low .panel { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: var(--glass-solid); }
-#hud, #station { text-shadow: 0 1px 2px rgba(0, 0, 0, .5); }
+#hud, #station { text-shadow: 0 1px 2px rgba(0, 0, 0, .65); }
 
 kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255, 255, 255, .45); border-radius: 2px; padding: 0 4px; }
 .ico { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; flex: none; }
@@ -78,27 +67,27 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .orbits circle:nth-child(3) { stroke-dasharray: 90 70 380 120; }
 .orbits circle:nth-child(4) { stroke-dasharray: 520 160 60 90; }
 
-/* Buttons: brackets and a faint fill. The main button on a screen is solid yellow with two
-   clipped corners. */
+/* Buttons: a faint fill that lights up yellow. The main button on a screen is solid yellow with
+   two clipped corners. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   font: 700 .9rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
-  --fill: rgba(255, 255, 255, .07); --fl: 8px;
+  --fill: rgba(255, 255, 255, .1);
   padding: 0 20px; min-height: 48px; cursor: pointer;
   transition: color .15s var(--ease), transform .15s var(--ease);
 }
 .btn .ico { vertical-align: 0; }
-.btn:hover:not(:disabled):not(.primary) { --fr: var(--yellow); --fill: rgba(234, 254, 7, .1); color: var(--yellow); }
+.btn:hover:not(:disabled):not(.primary) { --fill: rgba(234, 254, 7, .1); color: var(--yellow); }
 .btn:active:not(:disabled) { transform: scale(.98); }
 .btn.primary {
-  --pf: var(--yellow); color: var(--deep);
+  --pf: var(--yellow); color: var(--deep); border-radius: 0;
   background:
     linear-gradient(225deg, transparent 9px, var(--pf) 0) right / 51% 100% no-repeat,
     linear-gradient(45deg, transparent 9px, var(--pf) 0) left / 51% 100% no-repeat;
 }
 .btn.primary:hover:not(:disabled) { --pf: #fff; }
 .btn.small { font-size: .875rem; padding: 0 16px; min-height: 44px; }
-.btn:disabled { color: rgba(201, 216, 242, .7); --fr: rgba(201, 216, 242, .4); --fill: transparent; cursor: default; }
+.btn:disabled { color: rgba(201, 216, 242, .6); --fill: rgba(255, 255, 255, .03); cursor: default; }
 /* A text link you can press: tall enough for a finger, without changing the line it sits in. */
 .link { font: inherit; color: var(--yellow); background: none; border: 0; padding: 12px 0; margin: -4px 0; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .screen :focus-visible { outline: 2px solid var(--yellow); outline-offset: 4px; }
@@ -129,22 +118,23 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Mission menu */
 #missions .inner { position: relative; max-width: 1080px; margin: 0 auto; padding: 24px 24px 40px; display: grid; gap: 24px; }
 .topbar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
-.score { --fill: rgba(5, 14, 40, .5); --fl: 8px; padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score { --fill: rgba(5, 14, 40, .4); padding: 4px 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
 #brief-mode { display: grid; gap: 8px; width: 100%; }
 #brief-mode h3 { font-size: 1.1rem; }
 #mode-choice { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg {
   font: 700 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
-  --fill: rgba(255, 255, 255, .07); --fl: 8px; padding: 0 16px; min-height: 44px; cursor: pointer;
+  --fill: rgba(255, 255, 255, .07); padding: 0 16px; min-height: 44px; cursor: pointer;
   transition: color .15s var(--ease);
 }
-.seg:hover { --fr: var(--yellow); color: var(--yellow); }
-.seg[aria-pressed="true"] { --fr: var(--yellow); --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
+.seg:hover { color: var(--yellow); }
+.seg[aria-pressed="true"] { --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
 #mode-about { min-height: 3em; }
 #mission-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; }
-.mission { --fill: rgba(5, 14, 40, .55); --fl: 16px; padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
-.mission.locked { --fr: rgba(201, 216, 242, .45); --fill: rgba(5, 14, 40, .3); }
+.mission { --fill: rgba(5, 14, 40, .38); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto auto; justify-items: start; }
+.mission.locked { --fill: rgba(5, 14, 40, .2); }
+.mission.locked h3, .mission.locked > p:not(.need) { opacity: .75; }
 .mission .num { font: 400 2.6rem/1 var(--mono); color: var(--yonder); font-variant-numeric: tabular-nums; }
 .mission .num::before { content: "0"; opacity: .45; }
 .mission .btn { width: 100%; }
@@ -199,7 +189,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .rt-node:focus-visible .rt-dot { outline: 3px solid var(--yellow); outline-offset: 4px; }
 .rt-badge { position: absolute; right: -6px; top: -6px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; background: #000; border: 1.5px solid #fff; color: #fff; display: grid; place-items: center; }
 .rt-badge .ico { stroke-width: 2; }
-#research-panel { position: sticky; top: 16px; --fill: rgba(3, 4, 12, .7); --fl: 16px; padding: 16px; display: grid; gap: 12px; justify-items: start; }
+#research-panel { position: sticky; top: 16px; --fill: rgba(3, 4, 12, .55); padding: 16px; display: grid; gap: 12px; justify-items: start; }
 .n-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
 .n-cost { font: 400 .85rem var(--mono); color: var(--soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .n-opens { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .95rem; }
@@ -216,16 +206,16 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Game paused sits above everything in the mission screen, the guided tour included. */
 #pause { background: rgba(4, 12, 34, .62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 16px; box-sizing: border-box; z-index: 30; }
 #debrief, #brief, #how, #credits { display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
-.dialog { position: relative; --fill: rgba(5, 14, 40, .72); --fl: 20px; padding: 28px; display: grid; gap: 16px; width: min(520px, 100%); justify-items: start; }
+.dialog { position: relative; --fill: rgba(5, 14, 40, .55); padding: 28px; display: grid; gap: 16px; width: min(520px, 100%); justify-items: start; }
 .dialog.wide { width: min(760px, 100%); }
 #brief .dialog, #debrief .dialog, #how .dialog, #credits .dialog { margin: auto; }
 .lesson, .goal { background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 12px 16px; width: 100%; box-sizing: border-box; }
 .sitefacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
-.sitefacts div { --fl: 8px; --fr: rgba(201, 216, 242, .7); --fill: rgba(255, 255, 255, .04); padding: 12px; display: grid; gap: 4px; }
+.sitefacts div { --fill: rgba(255, 255, 255, .04); padding: 12px; display: grid; gap: 4px; }
 .sitefacts .ico { stroke: var(--soft); }
 .sitefacts b { font: 500 1.5rem var(--mono); font-variant-numeric: tabular-nums; }
 .sitefacts span { font-size: .9rem; color: var(--soft); }
-.card { --fl: 12px; --fr: rgba(201, 216, 242, .7); --fill: rgba(255, 255, 255, .04); padding: 16px; display: grid; gap: 8px; }
+.card { --fill: rgba(255, 255, 255, .04); padding: 16px; display: grid; gap: 8px; }
 .card h3 { font-size: 1.1rem; }
 .cards { display: grid; gap: 12px; width: 100%; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0; font-variant-numeric: tabular-nums; }
@@ -239,9 +229,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #credits h3 { margin-top: 8px; }
 /* Game paused: the settings, one per row, then what to do next. */
 .settings { display: grid; gap: 8px; width: 100%; }
-.setting { --fl: 8px; --fr: rgba(201, 216, 242, .6); --fill: rgba(255, 255, 255, .04); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 8px 8px 16px; font-size: .85rem; }
+.setting { --fill: rgba(255, 255, 255, .04); display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 8px 8px 16px; font-size: .85rem; }
 .setting .btn { min-width: 140px; white-space: nowrap; }
-#speed[aria-pressed="true"], #sound[aria-pressed="true"] { --fr: var(--yellow); color: var(--yellow); }
+#speed[aria-pressed="true"], #sound[aria-pressed="true"] { color: var(--yellow); }
 
 /* ---- In-mission screen ----
    Corners: messages top left, sun clock top middle, the mission and settings buttons top right
@@ -250,7 +240,21 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #hud .fine, #station .fine { font-size: 14px; color: var(--soft); margin: 0; }
 #station :focus-visible, #hud :focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 
-#meters { left: 12px; bottom: 12px; width: 300px; display: grid; gap: 12px; padding: 16px; }
+/* These float on their own. No plate and no border: a soft dark haze sits behind each group and
+   every letter, icon and bar carries its own shadow, so they read over pale walls and black sky. */
+#meters, #clock, #supplies, #rp-bar {
+  --fill: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .95), 0 0 8px rgba(0, 0, 0, .75);
+}
+.low #meters, .low #clock, .low #supplies, .low #rp-bar { --fill: transparent; }
+#meters::before, #clock::before, #corner::before, .hud-icons::before {
+  content: ""; position: absolute; inset: -28px -36px; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(3, 8, 24, .5), rgba(3, 8, 24, .28) 60%, transparent);
+}
+#meters .ico, #clock .ico, #supplies .ico, #rp-bar .ico, .icon-btn .ico { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .9)); }
+#meters .bar, #rp-bar .bar, #clock .track { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
+#meters .bar::before, #rp-bar .bar::before { background: rgba(3, 8, 24, .6); }
+#meters { left: 16px; bottom: 16px; width: 296px; display: grid; gap: 12px; }
 .meter { display: grid; gap: 4px; }
 .m-top { display: flex; gap: 8px; align-items: center; }
 .m-top .ico { stroke: var(--soft); vertical-align: 0; }
@@ -272,10 +276,10 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .m-state .ico { vertical-align: 0; }
 .meter.bad .m-state { color: #fff; background: var(--martian); padding: 0 8px; justify-self: start; }
 
-#corner { position: fixed; right: 12px; bottom: 64px; /* leaves room for the fullscreen icon */ width: 300px; display: flex; flex-direction: column; gap: 8px; }
+#corner { position: fixed; right: 16px; bottom: 16px; width: 296px; display: flex; flex-direction: column; gap: 12px; }
 #corner .panel { position: static; }
 /* Airlock progress: one bar per step, stacked with the other bottom-right boxes */
-#airlock-panel { display: grid; gap: 8px; --fr: var(--yellow); }
+#airlock-panel { display: grid; gap: 8px; }
 #airlock-panel h3 { font: 700 16px var(--head); text-transform: uppercase; letter-spacing: .1em; margin: 0; display: flex; gap: 8px; align-items: center; }
 #airlock-panel h3 .ico { stroke: var(--soft); vertical-align: 0; }
 #airlock-panel p { margin: 0; }
@@ -294,7 +298,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #rp-bar .bar i { background: var(--yellow); }
 .rp-next { font-size: 14px; color: var(--soft); }
 
-#clock { top: 12px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 680px)); min-width: 280px; display: grid; gap: 8px; }
+#clock { top: 16px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 680px)); min-width: 280px; display: grid; gap: 8px; }
 .c-row { display: flex; gap: 4px 16px; flex-wrap: wrap; font-weight: 700; font-size: 14px; }
 .c-row .ico { vertical-align: -4px; }
 .c-row .dim { color: var(--soft); font-weight: 400; }
@@ -304,25 +308,18 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .track .earth-gap { position: absolute; bottom: -4px; height: 2px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }
 .track .storm-mark { position: absolute; top: 0; bottom: 0; background: var(--red); }
 .track i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(5, 14, 40, .8); }
-#clock { padding-bottom: 16px; }
 
-/* Two separate buttons in the top right corner: the target shows or hides the mission box, the
-   gear pauses the game and opens the settings. */
-.hud-icons { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 6; }
-.icon-btn, .fs-btn {
-  width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; color: var(--text); cursor: pointer;
-  --fl: 8px; --fill: var(--glass);
-  -webkit-backdrop-filter: blur(10px) brightness(.6); backdrop-filter: blur(10px) brightness(.6);
-  transition: color .15s var(--ease);
-}
-.low .icon-btn, .low .fs-btn { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: var(--glass-solid); }
-.icon-btn .ico, .fs-btn .ico { vertical-align: 0; }
-.icon-btn:hover, .fs-btn:hover, .icon-btn[aria-pressed="true"] { --fr: var(--yellow); color: var(--yellow); }
+/* Two separate buttons in the top right corner, drawn as bare icons: the target shows or hides
+   the mission box, the gear pauses the game and opens the settings. */
+.hud-icons { position: fixed; top: 8px; right: 12px; display: flex; gap: 4px; z-index: 6; }
+.icon-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; transition: color .15s var(--ease); }
+.icon-btn .ico { vertical-align: 0; }
+.icon-btn:hover, .icon-btn[aria-pressed="true"] { color: var(--yellow); }
 .icon-btn:active { transform: scale(.96); }
 
-/* The mission box says what to do next, so its brackets are yellow. It starts in the middle of the
-   screen so you see it, then settles under its button. */
-#mission-card { top: 64px; right: 12px; width: 300px; display: grid; gap: 8px; --fr: var(--yellow); }
+/* The mission box says what to do next. It starts in the middle of the screen so you see it,
+   then settles under its button. */
+#mission-card { top: 56px; right: 12px; width: 300px; display: grid; gap: 8px; }
 #mission-card.intro { animation: mc-intro 4.5s var(--ease); z-index: 5; }
 #mission-card h2 { font-size: 14px; line-height: 1.2; margin: 0; }
 .mc-head { display: flex; align-items: center; gap: 8px; color: var(--yellow); }
@@ -331,28 +328,23 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .mc-head::after, .st-head h3::after { content: ""; flex: 1; height: 1px; margin-left: 4px; background: linear-gradient(90deg, currentColor, transparent 85%); opacity: .6; }
 .mc-name { margin: 0; font-size: 14px; }
 #hint { margin: 0; background: rgba(0, 66, 166, .5); border-left: 2px solid var(--yellow); padding: 8px 12px; font-weight: 700; font-size: 16px; }
-@keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 142px)) scale(1.4); } 100% { transform: none; } }
+@keyframes mc-intro { 0%, 65% { transform: translate(calc(-50vw + 162px), calc(50vh - 134px)) scale(1.4); } 100% { transform: none; } }
 #air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; font: 700 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
 #air-toast.warn { background: var(--glass-solid); border: 1.5px solid var(--yellow); color: var(--yellow); }
 #air-toast.bad { background: rgba(142, 17, 0, .94); border: 1.5px solid #fff; color: #fff; }
 @keyframes air-fade { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Messages: newest at the bottom. Older ones scroll up and fade out at the top edge; scroll the
-   list (wheel or drag) to read back. Each has a line down its left side in the colour of its
-   kind, a short stroke along the top and a bracket in the far corner. */
+   list (wheel or drag) to read back. The line down the left side is the colour of its kind. */
 #feed { position: fixed; left: 12px; top: 12px; width: 340px; max-height: min(42vh, 360px); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 4px 0 0; box-sizing: border-box; list-style: none; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; scrollbar-color: rgba(201, 216, 242, .5) transparent; }
 #feed.faded { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 76px); mask-image: linear-gradient(to bottom, transparent 0, #000 76px); }
 #feed:focus-visible { outline-offset: -3px; }
 .typed.typing::after { content: ""; display: inline-block; width: .5em; height: 1em; margin-left: 2px; background: currentColor; vertical-align: -2px; }
 .msg {
-  --k: rgba(201, 216, 242, .7); --c: rgba(255, 255, 255, .55);
+  --k: rgba(201, 216, 242, .7);
   flex: none; padding: 8px 12px 8px 16px; font-size: 14px; animation: pop .3s var(--ease);
-  background:
-    linear-gradient(var(--k), var(--k)) 0 0 / 2px 100% no-repeat,
-    linear-gradient(var(--k), var(--k)) 0 0 / 28px 1.5px no-repeat,
-    linear-gradient(var(--c), var(--c)) 100% 100% / 10px 1.5px no-repeat,
-    linear-gradient(var(--c), var(--c)) 100% 100% / 1.5px 10px no-repeat,
-    rgba(5, 14, 40, .58);
+  background: linear-gradient(var(--k), var(--k)) 0 0 / 2px 100% no-repeat, rgba(5, 14, 40, .42);
+  border-radius: 0 4px 4px 0;
 }
 .msg .from { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: center; font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); }
 .msg .from .ico { vertical-align: 0; }
@@ -362,8 +354,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .msg.warn { --k: var(--yellow); }
 .msg.bad { --k: var(--red); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
-#keys { left: 50%; bottom: 12px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 648px); padding: 4px 12px; text-align: center; line-height: 1.7; --fr: rgba(255, 255, 255, .5); --fl: 8px; }
-#prompt { left: 50%; bottom: 120px; transform: translateX(-50%); font-weight: 700; margin: 0; --fr: var(--yellow); --fl: 8px; }
+#keys { left: 50%; bottom: 12px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 648px); padding: 4px 12px; text-align: center; line-height: 1.7; }
+#prompt { left: 50%; bottom: 120px; transform: translateX(-50%); font-weight: 700; margin: 0; }
 
 /* A solar storm is live danger, so this is the one thing on screen that pulses. */
 #storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 6px var(--red), inset 0 0 120px rgba(228, 55, 0, .45); animation: throb 1.2s ease-in-out infinite alternate; }
@@ -372,12 +364,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #storm-frame.safe p { background: var(--electric); }
 @keyframes throb { to { box-shadow: inset 0 0 0 6px var(--red), inset 0 0 40px rgba(228, 55, 0, .25); } }
 
-/* The station panel is the darkest glass, with the view behind it heavily blurred, so you read
+/* The station panel is see-through too, but the view behind it is heavily blurred, so you read
    the panel and not the labels floating behind it. */
 #station {
   left: 50%; top: 50%; transform: translate(-50%, -46%); width: min(540px, calc(100vw - 648px)); max-height: calc(100vh - 160px); overflow-y: auto;
-  display: grid; gap: 12px; padding: 20px 24px; --fl: 20px; --fill: rgba(5, 14, 40, .7);
-  -webkit-backdrop-filter: blur(18px) brightness(.5); backdrop-filter: blur(18px) brightness(.5);
+  display: grid; gap: 12px; padding: 20px 24px; --fill: rgba(5, 14, 40, .5);
+  -webkit-backdrop-filter: blur(18px) brightness(.55); backdrop-filter: blur(18px) brightness(.55);
 }
 .low #station { --fill: rgba(5, 14, 40, .95); }
 .st-head { display: flex; align-items: center; gap: 12px; }
@@ -389,11 +381,11 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #station .big { font: 700 24px/1.2 var(--head); }
 .opts { display: grid; gap: 8px; }
 .opt {
-  text-align: left; font: 400 14px var(--body); color: var(--text); --fill: rgba(255, 255, 255, .06); --fr: rgba(255, 255, 255, .75); --fl: 10px;
+  text-align: left; font: 400 14px var(--body); color: var(--text); --fill: rgba(255, 255, 255, .06);
   padding: 8px 16px; min-height: 44px; cursor: pointer; display: grid; gap: 4px;
 }
-.opt:hover:not(:disabled) { --fr: var(--yellow); --fill: rgba(234, 254, 7, .08); }
-.opt.on { --fill: rgba(0, 66, 166, .6); --fr: var(--yellow); }
+.opt:hover:not(:disabled) { --fill: rgba(234, 254, 7, .08); }
+.opt.on { --fill: rgba(0, 66, 166, .6); box-shadow: inset 2px 0 0 var(--yellow); }
 .opt-label { font: 700 16px var(--head); }
 .opt-label small { font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); }
 .opt-note { color: var(--soft); font-size: 14px; }
@@ -409,14 +401,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .uses .u-val { font: 400 14px var(--mono); font-variant-numeric: tabular-nums; }
 .uses .u-where { grid-column: 1 / -1; font-size: 14px; color: var(--soft); }
 
-/* Full screen button, bottom right, with a hover label */
-.fs-btn { position: fixed; right: 12px; bottom: 12px; z-index: 6; }
-.fs-btn::after { content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 8px); background: var(--glass-solid); color: #fff; font: 700 14px var(--head); text-transform: uppercase; letter-spacing: .1em; padding: 4px 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
-.fs-btn:hover::after, .fs-btn:focus-visible::after { opacity: 1; }
-
 /* Guided tour (First Night). It has to grab attention, so it keeps a solid red edge. */
 #tour { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
-#tour-card { width: 330px; display: grid; gap: 8px; --fr: transparent; --fill: rgba(5, 14, 40, .88); border: 2px solid var(--red); pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
+#tour-card { width: 330px; display: grid; gap: 8px; --fill: rgba(5, 14, 40, .8); border: 2px solid var(--red); pointer-events: auto; max-height: calc(100vh - 24px); overflow-y: auto; }
 #tour-card.at-right { right: 12px; top: 230px; }
 #tour-card.at-bottom { left: 50%; bottom: 96px; transform: translateX(-50%); }
 #tour-card.at-center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); }
@@ -441,7 +428,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
    panels stack in reading order down the screen and the base shows through the gap in the middle. */
 @media (max-width: 900px) and (orientation: portrait) {
   #hud { position: fixed; inset: 0; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-  #hud > :not(#air-toast, #tour, .fs-btn) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
+  #hud > :not(#air-toast, #tour) { position: static; transform: none; width: auto; max-width: none; min-width: 0; flex: none; pointer-events: auto; }
   .hud-icons { order: 0; align-self: flex-end; }
   #clock { order: 1; }
   #mission-card { order: 2; }
@@ -449,11 +436,11 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
   .mc-name { display: none; }
   #feed { order: 3; max-height: 18vh; }
   #prompt { order: 4; align-self: center; margin-top: auto; }
-  #corner { order: 5; margin-top: auto; margin-right: 52px; flex-direction: row; flex-wrap: wrap; }
+  #corner { order: 5; margin-top: auto; flex-direction: row; flex-wrap: wrap; gap: 8px 24px; }
   #corner > * { flex: 1 1 160px; }
   .rp-next { display: none; }
   #back-in { flex-basis: 100%; }
-  #meters { order: 6; gap: 8px; margin-right: 52px; }
+  #meters { order: 6; gap: 8px; }
   #keys { display: none; }
   #station { left: 8px; right: 8px; top: auto; bottom: 8px; transform: none; width: auto; max-height: 72vh; }
 }

@@ -71,9 +71,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (document.fullscreenElement) document.exitFullscreen?.();
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
-  $('fullscreen').innerHTML = icon('expand', 26);
   $('fullscreen').addEventListener('click', fsBtn);
-  $('fullscreen-setting').addEventListener('click', fsBtn); // the same switch, inside the Game paused panel
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
   function renderRp() {
@@ -521,7 +519,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
-      $('fullscreen-setting').removeEventListener('click', fsBtn);
       $('missions-toggle').removeEventListener('click', missionBtn);
       $('mission-card').removeEventListener('animationend', settle);
       $('sound').removeEventListener('click', soundBtn);
