@@ -131,7 +131,7 @@
     <div class="mission-layout">
       <section id="mission-list" aria-label="Missions"></section>
       <div id="moon-notes">
-        <p id="moon-caption" class="fine">Your base is on Connecting Ridge, 16 km from the Moon's south pole, so every mission's flag stands there. The dashed line is the axis the Moon spins on. Drag the Moon to tip it. Pick a mission to see where you will land.</p>
+        <p id="moon-caption" class="fine">Your base is on Connecting Ridge, near the Moon's south pole. The dashed line is the axis the Moon spins on. Drag the Moon to tip it. Pick a mission to see where you will land.</p>
         <p id="sun-now" class="fine" role="status" hidden></p>
         <p id="brief-flare" class="fine" hidden></p>
       </div>
@@ -178,9 +178,10 @@
     <h2>Research Tree</h2>
     <div class="rt-side">
       <p class="score">Research points: <b id="research-points">0</b></p>
-      <p id="research-note"></p>
     </div>
   </header>
+  <!-- How to use the map: in the bottom corner, out of the way of the title bar and the tree. -->
+  <p id="research-note"></p>
   <!-- The whole screen is the map: drag it, zoom it (see ui.js). -->
   <div id="research-view"><div id="research-map"></div></div>
   <div class="rt-zoom" role="group" aria-label="Zoom">
@@ -306,6 +307,7 @@
     <p id="debrief-reason"></p>
     <p id="debrief-stars"></p>
     <dl id="debrief-stats" class="facts"></dl>
+    <p id="debrief-note" class="fine"></p>
     <p id="debrief-points"></p>
     <p id="debrief-pages" class="lesson" hidden></p>
     <p class="lesson"><b>What you just learned:</b> <span id="debrief-lesson"></span></p>

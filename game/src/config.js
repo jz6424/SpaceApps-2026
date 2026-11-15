@@ -118,11 +118,9 @@ export const MODES = {
   },
 };
 
-// Where the base really is: the middle of the piece of NASA's LOLA map the game's ground is cut
-// from (Site01, Connecting Ridge), 16 km from the south pole. Every mission is flown from it, so
-// every mission's flag on the menu Moon stands here.
-export const BASE = { lat: -89.47, lon: 220.4 };
-
+// The base's real spot is 89.47 S, 220.4 E (the middle of the piece of NASA's LOLA Site01 map the
+// ground is cut from), 16 km from the south pole. On the menu Moon the missions' flags are spread
+// round the pole instead, so each can be seen and clicked.
 // Missions in order. Times are game seconds. Goal values can be per mode.
 // Each storm lists the usual time and length, and the size of real flare it draws (planRun in
 // sim.js picks the flare and shifts the time for every playthrough).
@@ -131,7 +129,7 @@ export const MISSIONS = [
     id: 'FirstNight',
     name: 'First Night',
     short: 'Collect 5 rocks and last the night.',
-    place: BASE,  // where its flag stands on the menu Moon (see moon-menu.js)
+    place: { lat: -79, lon: 150 },  // where its flag stands on the menu Moon (see moon-menu.js)
     multiplier: 1,
     goal: 'Collect 5 glowing rock samples and survive the night.',
     brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the tour to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
@@ -150,7 +148,7 @@ export const MISSIONS = [
     id: 'SolarStorm',
     name: 'Solar Storm',
     short: 'Hide from two solar storms.',
-    place: BASE,
+    place: { lat: -74, lon: 262 },
     multiplier: 1.5,
     requires: { id: 'Shielding', name: 'Regolith Shielding', about: 'Regolith is the science word for moon dirt.', cost: 10 },
     goal: 'Keep your radiation dose low through two solar storms.',
@@ -174,7 +172,7 @@ export const MISSIONS = [
     id: 'IceAndGreens',
     name: 'Ice and Greens',
     short: 'Grow food with crater ice.',
-    place: BASE,
+    place: { lat: -81, lon: 30 },
     multiplier: 2,
     requires: { id: 'Greenhouse', name: 'Greenhouse', cost: 20 },
     goal: 'Grow enough food to have meals left at sunrise.',

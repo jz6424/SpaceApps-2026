@@ -99,8 +99,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 @keyframes scope-ring { to { transform: scale(var(--scope-grow)); } }
 
 /* The Research Tree's title bar and buttons fade in once the sky has slowed, and out as it leaves. */
-#research.arriving.move-up :is(.rt-top, .rt-zoom) { animation: screen-fade .5s ease .55s reverse backwards; }
-#research.leaving.move-down :is(.rt-top, .rt-zoom, #research-panel) { animation: screen-fade .3s ease both; }
+#research.arriving.move-up :is(.rt-top, .rt-zoom, #research-note) { animation: screen-fade .5s ease .55s reverse backwards; }
+#research.leaving.move-down :is(.rt-top, .rt-zoom, #research-panel, #research-note) { animation: screen-fade .3s ease both; }
 /* A screen that is sliding carries its pinned parts with it. If it had been scrolled, this keeps
    them where they were (--scrolled is set by ui.js). */
 .screen.leaving:is(.move-up, .move-down) .orbits { top: calc(var(--scrolled, 0px) - 120px); }
@@ -273,13 +273,15 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #research-view { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 #research-view.dragging { cursor: grabbing; }
 #research-map { position: absolute; left: 0; top: 0; width: 840px; height: 840px; transform-origin: 0 0; }
-.rt-top { z-index: 2; position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 16px; padding: 20px 24px; pointer-events: none; }
+/* The title, points and hint sit on a dark bar, so circles that pass under them when the map is
+   dragged don't show through the words. */
+.rt-top { z-index: 2; position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 16px; padding: 16px 24px; pointer-events: none; background: rgba(3, 4, 12, .94); border-bottom: 1px solid rgba(255, 255, 255, .12); }
 .rt-top > * { pointer-events: auto; }
 .rt-top .btn { justify-self: start; }
 .rt-top h2 { text-align: center; padding-top: 4px; text-shadow: 0 2px 8px rgba(0, 0, 0, .6); }
-.rt-side { justify-self: end; display: grid; justify-items: end; gap: 8px; width: min(272px, 30vw); }
+.rt-side { justify-self: end; }
 #research .score { --fill: rgba(3, 4, 12, .6); }
-#research-note { font-size: .85rem; line-height: 1.45; color: var(--soft); text-align: right; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
+#research-note { z-index: 2; position: absolute; left: 24px; bottom: 24px; width: min(360px, calc(100vw - 140px)); margin: 0; padding: 8px 12px; font-size: .85rem; line-height: 1.45; color: var(--soft); background: rgba(3, 4, 12, .88); border-radius: 4px; pointer-events: none; }
 .rt-zoom { z-index: 2; position: absolute; right: 24px; bottom: 24px; display: grid; gap: 8px; }
 .rt-zoom .icon-btn { font: 400 26px/1 var(--head); background: rgba(3, 4, 12, .55); border: 1px solid rgba(255, 255, 255, .35); border-radius: 4px; }
 .rt-zoom .icon-btn:hover { border-color: #fff; color: #fff; background: rgba(255, 255, 255, .12); }
@@ -394,6 +396,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .card h3 { font-size: 1.1rem; }
 .cards { display: grid; gap: 12px; width: 100%; }
 .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0; font-variant-numeric: tabular-nums; }
+/* On a narrow screen a long value next to a long label is squeezed to a word a line, so the
+   debrief's values go under their labels there. */
+@media (max-width: 600px) {
+  #debrief-stats { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  #debrief-stats dd { margin-bottom: 8px; }
+}
 .facts dt { color: var(--soft); }
 .facts dd { margin: 0; font-weight: 600; }
 #debrief-tips { margin: 0; padding-left: 20px; }

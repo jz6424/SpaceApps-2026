@@ -187,7 +187,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
           <p>The write-up, the real-life photo and the NASA links are hidden until you unlock it.</p>
           <div class="sb-scribble" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         </div>
-        <p class="sb-game"><b>How to unlock</b> ${unlockText(page)}${page.needs ? ' <button class="sb-link" data-do="research">Open the Research Tree</button>' : ''}</p>
+        <p class="sb-game"><b>How to unlock</b> ${esc(page.hint)}${page.needs ? ' <button class="sb-link" data-do="research">Open the Research Tree</button>' : ''}</p>
         <p class="sb-upgrades">When it is unlocked, reading it for the first time earns ${points(CONFIG.science.pageRP)}.</p>
       </section>
     </article>

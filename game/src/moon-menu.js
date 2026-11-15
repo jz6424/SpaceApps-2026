@@ -11,9 +11,8 @@
 //  * public/moon/lroc_color_poles_1k.jpg: how bright the ground is, from the LROC camera.
 //  * public/moon/ldem_3_8bit.jpg: how high the ground is, from the LOLA laser altimeter.
 //
-// Each flag stands where its mission is really flown from. Every mission so far is flown from the
-// same base on Connecting Ridge, 16 km from the south pole, so their flags are planted side by
-// side on that spot and lean apart like a bunch of flowers, so each can be seen and clicked.
+// The flags stand close together near the south pole, because every mission is flown from the same
+// base on Connecting Ridge. They are spread a little so each can be seen and clicked.
 import * as THREE from 'three';
 
 const DEG = Math.PI / 180;
@@ -39,11 +38,10 @@ const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-m
 const onGlobe = (lat, lon, r = 1) => new THREE.Vector3(
   r * Math.cos(lat * DEG) * Math.cos(lon * DEG), r * Math.sin(lat * DEG), -r * Math.cos(lat * DEG) * Math.sin(lon * DEG));
 
-// The blue crater near the base. It is our own marker laid over the real ground, and not from the
-// maps: it stands in for the permanently shadowed craters where the ice is. It is where Cabeus is,
-// the crater NASA's LCROSS mission found water ice in (2009), drawn about four times Cabeus's real
-// size so it can be seen from this far away, and clear of the flags at the pole.
-const ICE = { at: onGlobe(-84.9, 324.5), size: 3.5 * DEG };
+// The blue crater beside the base. It is our own marker laid over the real ground, and not from the
+// maps: it stands in for the permanently shadowed craters where the ice is, which are too small to
+// see from this far away.
+const ICE = { at: onGlobe(-84, 205), size: 9 * DEG };
 // How much the blue crater moves the ground at `d` crater radii from its middle: a bowl with a raised rim.
 const iceBowl = d => (d < 1 ? -0.035 * ICE.size * 6 * (1 - d * d) : d < 1.3 ? 0.012 * ICE.size * 6 * (1 - (d - 1) / 0.3) : 0);
 
@@ -145,7 +143,6 @@ function buildMoon() {
     piece.add(rim);
     moon.add(piece);
   }
-  moon.userData.axis = [[white, 0.5], [dark, 0.22]];   // the line's two paints and how see-through each is, so it can be faded
   return moon;
 }
 
@@ -155,7 +152,9 @@ function numberSprite(n) {
   const ctx = cv.getContext('2d');
   ctx.fillStyle = '#07173F'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.arc(48, 48, 40, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = '700 54px "Chakra Petch", system-ui, sans-serif'; // the game's heading font (Fira Sans is never loaded here) ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // The game's heading font (Fira Sans is never loaded here). The digit is centred in the circle.
+  ctx.fillStyle = '#fff'; ctx.font = '700 54px "Chakra Petch", system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(String(n), 48, 52);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -165,33 +164,9 @@ function numberSprite(n) {
   return sprite;
 }
 
-// Flags that share a spot are planted in a small ring round it. On the whole-Moon view they lean
-// outward, or they would hide each other. When a mission is picked the camera goes in close: the
-// flags shrink to fit the closer view (CLOSE.size) and stand up straight, and the Moon turns under
-// them until they stand in a row across the picture, the picked one at the right-hand end with
-// its cloth clear of the others (CLOSE.turn).
-const FAN = { out: 1.5 * DEG, lean: 40 * DEG };   // how far from the spot each foot is, and how far each flag leans from far away
-// Picked: how far the camera stands from the spot (Moon radii), how big the flags are, where the
-// dive ends, and where the picked flag stands round the spot, measured from the camera's side.
-const CLOSE = { back: 0.34, size: 0.24, dive: 0.08, turn: 60 * DEG };
-
-// fan: null for a flag on its own, or { turn } in radians: which way round the shared spot this one stands and leans.
-function buildFlag(place, number, fan = null) {
+function buildFlag(place, number) {
   const flag = new THREE.Group();
-  const spot = onGlobe(place.lat, place.lon).normalize(), up = spot.clone(), lean = new THREE.Group();
-  if (fan) {
-    // Two directions along the ground at the spot, then this flag's own direction between them.
-    const ref = Math.abs(spot.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-    const t1 = ref.addScaledVector(spot, -ref.dot(spot)).normalize(), t2 = new THREE.Vector3().crossVectors(spot, t1);
-    const away = t1.multiplyScalar(Math.cos(fan.turn)).addScaledVector(t2, Math.sin(fan.turn));
-    up.multiplyScalar(Math.cos(FAN.out)).addScaledVector(away, Math.sin(FAN.out)).normalize();
-    // Lean away from the spot: a turn about the line along the ground that is square to `away`.
-    const hinge = new THREE.Vector3().crossVectors(up, away).normalize();
-    hinge.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(0, 1, 0)));
-    lean.quaternion.setFromAxisAngle(hinge, FAN.lean);
-    lean.userData.hinge = hinge;   // kept, so the lean can be eased away when the camera comes in close
-    lean.userData.away = away.clone().addScaledVector(up, -away.dot(up)).normalize();   // from the shared spot to this foot, along the ground
-  }
+  const up = onGlobe(place.lat, place.lon).normalize();
   // Where this spot sits when it faces the camera: a little below the middle of the picture.
   const face = new THREE.Vector3(0, up.y, Math.sqrt(1 - up.y * up.y)).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
   flag.position.copy(up).multiplyScalar(0.985);   // moved onto the real ground once the maps arrive
@@ -208,16 +183,14 @@ function buildFlag(place, number, fan = null) {
   ring.renderOrder = 4;
   const badge = numberSprite(number);
   badge.position.y = 0.26;
-  // An unseen ball round the flag makes it easier to click or tap. On a leaning flag it is smaller
-  // and nearer the top, where the flags are furthest apart, so each has its own.
-  const reach = new THREE.Mesh(new THREE.SphereGeometry(fan ? 0.1 : 0.11, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
-  reach.position.y = fan ? 0.2 : 0.1;
+  // An unseen ball round the flag makes it easier to click or tap.
+  const reach = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+  reach.position.y = 0.1;
   // The pole and cloth turn on the spot to keep the cloth facing whoever is looking.
   const mast = new THREE.Group();
   mast.add(pole, cloth);
-  lean.add(mast, badge, reach);
-  flag.add(lean, ring);
-  return { flag, lean, mast, cloth, ring, badge, reach, up, face };
+  flag.add(mast, ring, badge, reach);
+  return { flag, mast, cloth, ring, badge, reach, up, face };
 }
 
 // missions: [{ id, place: { lat, lon } }]. onPick(id) is called when a flag is clicked, and
@@ -235,11 +208,8 @@ export function createMoonMenu(canvas, missions, onPick) {
   const moon = buildMoon();
   moon.rotation.x = TILT;
   scene.add(moon);
-  // Missions flown from the same place share a spot: their flags stand round it, evenly spaced.
-  const sameSpot = m => missions.filter(o => o.place.lat === m.place.lat && o.place.lon === m.place.lon);
   const flags = Object.fromEntries(missions.map((m, i) => {
-    const group = sameSpot(m);
-    const made = buildFlag(m.place, i + 1, group.length > 1 ? { turn: (group.indexOf(m) / group.length + 0.25) * 2 * Math.PI } : null);
+    const made = buildFlag(m.place, i + 1);
     made.reach.userData.id = m.id;
     moon.add(made.flag);
     return [m.id, made];
@@ -252,7 +222,6 @@ export function createMoonMenu(canvas, missions, onPick) {
   }).catch(() => {});
 
   let picked = null;        // mission id whose flag faces the camera
-  let near = 0;             // 0 = the whole-Moon view, up to 1 = in close on the picked flag
   let locked = new Set();   // missions that can't be played yet: their flags are grey
   let diving = 0;           // 0 = not diving, up to 1 = at the surface
   let diveDone = null;
@@ -273,7 +242,7 @@ export function createMoonMenu(canvas, missions, onPick) {
     for (const [id, f] of Object.entries(flags)) {
       const on = id === picked, shut = locked.has(id);
       f.cloth.material.color.setHex(on ? 0xeafe07 : shut ? 0x8fa3c8 : 0x2e96f5);
-      f.want = on ? 1.35 : picked ? 0.85 : 1;   // its size next to the others; frame() eases to it
+      f.flag.scale.setScalar(on ? 1.35 : picked ? 0.85 : 1);
       f.ring.material.opacity = on ? 1 : 0;
       f.badge.material.opacity = picked && !on ? 0.55 : 1;
     }
@@ -294,21 +263,10 @@ export function createMoonMenu(canvas, missions, onPick) {
       out.copy(spot).normalize();
       // Close in low and from the side, with the ground at the bottom of the picture, so the
       // flag stands upright against the sky. The dive goes almost down to the ground.
-      const back = THREE.MathUtils.lerp(CLOSE.back, CLOSE.dive, diving);
+      const back = THREE.MathUtils.lerp(1.5, 0.2, diving);
       side.copy(TOWARD).addScaledVector(out, -TOWARD.dot(out)).normalize();
-      // Flags that share the spot: turn the Moon about the flag until they stand in a row across
-      // the picture. `step` is where the picked flag should be round the spot: toward the camera
-      // and to its right.
-      const away = flags[picked].lean.userData.away;
-      if (away) {
-        seen.copy(away).applyQuaternion(moon.quaternion).addScaledVector(out, -seen.dot(out)).normalize();
-        step.crossVectors(out, side).multiplyScalar(Math.sin(CLOSE.turn)).addScaledVector(side, Math.cos(CLOSE.turn)).normalize();
-        moon.quaternion.premultiply(turnBy.setFromUnitVectors(seen, step).slerp(NONE, 1 - ease)).normalize();
-        moon.updateMatrixWorld(true);
-        flags[picked].flag.getWorldPosition(spot);
-      }
       wantPos.copy(side).addScaledVector(out, 0.5).normalize().multiplyScalar(back).add(spot);
-      wantLook.copy(spot).addScaledVector(out, 0.035);
+      wantLook.copy(spot).addScaledVector(out, 0.1);
       wantUp.copy(out);
       flags[picked].ring.scale.setScalar(1 + 0.12 * Math.sin(now / 260));
     } else {
@@ -322,18 +280,9 @@ export function createMoonMenu(canvas, missions, onPick) {
     look.lerp(wantLook, ease);
     camera.up.lerp(wantUp, ease).normalize();
     camera.lookAt(look);
-    // In close the flags are small and upright; from far away they are full size and lean apart.
-    near += ((picked ? 1 : 0) - near) * ease;
-    // Up close the axis line would be a thick bar behind the flags, so it fades out on the way in.
-    for (const [paint, full] of moon.userData.axis) paint.opacity = full * (1 - near);
-    for (const f of Object.values(flags)) {
-      f.size = (f.size ?? 1) + ((f.want ?? 1) - (f.size ?? 1)) * ease;
-      f.flag.scale.setScalar(f.size * THREE.MathUtils.lerp(1, CLOSE.size, near));
-      if (f.lean.userData.hinge) f.lean.quaternion.setFromAxisAngle(f.lean.userData.hinge, FAN.lean * (1 - near));
-    }
     // Turn each flag's cloth to face the camera.
     for (const f of Object.values(flags)) {
-      f.lean.worldToLocal(seen.copy(camera.position));
+      f.flag.worldToLocal(seen.copy(camera.position));
       f.mast.rotation.y = Math.atan2(seen.x, seen.z);
     }
     if (diveDone) {

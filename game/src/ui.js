@@ -402,7 +402,9 @@ function fitMap() {
   const box = $('research-view'), w = box.clientWidth, h = box.clientHeight;
   view.s = zoomRange()[0] * 1.22; // a little closer than the furthest you can zoom out
   view.x = w / 2 - MAP.size / 2 * view.s;
-  view.y = h / 2 + 20 - MAP.size / 2 * view.s;
+  // Centred in the space below the title bar, not behind it.
+  const bar = $('research').querySelector('.rt-top').offsetHeight;
+  view.y = (h + bar) / 2 - MAP.size / 2 * view.s;
   placeMap();
 }
 (function dragMap() {
@@ -728,6 +730,28 @@ function pick(id) {
   picked = picked === id ? null : id;
   renderResearch();
   $(`node-${id}`)?.focus({ preventScroll: true });
+  if (picked) clearOfPanel(id);
+}
+// The details box opens over the map. If it covers the circle just picked (or the title bar
+// does), the map slides the shortest way that brings the circle and its name back into view.
+function clearOfPanel(id) {
+  const dot = $(`node-${id}`)?.closest('.rt-node'), panel = $('research-panel');
+  if (!dot || panel.hidden) return;
+  const c = dot.querySelector('.rt-dot').getBoundingClientRect(), n = dot.querySelector('.rt-name')?.getBoundingClientRect() ?? c;
+  // The circle and the name under it, as one box.
+  const d = { left: Math.min(c.left, n.left), right: Math.max(c.right, n.right), top: c.top, bottom: Math.max(c.bottom, n.bottom) };
+  const p = panel.getBoundingClientRect(), bar = $('research').querySelector('.rt-top').getBoundingClientRect();
+  const GAP = 16, NAME = 0;
+  if (d.top < bar.bottom + GAP) view.y += bar.bottom + GAP - d.top;
+  else if (d.right + GAP > p.left && d.left - GAP < p.right && d.bottom + NAME > p.top && d.top - GAP < p.bottom) {
+    const left = d.right + GAP - p.left, up = d.bottom + NAME - p.top;
+    // Sideways if the box is beside the tree (a computer), upward if it lies along the bottom (a phone).
+    if (p.width < innerWidth * 0.7) view.x -= left; else view.y -= up;
+  } else return;
+  const map = $('research-map');
+  map.style.transition = calm ? '' : 'transform .3s ease';
+  placeMap();
+  setTimeout(() => { map.style.transition = ''; }, 320);
 }
 
 function buy(id) {
@@ -958,10 +982,9 @@ function finish() {
   const facts = [
     ['Lowest life support', `${Math.round(sim.lowestAir)}%`],
     ['Radiation dose', `${Math.round(sim.dose)} of 100${mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`],
-    ['Real dose limit', 'The meter counts this mission\'s share of a safe dose, out of 100. NASA caps a real astronaut\'s whole career at 600 millisieverts (the unit for radiation dose), so every mission has to stay well under it.'],
     ['Battery empty for', `${Math.round(sim.blackout)} s`],
     ...(sim.food !== null ? [['Meals at the end', `${sim.food} (goal ${sim.goalValue})`]] : []),
-    ...(mission.goalType === 'samples' ? [['Rock samples', `${sim.samples.size} of ${sim.goalValue}`]] : []),
+    ...(mission.goalType === 'samples' ? [['Rock samples', `${sim.samples.size} (goal ${sim.goalValue})`]] : []),
     ['Research from samples and data', `${sim.rp}`],
     ...stormFacts,
   ];
@@ -970,6 +993,8 @@ function finish() {
   $('debrief-reason').textContent = o.reason;
   $('debrief-stars').innerHTML = starsHtml(stars);
   $('debrief-stats').innerHTML = facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  // A full-width note under the table: as a table row its long text was squeezed into a narrow column on phones.
+  $('debrief-note').textContent = 'About the dose: the meter counts this mission\'s share of a safe dose, out of 100. NASA caps a real astronaut\'s whole career at 600 millisieverts (the unit for radiation dose), so every mission has to stay well under it.';
   $('debrief-points').textContent = `You earned ${earned} research points. You now have ${save.points}.`;
   $('debrief-pages').hidden = !newPages.length;
   if (newPages.length) {
