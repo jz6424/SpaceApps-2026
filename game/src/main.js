@@ -13,7 +13,8 @@ const SPAN = (GRID - 1) * POST;
 const PAD_HALF = 50;           // the ground under the base is flattened out to here...
 const PAD_BLEND = 40;          // ...then eases back to the real terrain over this distance
 const CREW_HEIGHT = 1.8;
-const CREW_RADIUS = 0.3;
+const CREW_RADIUS = 0.26;
+const SKIN = 0.04; // the gap the controller keeps from walls and floors, so it slides along them instead of snagging
 const GRAVITY = 1.62;          // Moon gravity, m/s2
 const WALK = 2.5, RUN = 5, JUMP = 2.6;
 const USE_RANGE = 2.4;         // how close you must be to use something with E
@@ -177,14 +178,20 @@ scene.add(habitat);
 const roofMeshes = [], colNodes = [], stationNodes = {};
 habitat.traverse(o => {
   if (o.name.startsWith('COL_')) { colNodes.push(o); o.visible = false; return; }
-  if (o.name.startsWith('ROOF_')) roofMeshes.push(o);
+  if (o.name.startsWith('ROOF_')) { roofMeshes.push(o); if (o.isMesh) o.material = o.material.clone(); }
   const m = o.name.match(/^STATION_([A-Za-z]+)$/);
   if (m) stationNodes[m[1]] = o;
   if (o.isMesh && !o.parent.name.startsWith('COL_')) o.castShadow = o.receiveShadow = !o.material.transparent;
 });
 habitat.updateMatrixWorld(true);
+// The Habitat's white paint is close to pure white, which looks like it glows under any light. A
+// slightly greyer white keeps it reading as white while letting light and shade show on it.
+habitat.traverse(o => { if (o.isMesh && o.material?.name === 'M_White') o.material.color.multiplyScalar(0.84); });
+// The cabin lamps. In the cutaway view the roof is not drawn but still casts its shadow, so the
+// cabin is lit by these, not by the Sun pouring in through a missing roof.
+const LAMP = 8.5;
 const inLights = [-4.6, -1.4, 1.8].map(x => {
-  const l = new THREE.PointLight(0xfff4dd, 1, 0, 1.6);
+  const l = new THREE.PointLight(0xfff4dd, LAMP, 0, 1.6);
   l.position.set(x, 6.3, 0);
   habitat.add(l);
   return l;
@@ -230,6 +237,59 @@ const airlockX = new THREE.Box3().setFromObject(colNodes.find(n => n.name === 'C
 hull.expandByObject(colNodes.find(n => n.name === 'COL_AirlockBase'));
 
 // --- Stations: each gets its own copy of its materials (to glow) and a floating label ---
+// --- Callouts: names floating over things you can use ---
+// Drawn as page elements on top of the 3D view, not as pictures inside it, so the text is as sharp
+// as the rest of the screen at any distance. A white dot sits on the thing itself, a thin line
+// leads up and away, and the name is at the end of the line. Each callout fades with the
+// astronaut's distance from it: full near, faint (or gone) far away, and full again when pointed at.
+const calloutLayer = document.createElement('div');
+calloutLayer.id = 'callouts';
+renderer.domElement.after(calloutLayer); // under the HUD and the menus, over the 3D view
+const callouts = [];
+// near/far: metres from the astronaut where it starts to fade and where it is faintest.
+// faint: how visible it stays when far (0 = gone). station: the station it opens when clicked.
+function makeCallout(text, { color = '#FFFFFF', near = 6, far = 14, faint = 0.2, station = null } = {}) {
+  const el = document.createElement('div');
+  el.className = 'callout';
+  el.style.display = 'none'; // until placeCallouts() finds it on screen
+  el.style.setProperty('--co', color);
+  el.innerHTML = `<i class="co-dot"></i><svg class="co-line" viewBox="0 0 40 28" aria-hidden="true"><path d="M3 25 21 7h19"/></svg>`;
+  const name = document.createElement(station ? 'button' : 'span');
+  name.className = 'co-name';
+  name.textContent = text;
+  if (station) {
+    name.tabIndex = -1; // the stations have keys (E) and the mouse; this keeps Space for jumping
+    name.addEventListener('pointerenter', () => { if (state === 'play') hovered = station; });
+    name.addEventListener('pointerleave', () => { if (hovered === station) hovered = null; });
+    name.addEventListener('click', () => { name.blur(); if (state === 'play' && isInside(crewBody.translation())) goToStation(station); });
+  }
+  el.append(name);
+  calloutLayer.append(el);
+  const c = { el, name, position: new THREE.Vector3(), visible: true, near, far, faint, on: 0, shown: false };
+  callouts.push(c);
+  return c;
+}
+const toScreen = new THREE.Vector3();
+function placeCallouts() {
+  camera.updateMatrixWorld();
+  const me = crewBody.translation(), w = innerWidth, h = innerHeight;
+  for (const c of callouts) {
+    let show = c.visible;
+    if (show) {
+      toScreen.copy(c.position).project(camera);
+      show = toScreen.z < 1 && toScreen.x > -1.3 && toScreen.x < 1.1 && toScreen.y > -1.1 && toScreen.y < 1.3;
+    }
+    if (show !== c.shown) { c.el.style.display = show ? '' : 'none'; c.shown = show; }
+    if (!show) continue;
+    const away = Math.hypot(c.position.x - me.x, c.position.y - me.y, c.position.z - me.z);
+    const fade = 1 - (1 - c.faint) * THREE.MathUtils.smoothstep(away, c.near, c.far);
+    const size = THREE.MathUtils.clamp(9 / camera.position.distanceTo(c.position), 0.78, 1.08) * (1 + 0.12 * c.on);
+    c.el.style.opacity = Math.max(fade, c.on).toFixed(2);
+    c.el.style.transform = `translate(${((toScreen.x + 1) / 2 * w).toFixed(1)}px, ${((1 - toScreen.y) / 2 * h).toFixed(1)}px) scale(${size.toFixed(3)})`;
+    if (c.fadeOut !== (fade < 0.05 && c.on < 0.05)) { c.fadeOut = !c.fadeOut; c.el.classList.toggle('gone', c.fadeOut); } // nothing to click when faded out
+  }
+}
+
 const STATION_INFO = {
   Power: { label: 'Power', icon: 'bolt' },
   LifeSupport: { label: 'Life Support', icon: 'wind' },
@@ -259,11 +319,8 @@ for (const [id, node] of Object.entries(stationNodes)) {
   node.traverse(o => { if (o.isMesh && !o.name.endsWith('_Stand')) body.expandByObject(o); });
   const dot = body.isEmpty() ? pos.clone().add(new THREE.Vector3(0, 1.4, 0))
     : new THREE.Vector3((body.min.x + body.max.x) / 2, Math.min(body.min.y + (body.max.y - body.min.y) * 0.8, pos.y + 2.2), (body.min.z + body.max.z) / 2);
-  const marker = calloutSprite(STATION_INFO[id].label, STATION_INFO[id].icon);
+  const marker = makeCallout(STATION_INFO[id].label, { near: 5, far: 13, faint: 0.22, station: id });
   marker.position.copy(dot);
-  marker.userData.station = id;
-  scene.add(marker);
-  pickables.push(marker);
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
 }
 
@@ -287,97 +344,23 @@ const shelterZone = (() => {
   return { group, fill, edge };
 })();
 
-// --- Labels drawn on a canvas: a line icon plus text ---
-function iconPath(ctx, name, x, y, s, width = 2) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s / 24, s / 24);
-  ctx.lineWidth = width; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
-  const p = new Path2D({
-    bolt: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z',
-    wind: 'M9.6 4.6A2 2 0 1 1 11 8H2m10.6 11.4A2 2 0 1 0 14 16H2m15.7-8.3A2.5 2.5 0 1 1 19.5 12H2',
-    radio: 'M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
-    leaf: 'M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10ZM2 21c0-3 1.9-5.4 5.2-6',
-    map: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4zM8 2v16M16 6v16',
-    shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
-    door: 'M3 21h18M5 21V3h14v18M14.5 11v2.5',
-    rock: 'M3 17l4-9 5 2 4-5 5 12z',
-    wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z',
-  }[name] ?? '');
-  ctx.stroke(p);
-  ctx.restore();
-}
-
-// A callout: a dot sits on the thing itself, a thin line leads up and away from it,
-// and the name is at the end of the line on a faint see-through plate (no border). The sprite is
-// pinned by its dot, so the dot stays on the object from every angle. Stations get a white line
-// and a yellow icon; a coloured line marks something special (red = broken, blue = ice).
-function calloutSprite(text, icon, color = '#FFFFFF') {
-  const CALLOUT = 0.0056; // metres of sprite per pixel of drawing
-  const H = 128, AX = 22, AY = H - 22, EX = 68, EY = 60, LX = 94, DOT = 7; // dot, elbow, where the name starts
-  const ICON = 40, GAP = 10, PAD = 14, FONT = '600 40px "Exo 2", system-ui, sans-serif';
-  const label = text.toUpperCase();
-  const canvas = document.createElement('canvas');
-  let ctx = canvas.getContext('2d');
-  ctx.font = FONT;
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-  const textW = Math.ceil(ctx.measureText(label).width);
-  const W = LX + PAD + ICON + GAP + textW + PAD + 12;
-  canvas.width = W * 2; canvas.height = H * 2; // drawn at twice the size so the lines stay crisp up close
-  ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
-  ctx.font = FONT;
-  ctx.textBaseline = 'middle';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-  // The plate behind the name.
-  ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, .45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 2;
-  ctx.fillStyle = 'rgba(5, 14, 40, .58)';
-  ctx.beginPath(); ctx.roundRect(LX, EY - 30, W - LX - 10, 60, 6); ctx.fill();
-  ctx.restore();
-  // The line and the dot: a dark edge first so they show on pale walls, then the colour.
-  const k = Math.SQRT1_2;
-  const lines = () => { ctx.beginPath(); ctx.moveTo(AX + DOT * k, AY - DOT * k); ctx.lineTo(EX, EY); ctx.lineTo(LX, EY); ctx.stroke(); };
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(3, 8, 24, .6)'; ctx.lineWidth = 6; lines();
-  ctx.strokeStyle = color; ctx.lineWidth = 3; lines();
-  ctx.fillStyle = 'rgba(3, 8, 24, .6)'; ctx.beginPath(); ctx.arc(AX, AY, DOT + 2.2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(AX, AY, DOT, 0, Math.PI * 2); ctx.fill();
-  // Icon and name.
-  ctx.strokeStyle = color === '#FFFFFF' ? '#EAFE07' : '#FFFFFF';
-  iconPath(ctx, icon, LX + PAD, EY - ICON / 2, ICON, 2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(label, LX + PAD + ICON + GAP, EY + 3);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.center.set(AX / W, (H - AY) / H); // pinned by the dot
-  sprite.scale.set(W * CALLOUT, H * CALLOUT, 1);
-  sprite.userData.size = sprite.scale.clone(); // its resting size; it grows a little when pointed at
-  // Where the middle of the name is, measured from the dot, as a share of the sprite's size.
-  sprite.userData.nameAt = { x: ((LX + W - 10) / 2 - AX) / W, y: (AY - EY) / H };
-  sprite.renderOrder = 10;
-  return sprite;
-}
-
-// A floating tag (used for the airlock's status sign): a dark see-through plate with a sharp outline and
+// A floating tag in the 3D scene, used for the airlock's status sign: a dark see-through plate with a sharp outline and
 // two clipped corners, a line icon, spaced capitals, and a small pointer down to the thing it names.
 // A soft shadow lifts it off the pale Habitat walls. Station tags have a white outline and a
 // yellow icon; a coloured outline marks something special (red = broken, blue = ice).
 function labelSprite(text, icon, color = '#FFFFFF') {
   const W = 512, H = 144;
   const canvas = document.createElement('canvas');
-  canvas.width = W * 2; canvas.height = H * 2; // drawn at twice the size so the lines stay crisp up close
+  canvas.width = W * 3; canvas.height = H * 3; // drawn at three times the size so it stays crisp up close
   const ctx = canvas.getContext('2d');
-  ctx.scale(2, 2);
+  ctx.scale(3, 3);
   const label = text.toUpperCase();
   ctx.font = '600 44px "Exo 2", system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-  const ICON = 56, GAP = 16, PAD = 24, textMax = W - 28 - 2 * PAD - ICON - GAP;
+  const PAD = 28, textMax = W - 28 - 2 * PAD;
   const textW = Math.min(textMax, ctx.measureText(label).width);
-  const boxW = PAD + ICON + GAP + textW + PAD, x0 = (W - boxW) / 2, x1 = x0 + boxW, y0 = 16, y1 = 108, cut = 20, mid = W / 2;
+  const boxW = PAD + textW + PAD, x0 = (W - boxW) / 2, x1 = x0 + boxW, y0 = 16, y1 = 108, cut = 20, mid = W / 2;
   ctx.beginPath();
   ctx.moveTo(x0, y0); ctx.lineTo(x1 - cut, y0); ctx.lineTo(x1, y0 + cut); ctx.lineTo(x1, y1);
   ctx.lineTo(mid + 14, y1); ctx.lineTo(mid, y1 + 18); ctx.lineTo(mid - 14, y1); // the pointer
@@ -390,11 +373,8 @@ function labelSprite(text, icon, color = '#FFFFFF') {
   ctx.restore();
   ctx.lineJoin = 'miter';
   ctx.strokeStyle = color; ctx.lineWidth = 3.5; ctx.stroke();
-  const ix = x0 + PAD, iy = (y0 + y1 - ICON) / 2;
-  ctx.strokeStyle = color === '#FFFFFF' ? '#EAFE07' : '#FFFFFF';
-  iconPath(ctx, icon, ix, iy, ICON, 2);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(label, ix + ICON + GAP, (y0 + y1) / 2 + 3, textMax);
+  ctx.fillText(label, x0 + PAD, (y0 + y1) / 2 + 3, textMax);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -426,10 +406,9 @@ const panels = [-12, -4, 4].map((dx, i) => {
   const spark = new THREE.PointLight(0xe43700, 0, 12, 1.5);
   spark.position.set(0, 3, 0);
   model.add(spark);
-  const label = calloutSprite(`Fix panel ${i + 1}`, 'wrench', '#E43700');
+  const label = makeCallout(`Fix panel ${i + 1}`, { color: '#E43700', near: 25, far: 90, faint: 0.45 });
   label.position.copy(model.position).add(new THREE.Vector3(0, 3.2, 0));
   label.visible = false;
-  scene.add(label);
   return { model, spark, label, at: model.position.clone().add(new THREE.Vector3(0, 0, 4.2)) };
 });
 place('Battery', L(12, -14));
@@ -447,10 +426,8 @@ const iceSpot = icePixel
 iceSpot.y = groundAt(iceSpot.x, iceSpot.z);
 const iceDistance = Math.round(Math.hypot(iceSpot.x - site.x, iceSpot.z - site.z));
 place('IceDrill', iceSpot);
-const iceLabel = calloutSprite('Crater ice', 'rock', '#2E96F5');
+const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 60, far: 420, faint: 0.4 });
 iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
-iceLabel.scale.multiplyScalar(4);
-scene.add(iceLabel);
 
 // Rock samples to collect on a moonwalk.
 const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a8f7f, emissive: 0xeafe07, emissiveIntensity: 0.25, roughness: 0.9 });
@@ -460,9 +437,8 @@ const samples = [[24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
   mesh.castShadow = true;
   scene.add(mesh);
-  const label = calloutSprite('Rock sample', 'rock', '#EAFE07');
+  const label = makeCallout('Rock sample', { color: '#EAFE07', near: 14, far: 60, faint: 0 });
   label.position.copy(at).add(new THREE.Vector3(0, 0.6, 0));
-  scene.add(label);
   return { id: `rock${i}`, mesh, label, at };
 });
 
@@ -759,7 +735,7 @@ function useDoorNow(which) {
 // has its pivot at the feet and faces +Z, so it hangs half a body height below.
 const crew = new THREE.Group();
 const crewModel = crewGltf.scene;
-crewModel.position.y = -CREW_HEIGHT / 2;
+crewModel.position.y = -CREW_HEIGHT / 2 - SKIN; // the feet on the ground, not on the controller's gap
 crew.add(crewModel);
 // The limbs move, so three.js can't tell from the rest pose when the mesh is off screen.
 crew.traverse(o => { o.castShadow = true; o.frustumCulled = false; });
@@ -887,7 +863,7 @@ function bodyLanguage(dt, pace, outside) {
 
   // Run: lean in and bound. The clip takes two steps per loop, so the body rises twice.
   const stride = moves.Run.time / moves.Run.getClip().duration; // 0 to 1 through the loop
-  crewModel.position.y = -CREW_HEIGHT / 2 + lope * 0.07 * Math.abs(Math.sin(stride * Math.PI * 2));
+  crewModel.position.y = -CREW_HEIGHT / 2 - SKIN + lope * 0.07 * Math.abs(Math.sin(stride * Math.PI * 2));
   bend('Spine', 0.2, 0, 0, lope * 0.8);
 
   // A tool in the right hand: elbow bent, forearm forward.
@@ -934,11 +910,14 @@ const startSpot = () => standSpot('MapTable');
 const start = outsideSpot();
 const crewBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(start.x, start.y, start.z));
 const crewCollider = world.createCollider(RAPIER.ColliderDesc.capsule(CREW_HEIGHT / 2 - CREW_RADIUS, CREW_RADIUS), crewBody);
-const controller = world.createCharacterController(0.02);
+const controller = world.createCharacterController(SKIN);
 controller.setUp({ x: 0, y: 1, z: 0 });
-controller.setMaxSlopeClimbAngle(50 * Math.PI / 180);
-controller.setMinSlopeSlideAngle(55 * Math.PI / 180);
+controller.setMaxSlopeClimbAngle(52 * Math.PI / 180);
+controller.setMinSlopeSlideAngle(58 * Math.PI / 180);
 controller.enableSnapToGround(0.5);
+// Steps over small lips (a box edge, a seam in the ground) instead of stopping dead against them.
+// The 0.49 m stairs are still taken by the ramp laid over them.
+controller.enableAutostep(0.3, 0.12, false);
 controller.setApplyImpulsesToDynamicBodies(false);
 
 // --- Input ---
@@ -1041,8 +1020,7 @@ const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
 function pick(e) {
   mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(mouse, camera);
-  const visible = pickables.filter(o => o.isSprite ? o.visible : true);
-  const hit = raycaster.intersectObjects(visible, false).find(h => !h.object.isSprite || h.object.visible);
+  const hit = raycaster.intersectObjects(pickables, false)[0];
   return hit?.object.userData ?? null; // { station } or { door }
 }
 let hovered = null;
@@ -1088,7 +1066,9 @@ let lockSteer = false;         // true while the keys follow the airlock view in
 const ACCEL = 7;       // how quickly the walking speed catches up with the keys
 const BRAKE = 10;      // how quickly they stop when you let go
 const TURN = 7;        // how quickly the body turns to face its direction
-const TURN_MAX = 7;    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
+const TURN_MAX = 7;
+const AIR_TURN = 1.2;  // how fast the keys can bend your path in mid-air, in radians a second
+const FOV = 60, FOV_RUN = 68; // the view widens a little while sprinting    // and the fastest it may spin, in radians a second, so big turns don't start with a jerk
 let velX = 0, velZ = 0, facing = 0;
 const camRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
 const head = new THREE.Vector3(), camDir = new THREE.Vector3();
@@ -1181,11 +1161,25 @@ function tick(dt) {
   const len = Math.hypot(mx, mz);
   if (len > 0) { mx *= speedWalk / len; mz *= speedWalk / len; }
 
-  // Speed drifts toward what the keys ask for, so starts, stops and changes of direction are curves.
+  // On the ground, speed drifts toward what the keys ask for, so starts, stops and turns are curves.
+  // In the air there is nothing to push against, so the speed you jumped with is the speed you
+  // keep: the keys can only bend the path a little, and Shift changes nothing but the view.
   const ease = rate => 1 - Math.exp(-rate * dt);
-  const pull = ease(len > 0 ? ACCEL : BRAKE);
-  velX += (mx - velX) * pull;
-  velZ += (mz - velZ) * pull;
+  if (grounded) {
+    const pull = ease(len > 0 ? ACCEL : BRAKE);
+    velX += (mx - velX) * pull;
+    velZ += (mz - velZ) * pull;
+  } else if (len > 0) {
+    const fly = Math.hypot(velX, velZ);
+    if (fly > 0.05) {
+      const heading = Math.atan2(velX, velZ), wanted = Math.atan2(mx, mz);
+      const bend = THREE.MathUtils.clamp(Math.atan2(Math.sin(wanted - heading), Math.cos(wanted - heading)), -AIR_TURN * dt, AIR_TURN * dt);
+      velX = Math.sin(heading + bend) * fly;
+      velZ = Math.cos(heading + bend) * fly;
+    }
+  }
+  // Sprinting (Shift, or the joystick pushed all the way) widens the view a little, in the air too.
+  const sprinting = len > 0 && speedWalk === RUN;
 
   if (grounded && (keys.has('Space') || jumpAsked)) vy = JUMP;
   jumpAsked = false;
@@ -1226,14 +1220,15 @@ function tick(dt) {
   const inHull = inside && now.x < airlockX; // the airlock tube has its own roof, so it uses the normal camera
   const inLock = airlockZone(now).inAirlock;
   // Cutaway: inside, the roof fades away and the camera looks down from above.
-  roofMeshes.forEach(m => { m.visible = !inside; });
+  // Not drawn, but still there for the Sun: the roof keeps shading the cabin.
+  roofMeshes.forEach(m => { if (m.material) { m.material.colorWrite = m.material.depthWrite = !inside; } else m.visible = !inside; });
   const closest = nearestUsable()?.id; // worked out once, not once per station
   Object.values(stations).forEach(s => {
     s.marker.visible = inside && !(inLock && s.id === 'Airlock'); // it would hang in front of the airlock camera
     const on = inside && (hovered === s.id || closest === s.id);
     s.glow += ((on ? 1 : 0) - s.glow) * Math.min(1, dt * 8);
     s.mats.forEach(m => { m.emissive?.setRGB(0.05 * s.glow, 0.26 * s.glow, 0.55 * s.glow); });
-    s.marker.scale.copy(s.marker.userData.size).multiplyScalar(1 + 0.15 * s.glow); // the tag you point at grows
+    s.marker.on = s.glow; // the callout you point at grows and stays fully visible
   });
 
   head.set(now.x, now.y + 0.6, now.z);
@@ -1256,8 +1251,9 @@ function tick(dt) {
     const d = hit ? Math.max(hit.timeOfImpact - 0.3, 0.2) : want;
     camera.position.copy(head).addScaledVector(camDir, d);
   }
-  const fov = inLock ? 88 : 60;
-  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  // The airlock's ceiling camera is wide. Elsewhere the view eases a little wider while sprinting.
+  const fov = inLock ? 88 : camera.fov + ((sprinting ? FOV_RUN : FOV) - camera.fov) * ease(6);
+  if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
   camera.lookAt(head);
 
   sun.target.position.copy(head);
@@ -1278,7 +1274,7 @@ function syncWorld(dt) {
   const pulse = stormOn ? 0.5 + 0.5 * Math.sin(performance.now() / 250) : 0;
   shelterZone.fill.material.opacity = 0.3 + 0.25 * pulse;
   shelterZone.edge.material.opacity = 0.7 + 0.3 * pulse;
-  inLights.forEach(l => { l.intensity = sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1; });
+  inLights.forEach(l => { l.intensity = LAMP * (sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1); });
   panels.forEach((pn, i) => {
     const broken = !sim.panels[i];
     pn.spark.intensity = broken ? 4 + 4 * Math.random() : 0;
@@ -1337,6 +1333,7 @@ renderer.setAnimationLoop(t => {
       frames = 0; slowSince = t;
     }
   }
+  calloutLayer.hidden = state === 'off';
   if (state === 'off') return;
   if (state === 'play') {
     tick(dt);
@@ -1360,6 +1357,7 @@ renderer.setAnimationLoop(t => {
     syncAirlock(dt);
     hooks?.frame(nearestUsable());
   }
+  placeCallouts();
   renderer.render(scene, camera);
 });
 
@@ -1393,12 +1391,10 @@ gameReady({
   stationScreen(id) {
     const s = stations[id];
     if (!s) return null;
-    // The middle of the name: out from the dot along the screen's own right and up.
-    const m = s.marker, at = m.userData.nameAt;
-    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-    const v = m.position.clone().addScaledVector(right, at.x * m.scale.x).addScaledVector(up, at.y * m.scale.y).project(camera);
-    if (v.z > 1) return null;
-    return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+    // The middle of the name, as drawn on the page.
+    if (!s.marker.shown) return null;
+    const r = s.marker.name.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   },
   // Shortcut for scripted checks: skips the airlock and leaves it open to the Moon.
   goOutside() { teleport(outsideSpot()); sim?.airlockSet('vacuum'); syncAirlock(0, true); yaw = Math.PI / 2; pitch = 0.25; camDist = 7; state = 'play'; },

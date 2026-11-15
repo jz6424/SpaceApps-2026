@@ -27,6 +27,9 @@ export const ICONS = {
   ff: '<path d="m13 19 9-7-9-7zM2 19l9-7-9-7z"/>',
   wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>',
   scoop: '<path d="M4 20 13 11"/><path d="m11 7 6 6 3.5-2.5c1.2-3.2-.8-6.8-4.5-7.5z"/>',
+  // Hotbar tools, drawn in the instrument style (square ends, see .slot-icon in ui.css).
+  driver: '<path d="m13 6 5-2 2 2-2 5-2 1-4-4z"/><path d="M13.5 10.5 4.5 19.5"/><path d="m6 15 3 3M8 13l3 3"/><path d="m17.5 6.5-1.5 1.5"/>',
+  sampler: '<path d="M9 3h6v3l1.5 1.5V19a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V7.5L9 6z"/><path d="M9 6h6"/><path d="M7.5 11h3.5M7.5 14h2.5M7.5 17h3.5"/><path d="M14 12.5v4"/>',
   left: '<path d="m15 5-7 7 7 7"/>',
   right: '<path d="m9 5 7 7-7 7"/>',
   target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
@@ -89,8 +92,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   // away. Fixing a panel or picking up a rock takes out the right tool by itself. For now the tools
   // are for show: nothing in the rules depends on which one is out.
   const SLOTS = [
-    { id: 'wrench', name: 'Repair tool', icon: 'wrench' },
-    { id: 'scoop', name: 'Sample scoop', icon: 'scoop' },
+    { id: 'wrench', name: 'Repair tool', icon: 'driver' },
+    { id: 'scoop', name: 'Sample kit', icon: 'sampler' },
     null,
     null,
   ];
@@ -98,7 +101,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   function renderHotbar() {
     $('hotbar').innerHTML = SLOTS.map((slot, i) => `<button class="slot${i === held ? ' on' : ''}${slot ? '' : ' empty'}" data-slot="${i}" ${slot ? '' : 'disabled'}
         aria-pressed="${i === held}" aria-label="Slot ${i + 1}: ${slot ? slot.name : 'empty'}" title="${slot ? slot.name : 'Empty'}">
-        <span class="slot-key">${i + 1}</span>${slot ? icon(slot.icon, 28) : ''}</button>`).join('');
+        <span class="slot-key">${i + 1}</span>${slot ? `<span class="slot-icon">${icon(slot.icon, 28)}</span>` : '<span class="slot-empty"></span>'}<i class="slot-bar"></i></button>`).join('');
     $('hotbar-name').textContent = held >= 0 ? SLOTS[held].name : '';
   }
   function selectSlot(i) {
@@ -135,22 +138,25 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       ${next ? `<div class="rp-next">Next unlock: ${next.name}</div>` : ''}`);
   }
 
-  // --- Low suit air warnings, shown once per level ---
-  let airLevel = 0; // 0 fine, 1 warning, 2 danger
-  function checkSuitAir() {
-    if (sim.where !== 'outside') { airLevel = 0; return; }
-    const level = sim.suit < 20 ? 2 : sim.suit < 40 ? 1 : 0;
+  // --- Low suit air alert ---
+  // It pulses a few times when it appears, then stays steady. It goes the moment it no longer
+  // applies (back inside, or the suit refilled). "Getting low" also goes after a few seconds;
+  // "almost gone" stays until you are back in.
+  let airLevel = 0, airShownAt = 0; // 0 fine, 1 getting low, 2 almost gone
+  function checkSuitAir(now) {
+    const t = $('air-toast');
+    const level = sim.where !== 'outside' ? 0 : sim.suit < 20 ? 2 : sim.suit < 40 ? 1 : 0;
     if (level > airLevel) {
-      const t = $('air-toast');
-      t.textContent = level === 2 ? 'Danger! Suit air almost gone. Return to the airlock now!' : 'Warning: suit air is getting low.';
+      t.textContent = level === 2 ? 'Suit air almost gone. Back to the airlock now!' : 'Suit air is getting low';
       t.className = level === 2 ? 'bad' : 'warn';
       t.hidden = false;
-      t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+      t.style.animation = 'none'; void t.offsetWidth; t.style.animation = ''; // pulse again from the start
       warningSound(level);
+      airShownAt = now;
     }
+    if (!t.hidden && (level === 0 || (level === 1 && now - airShownAt > 8000))) t.hidden = true;
     airLevel = level;
   }
-  $('air-toast').addEventListener('animationend', () => { $('air-toast').hidden = true; });
   $('feed').innerHTML = '';
 
   // --- Meters ---
@@ -202,7 +208,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       <div class="track"><b class="night" style="left:${pDay}%"></b>${earth}${storms}<i style="left:${pNow}%"></i></div>`);
     $('storm-frame').hidden = !storm;
     $('storm-frame').classList.toggle('safe', sim.where === 'shelter');
-    $('storm-text').textContent = sim.where === 'shelter' ? 'Solar storm: you are safe in the shelter' : 'Solar storm: get to the shelter!';
+    // Once you are in the shelter there is nothing left to warn about, so the words go; the thin
+    // blue edge stays to show the storm is still on.
+    $('storm-text').textContent = 'Solar storm: get to the shelter';
+    $('storm-text').hidden = sim.where === 'shelter';
   }
 
   // --- Messages ---
@@ -215,8 +224,20 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 12;
   const fadeTop = () => list.classList.toggle('faded', list.scrollTop > 4);
   list.addEventListener('scroll', fadeTop);
+  // After a while with nothing new the list fades back (not away). The mouse over it, a finger on
+  // it, scrolling it or a new message brings it back.
+  let feedAwake = performance.now(), overFeed = false;
+  const wakeFeed = () => { feedAwake = performance.now(); list.classList.remove('quiet'); };
+  const enterFeed = () => { overFeed = true; wakeFeed(); };
+  const leaveFeed = () => { overFeed = false; wakeFeed(); };
+  list.addEventListener('pointerenter', enterFeed);
+  list.addEventListener('pointerleave', leaveFeed);
+  list.addEventListener('pointerdown', wakeFeed);
+  list.addEventListener('wheel', wakeFeed, { passive: true });
   function renderFeed(now) {
     const follow = atBottom();
+    if (seen < sim.messages.length) wakeFeed();
+    else if (!overFeed && !typing.length && now - feedAwake > 6000) list.classList.add('quiet');
     for (; seen < sim.messages.length; seen++) {
       const m = sim.messages[seen], fromEarth = m.from === 'Mission Control';
       const li = document.createElement('li');
@@ -565,7 +586,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) toggleSpeed();
     const now = performance.now();
     renderFeed(now);
-    checkSuitAir();
+    checkSuitAir(now);
     watchSounds();
     renderAirlock();
     if (now - lastRender < 200) return;
@@ -598,6 +619,11 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('hotbar').removeEventListener('click', slotBtn);
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
+      list.removeEventListener('pointerenter', enterFeed);
+      list.removeEventListener('pointerleave', leaveFeed);
+      list.removeEventListener('pointerdown', wakeFeed);
+      list.removeEventListener('wheel', wakeFeed);
+      list.classList.remove('quiet');
       $('air-toast').hidden = true;
       $('lock-skip').removeEventListener('click', skipBtn);
       $('airlock-panel').hidden = true;

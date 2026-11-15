@@ -346,14 +346,18 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .mc-head::after, .st-head h3::after { content: ""; flex: 1; height: 1px; margin-left: 4px; background: linear-gradient(90deg, currentColor, transparent 85%); opacity: .6; }
 .mc-name { margin: 0; font-size: 14px; }
 #hint { margin: 0; background: rgba(0, 66, 166, .3); border-left: 2px solid var(--yellow); padding: 8px 12px; font-weight: 600; font-size: 16px; }
-#air-toast { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 12px 20px; font: 600 20px var(--head); text-align: center; pointer-events: none; opacity: 0; animation: air-fade 2.6s ease-in-out forwards; z-index: 8; max-width: calc(100vw - 32px); }
-#air-toast.warn { background: var(--glass-solid); border: 1.5px solid var(--yellow); color: var(--yellow); }
-#air-toast.bad { background: rgba(142, 17, 0, .94); border: 1.5px solid #fff; color: #fff; }
-@keyframes air-fade { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
+/* Alerts (low suit air, solar storm): see-through, a coloured edge, and a glow that pulses three
+   times when they appear and then holds steady. */
+#air-toast { position: fixed; left: 50%; top: 24%; transform: translateX(-50%); margin: 0; padding: 10px 24px; font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; text-align: center; pointer-events: none; z-index: 8; max-width: calc(100vw - 32px); border-radius: 4px; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); box-shadow: 0 0 10px var(--glow); animation: alert-pulse .9s ease-in-out 3; }
+#air-toast.warn { --glow: rgba(234, 254, 7, .28); background: rgba(234, 254, 7, .08); border: 1px solid rgba(234, 254, 7, .65); color: var(--yellow); }
+#air-toast.bad { --glow: rgba(228, 55, 0, .45); background: rgba(228, 55, 0, .14); border: 1px solid rgba(255, 120, 80, .85); color: #fff; }
+@keyframes alert-pulse { 50% { box-shadow: 0 0 30px var(--glow), inset 0 0 12px var(--glow); } }
 
 /* Messages: newest at the bottom. Older ones scroll up and fade out at the top edge; scroll the
    list (wheel or drag) to read back. The line down the left side is the colour of its kind. */
 #feed { position: fixed; left: 12px; top: 12px; width: 320px; max-height: min(42vh, 360px); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0 4px 0 0; box-sizing: border-box; list-style: none; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; scrollbar-color: rgba(201, 216, 242, .5) transparent; }
+#feed { transition: opacity .8s var(--ease); }
+#feed.quiet { opacity: .32; }
 #feed.faded { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 76px); mask-image: linear-gradient(to bottom, transparent 0, #000 76px); }
 #feed:focus-visible { outline-offset: -3px; }
 .typed.typing::after { content: ""; display: inline-block; width: .5em; height: 1em; margin-left: 2px; background: currentColor; vertical-align: -2px; }
@@ -371,30 +375,56 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .msg.warn { --k: var(--yellow); }
 .msg.bad { --k: var(--red); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
+/* Callouts over things you can use (made in main.js): a dot on the thing, a thin line, the name.
+   They are page elements, so the text is sharp; main.js moves them and fades them with distance. */
+#callouts { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.callout { --co: #fff; position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; }
+.co-dot { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--co); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
+.co-line { position: absolute; left: -3px; top: -25px; width: 40px; height: 28px; overflow: visible; fill: none; stroke: var(--co); stroke-width: 1.5; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .7)); }
+.co-name {
+  position: absolute; left: 37px; top: -18px; transform: translateY(-50%); margin: 0; padding: 3px 10px; border: 0; border-left: 2px solid var(--co); border-radius: 0 3px 3px 0;
+  white-space: nowrap; background: rgba(3, 8, 24, .5); color: #fff; font: 600 14px/18px var(--head); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+button.co-name { pointer-events: auto; cursor: pointer; transition: background-color .15s var(--ease); }
+button.co-name:hover { background: rgba(3, 8, 24, .78); }
+.callout.gone .co-name { pointer-events: none; }
+
 /* Hotbar: four see-through slots at the bottom of the screen. The one in use lifts and brightens.
    Small things that are always on screen (these slots, the mission box, the prompt) are tinted
    rather than blurred: blurring the moving 3D view behind them every frame costs speed. */
 #hotbar-wrap { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
 #hotbar-name { margin: 0; min-height: 20px; font: 600 14px/20px var(--head); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 6px rgba(0, 0, 0, .3); }
-#hotbar { display: flex; gap: 8px; }
+/* The bar sits on a thin rail with short end posts. Each slot is a cut-corner plate with a hairline
+   edge, its key number in the corner and a status line under the icon that lights up when in use. */
+#hotbar { position: relative; display: flex; gap: 6px; padding: 6px 12px 8px; }
+#hotbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5) 10%, rgba(255, 255, 255, .5) 90%, transparent); }
+#hotbar::after { content: ""; position: absolute; inset: auto 6px 0; height: 8px; pointer-events: none; background: linear-gradient(rgba(255, 255, 255, .55), rgba(255, 255, 255, .55)) 0 0 / 1px 100% no-repeat, linear-gradient(rgba(255, 255, 255, .55), rgba(255, 255, 255, .55)) 100% 0 / 1px 100% no-repeat; }
 .slot {
-  position: relative; width: 56px; height: 56px; padding: 0; display: grid; place-items: center; color: var(--text); cursor: pointer;
-  background: rgba(3, 8, 24, .34); border: 1px solid rgba(255, 255, 255, .26); border-radius: 8px;
-  transition: transform .15s var(--ease), border-color .15s var(--ease), background-color .15s var(--ease);
+  --edge: rgba(255, 255, 255, .34); --cut: 10px;
+  position: relative; width: 58px; height: 58px; padding: 0; border: 0; display: grid; place-items: center; color: var(--text); cursor: pointer;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  background: var(--edge); transition: transform .15s var(--ease);
 }
-.slot .ico { vertical-align: 0; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
-.slot:hover:not(:disabled) { border-color: rgba(255, 255, 255, .7); }
-.slot.on { transform: translateY(-4px); border-color: #fff; background: rgba(255, 255, 255, .16); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
-.slot.empty { cursor: default; border-color: rgba(255, 255, 255, .14); background: rgba(3, 8, 24, .12); }
-.slot-key { position: absolute; left: 6px; top: 2px; font: 500 14px var(--body); color: var(--soft); opacity: .8; }
+.slot::before { content: ""; position: absolute; inset: 1px; clip-path: polygon(calc(var(--cut) - .4px) 0, 100% 0, 100% calc(100% - var(--cut) + .4px), calc(100% - var(--cut) + .4px) 100%, 0 100%, 0 calc(var(--cut) - .4px)); background: linear-gradient(180deg, rgba(3, 8, 24, .62), rgba(3, 8, 24, .42)); }
+.slot > * { position: relative; }
+.slot-icon .ico { vertical-align: 0; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
+.slot-key { position: absolute; right: 7px; top: 2px; font: 500 14px/18px var(--mono); color: var(--soft); opacity: .75; }
+.slot-bar { position: absolute; left: 16px; right: 16px; bottom: 6px; height: 2px; background: rgba(255, 255, 255, .16); }
+.slot:hover:not(:disabled) { --edge: rgba(255, 255, 255, .7); }
+.slot.on { --edge: var(--yellow); transform: translateY(-4px); }
+.slot.on::before { background: linear-gradient(180deg, rgba(3, 8, 24, .55), rgba(234, 254, 7, .16)); }
+.slot.on .slot-icon, .slot.on .slot-key { color: var(--yellow); opacity: 1; }
+.slot.on .slot-bar { background: var(--yellow); box-shadow: 0 0 8px rgba(234, 254, 7, .7); }
+.slot.empty { --edge: rgba(255, 255, 255, .14); cursor: default; }
+.slot.empty::before { background: rgba(3, 8, 24, .24); }
+.slot-empty { width: 12px; height: 12px; opacity: .3; background: linear-gradient(#fff, #fff) center / 100% 1px no-repeat, linear-gradient(#fff, #fff) center / 1px 100% no-repeat; }
 #prompt { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: rgba(3, 8, 24, .5); left: 50%; bottom: 104px; transform: translateX(-50%); font-weight: 600; margin: 0; }
 
-/* A solar storm is live danger, so this is the one thing on screen that pulses. */
-#storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 6px var(--red), inset 0 0 120px rgba(228, 55, 0, .45); animation: throb 1.2s ease-in-out infinite alternate; }
-#storm-frame.safe { box-shadow: inset 0 0 0 4px var(--yonder), inset 0 0 80px rgba(46, 150, 245, .3); animation: none; }
-#storm-frame p { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; background: var(--martian); padding: 8px 16px; font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
-#storm-frame.safe p { background: var(--electric); }
-@keyframes throb { to { box-shadow: inset 0 0 0 6px var(--red), inset 0 0 40px rgba(228, 55, 0, .25); } }
+/* A solar storm: a red edge round the screen that throbs three times when the storm starts, then holds. */
+#storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 4px rgba(228, 55, 0, .8), inset 0 0 90px rgba(228, 55, 0, .3); animation: throb .6s ease-in-out 6 alternate; }
+#storm-frame.safe { box-shadow: inset 0 0 0 2px rgba(46, 150, 245, .6), inset 0 0 60px rgba(46, 150, 245, .18); animation: none; }
+#storm-frame p { --glow: rgba(228, 55, 0, .45); position: absolute; top: 96px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 20px; border-radius: 4px; background: rgba(228, 55, 0, .14); border: 1px solid rgba(255, 120, 80, .85); font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); box-shadow: 0 0 10px var(--glow); animation: alert-pulse .9s ease-in-out 3; }
+@keyframes throb { to { box-shadow: inset 0 0 0 6px var(--red), inset 0 0 140px rgba(228, 55, 0, .5); } }
 
 /* The station panel is see-through too, but the view behind it is heavily blurred, so you read
    the panel and not the labels floating behind it. */
