@@ -123,7 +123,7 @@ export const MISSIONS = [
     name: 'First Night',
     multiplier: 1,
     goal: 'Collect 5 glowing rock samples and survive the night.',
-    brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the red arrows to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
+    brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the tour to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
     lesson: 'No sun means no solar power. Turning things down at night (like the Eco setting) makes the battery last until sunrise.',
     dataCards: ['sunlight', 'air'],
     day: 200, night: 200,

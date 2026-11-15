@@ -11,6 +11,7 @@ import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
 import { PAGES } from './scrapbook.js';
 import { createScrapbook } from './scrapbook-view.js';
 import * as sound from './sound.js';
+import { isTouch as isTouchScreen } from './touch.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'brief', 'pause', 'debrief', 'how', 'credits'];
@@ -238,73 +239,131 @@ function panelHtml(node) {
     ${status}`;
 }
 
-// The map is laid out at one size and shrunk to fit narrower screens. Below 3/4 size the
-// circles get too small to tap, so it scrolls sideways instead.
-// The window onto the map has no scroll bars: you drag the map around inside it instead.
-const pan = { x: 0, y: 0, scale: 1, placed: false };
+// The whole screen is the map. Drag anywhere that isn't a circle or a button to move it; zoom with
+// the wheel, a trackpad pinch, two fingers on a touch screen, or the + and - keys. It opens zoomed
+// in on your base, its five branches and the start of each path. It can't be zoomed out further
+// than the whole tree, nor in further than 2.4 times, nor dragged so far that the tree leaves the
+// screen.
+const view = { x: 0, y: 0, s: 1 };
+const ZOOM_MAX = 2.4;
+const zoomRange = () => {
+  const box = $('research-view');
+  return [Math.min(box.clientWidth, box.clientHeight - 120) / (MAP.size + 80), ZOOM_MAX];
+};
 function placeMap() {
-  const view = $('research-view'), size = MAP.size * pan.scale;
-  // An axis that fits is centred. One that doesn't can be dragged until either edge shows.
-  const hold = (at, room) => (size <= room ? (room - size) / 2 : Math.min(0, Math.max(room - size, at)));
-  pan.x = hold(pan.x, view.clientWidth);
-  pan.y = hold(pan.y, view.clientHeight);
-  $('research-fit').style.transform = `translate(${pan.x}px, ${pan.y}px)`;
+  const box = $('research-view'), w = box.clientWidth, h = box.clientHeight, size = MAP.size * view.s;
+  const [lo, hi] = zoomRange();
+  view.s = Math.min(hi, Math.max(lo, view.s));
+  // The middle of the screen always stays over the tree.
+  view.x = Math.min(w / 2, Math.max(w / 2 - size, view.x));
+  view.y = Math.min(h / 2, Math.max(h / 2 - size, view.y));
+  $('research-map').style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
 }
+// Zoom by a factor, keeping the point under (px, py) where it is.
+function zoomMap(factor, px, py) {
+  const box = $('research-view');
+  px ??= box.clientWidth / 2; py ??= box.clientHeight / 2;
+  const [lo, hi] = zoomRange(), next = Math.min(hi, Math.max(lo, view.s * factor)), k = next / view.s;
+  view.x = px - (px - view.x) * k;
+  view.y = py - (py - view.y) * k;
+  view.s = next;
+  placeMap();
+}
+// The starting view: your base in the middle, with the branches and the first circle of each
+// path in sight.
 function fitMap() {
-  const view = $('research-view');
-  // The window takes whatever height is left on the screen, so the page itself never scrolls.
-  // On narrow screens the details panel sits under it and needs its share.
-  const narrow = matchMedia('(max-width: 1100px)').matches;
-  const top = view.getBoundingClientRect().top + $('research').scrollTop;
-  const room = innerHeight - top - 44 - (narrow ? $('research-panel').offsetHeight + 16 : 0);
-  view.style.height = `${Math.max(narrow ? 220 : 320, room)}px`;
-  pan.scale = Math.min(1, Math.max(0.75, view.clientWidth / MAP.size));
-  $('research-map').style.transform = `scale(${pan.scale})`;
-  $('research-fit').style.width = $('research-fit').style.height = `${MAP.size * pan.scale}px`;
-  if (!pan.placed) {
-    // Start with the base in the middle of the window.
-    pan.x = (view.clientWidth - MAP.size * pan.scale) / 2;
-    pan.y = (view.clientHeight - MAP.size * pan.scale) / 2;
-    pan.placed = true;
-  }
+  const box = $('research-view'), w = box.clientWidth, h = box.clientHeight;
+  const show = 2 * (MAP.radius[2] + 40); // out to just past the first circle of every path
+  view.s = Math.min(1.6, Math.max(0.7, Math.min(w, h - 150) / show));
+  view.x = w / 2 - MAP.size / 2 * view.s;
+  view.y = h / 2 + 20 - MAP.size / 2 * view.s;
   placeMap();
 }
 (function dragMap() {
-  const view = $('research-view');
-  let from = null, dragged = false;
-  view.addEventListener('pointerdown', e => {
-    if (e.button !== 0) return;
-    from = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-    dragged = false;
+  const box = $('research-view');
+  const fingers = new Map();
+  let from = null, dragged = false, pinch = 0;
+  box.addEventListener('pointerdown', e => {
+    // Circles are buttons: a press on one is for picking it, not for moving the map.
+    if (e.button !== 0 || e.target.closest('.rt-dot')) return;
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    box.setPointerCapture(e.pointerId);
+    from = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    dragged = false; pinch = 0;
   });
-  view.addEventListener('pointermove', e => {
-    if (!from) return;
+  box.addEventListener('pointermove', e => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 2) {
+      const [a, b] = [...fingers.values()], apart = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch) zoomMap(apart / pinch, (a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinch = apart; dragged = true;
+      return;
+    }
     const dx = e.clientX - from.x, dy = e.clientY - from.y;
-    // A small wobble is still a click on a circle. Past that it is a drag.
-    if (!dragged && Math.hypot(dx, dy) < 6) return;
-    if (!dragged) { dragged = true; view.setPointerCapture(e.pointerId); view.classList.add('dragging'); }
-    pan.x = from.panX + dx;
-    pan.y = from.panY + dy;
+    if (!dragged && Math.hypot(dx, dy) < 5) return;
+    dragged = true;
+    box.classList.add('dragging');
+    view.x = from.vx + dx;
+    view.y = from.vy + dy;
     placeMap();
   });
-  const drop = () => { from = null; view.classList.remove('dragging'); };
-  view.addEventListener('pointerup', drop);
-  view.addEventListener('pointercancel', drop);
-  // The click that ends a drag must not pick the circle under the pointer.
-  view.addEventListener('click', e => { if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; } }, true);
-  view.addEventListener('wheel', e => { e.preventDefault(); pan.x -= e.deltaX; pan.y -= e.deltaY; placeMap(); }, { passive: false });
-  // Tabbing to a circle outside the window brings it into view.
-  view.addEventListener('focusin', e => {
+  const drop = e => {
+    if (!fingers.delete(e.pointerId)) return;
+    box.classList.remove('dragging');
+    pinch = 0;
+    if (fingers.size === 1) { const [f] = fingers.values(); from = { x: f.x, y: f.y, vx: view.x, vy: view.y }; }
+    // A press on empty space that didn't move puts the details box away.
+    else if (!dragged && e.type === 'pointerup') { picked = null; showPanel(null); renderResearch(); }
+  };
+  box.addEventListener('pointerup', drop);
+  box.addEventListener('pointercancel', drop);
+  // The wheel and a two-finger trackpad swipe zoom; a trackpad pinch arrives as a wheel with Ctrl.
+  box.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomMap(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0016)), e.clientX - box.getBoundingClientRect().left, e.clientY - box.getBoundingClientRect().top);
+  }, { passive: false });
+  addEventListener('keydown', e => {
+    if ($('research').hidden || e.target.closest?.('input')) return;
+    if (e.key === '+' || e.key === '=') { zoomMap(1.2); e.preventDefault(); }
+    if (e.key === '-' || e.key === '_') { zoomMap(1 / 1.2); e.preventDefault(); }
+  });
+  // Hovering a circle shows its details; leaving it puts them away again, unless the circle was
+  // clicked (then they stay) or the pointer has moved onto the details box itself.
+  let leaveTimer = 0;
+  box.addEventListener('pointerover', e => {
+    const node = e.target.closest('.rt-dot')?.closest('.rt-node');
+    if (!node) return;
+    clearTimeout(leaveTimer);
+    showPanel(node.dataset.id);
+  });
+  box.addEventListener('pointerout', e => {
+    if (!e.target.closest('.rt-dot')) return;
+    clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(() => showPanel(picked), 280);
+  });
+  $('research-panel').addEventListener('pointerenter', () => clearTimeout(leaveTimer));
+  $('research-panel').addEventListener('pointerleave', () => { leaveTimer = setTimeout(() => showPanel(picked), 280); });
+  // Tabbing to a circle shows its details and brings it into view.
+  box.addEventListener('focusin', e => {
     const node = e.target.closest('.rt-node');
     if (!node) return;
-    const dot = node.querySelector('.rt-dot').getBoundingClientRect(), box = view.getBoundingClientRect(), edge = 72;
-    if (dot.left < box.left + edge) pan.x += box.left + edge - dot.left;
-    if (dot.right > box.right - edge) pan.x -= dot.right - (box.right - edge);
-    if (dot.top < box.top + edge) pan.y += box.top + edge - dot.top;
-    if (dot.bottom > box.bottom - edge) pan.y -= dot.bottom - (box.bottom - edge);
+    showPanel(node.dataset.id);
+    const dot = node.querySelector('.rt-dot').getBoundingClientRect(), edge = 96;
+    if (dot.left < edge) view.x += edge - dot.left;
+    if (dot.right > innerWidth - edge) view.x -= dot.right - (innerWidth - edge);
+    if (dot.top < edge + 60) view.y += edge + 60 - dot.top;
+    if (dot.bottom > innerHeight - edge) view.y -= dot.bottom - (innerHeight - edge);
     placeMap();
   });
 })();
+let panelShows = null;
+function showPanel(id) {
+  if (id === panelShows) return;
+  panelShows = id;
+  $('research-panel').hidden = !id;
+  if (id) $('research-panel').innerHTML = panelHtml(nodeById(id));
+}
 
 // The sky behind the tree: a field of stars, the same every time, redrawn to fit the window.
 function drawStars() {
@@ -333,28 +392,29 @@ function drawStars() {
 }
 
 function renderResearch() {
-  const all = BRANCHES.flatMap(branch => branch.nodes);
-  picked ??= (all.find(node => nodeState(node, unlocksNow(), save.points) === 'ready') ?? all[0]).id;
   $('research-points').textContent = save.points;
-  $('research-note').textContent = UPGRADES_LIVE
-    ? 'Pick a circle to see what it does. Drag the map to move around. Spend research points to add it to your base.'
-    : 'Pick a circle to see what it does. Drag the map to move around. Spend research points to open new missions. We are still building the upgrades, so they stay locked until a later update.';
+  $('research-note').textContent = (UPGRADES_LIVE
+    ? 'Point at a circle to see what it does, and click it to research it. '
+    : 'Point at a circle to see what it does. For now research opens new missions; the upgrades stay locked until a later update. ')
+    + (isTouchScreen ? 'Drag to move around, pinch to zoom.' : 'Drag to move around. Scroll or press + and − to zoom.');
   $('research-map').innerHTML = mapHtml();
-  $('research-panel').innerHTML = panelHtml(nodeById(picked));
-  if (!$('research').hidden) fitMap();
+  panelShows = undefined;
+  showPanel(picked);
 }
 
 function openResearch() {
+  picked = null;
   renderResearch();
   show('research');
   fitMap();
   drawStars();
 }
 
+// Clicking a circle keeps its details showing; clicking it again puts them away.
 function pick(id) {
-  picked = id;
+  picked = picked === id ? null : id;
   renderResearch();
-  $(`node-${id}`).focus();
+  $(`node-${id}`)?.focus({ preventScroll: true });
 }
 
 function buy(id) {
@@ -363,7 +423,8 @@ function buy(id) {
   save.points -= node.cost;
   save.unlocks.push(node.id);
   commit();
-  pick(id);
+  picked = id;
+  renderResearch();
 }
 
 // --- Scrapbook ---
@@ -393,12 +454,21 @@ function testsPassed(id, mode) {
 }
 
 // The difficulty buttons on the briefing, and the parts of the briefing that depend on them.
+// The goal in full words, with this mode's number in it.
+function goalText(mission, mode) {
+  const probe = new Sim(mission, mode, game.site);
+  return mission.goalType === 'dose'
+    ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
+    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
+    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.`
+    : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them.` : mission.goal;
+}
+
 function renderBriefMode() {
   const mission = missionById(chosen);
   $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
     `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}">${mode.label} · ${mode.level}</button>`).join('');
   $('mode-about').textContent = MODES[save.mode].about;
-  const probe = new Sim(mission, save.mode, game.site);
   // The three star tests, one under the other. A star is filled in only if that test has been
   // passed before in this mode, so a filled second star can sit between two empty ones.
   const S = C.stars, got = testsPassed(mission.id, save.mode);
@@ -410,11 +480,7 @@ function renderBriefMode() {
   $('star-title').textContent = `How to earn 3 stars in ${MODES[save.mode].label} mode`;
   $('star-list').innerHTML = tests.map((text, i) =>
     `<li class="${got[i] ? 'got' : ''}"><span class="star" aria-hidden="true">${got[i] ? '★' : '☆'}</span><span>${text}<span class="sr-only"> (${got[i] ? 'earned before' : 'not earned yet'})</span></span></li>`).join('');
-  $('brief-goal').textContent = mission.goalType === 'dose'
-    ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
-    : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
-    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.`
-    : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them.` : mission.goal;
+  $('brief-goal').textContent = goalText(mission, save.mode);
 }
 
 async function brief(id) {
@@ -483,18 +549,35 @@ function endMission() {
   game.stop();
 }
 
-function pause() {
+// The gear (or Esc) opens the Settings page; the "i" on the mission box opens the Mission page.
+function pause(tab = 'settings') {
   if (!hud) return;
   hud.close();
   game.pause();
   $('pause-mission').textContent = `${sim.mission.name}, ${sim.modeName} mode.`;
-  pauseTab('settings');
+  $('pm-goal').textContent = goalText(sim.mission, sim.modeName);
+  $('pm-brief').textContent = sim.mission.brief;
+  $('pm-flare').textContent = sim.storms.length ? 'Each solar storm in this mission is sized from a real flare in NASA\'s DONKI records.' : '';
+  $('abandon').hidden = true;
+  $('pause').querySelector('.dialog > .row').hidden = false;
+  pauseTab(tab);
   show('pause');
 }
 
-// The Game paused panel has two pages: the settings, and the list of controls.
+// Abandoning asks first, and says plainly what will be lost.
+function abandonAsk() {
+  const rp = sim.rp;
+  $('abandon-text').textContent = `You will go back to the mission menu and this run of ${sim.mission.name} ends here. `
+    + `It earns no stars and no research points${rp ? `, so the ${rp} research point${rp === 1 ? '' : 's'} you collected on this run will not be kept` : ''}. `
+    + 'Your saved stars, points and research stay as they are. You can start the mission again at any time.';
+  $('abandon').hidden = false;
+  $('pause').querySelector('.dialog > .row').hidden = true; // the question takes the place of the buttons
+  $('abandon').querySelector('[data-do="abandon-no"]').focus();
+}
+
+// The Game paused panel has three pages: the mission, the settings, and the list of controls.
 function pauseTab(id) {
-  for (const page of ['settings', 'controls']) {
+  for (const page of ['mission', 'settings', 'controls']) {
     $(`page-${page}`).hidden = page !== id;
     $(`tab-${page}`).setAttribute('aria-selected', page === id);
   }
@@ -587,10 +670,14 @@ const actions = {
   pick,
   buy,
   'pause-tab': pauseTab,
+  'map-zoom': id => zoomMap(id === 'in' ? 1.25 : 1 / 1.25),
   'open-all': () => { save.openAll = true; commit(); renderMissions(); },
   resume,
   leave: openMissions,
-  menu: pause,
+  menu: () => pause('settings'),
+  'mission-info': () => pause('mission'),
+  'abandon-ask': abandonAsk,
+  'abandon-no': () => { $('abandon').hidden = true; $('pause').querySelector('.dialog > .row').hidden = false; $('pause').querySelector('[data-do="resume"]').focus(); },
   'erase-ask': () => { confirmErase = true; renderMissions(); },
   'erase-no': () => { confirmErase = false; renderMissions(); },
   'erase-yes': () => {
@@ -614,7 +701,7 @@ addEventListener('keydown', e => {
   else if (!$('pause').hidden) resume();
 });
 
-addEventListener('resize', () => { if (!$('research').hidden) { fitMap(); drawStars(); } });
+addEventListener('resize', () => { if (!$('research').hidden) { placeMap(); drawStars(); } });
 
 addEventListener('unhandledrejection', () => {
   if (!game) $('start-status').textContent = 'The Moon didn\'t load. Please refresh the page.';

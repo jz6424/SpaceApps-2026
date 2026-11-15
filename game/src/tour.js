@@ -56,11 +56,11 @@ function buildSteps() {
       title: 'Welcome to your first night', at: 'center', freeze: true,
       text: [
         'You run a small Moon base on your own. <b>Bring back 5 glowing rock samples and keep the base running until the Sun comes back.</b>',
-        'Labels with red arrows will show what everything does. You can press <b>Skip tour</b> at any time.',
+        'Short labels will show what everything does. You can press <b>Skip tour</b> at any time.',
       ],
     },
     {
-      title: 'The bottom of your screen', at: 'center', freeze: true, callouts: SCREEN_BOTTOM,
+      title: 'The bottom of your screen', at: 'left', freeze: true, callouts: SCREEN_BOTTOM,
       text: ['Your meters are on the left. What you have collected is on the right. Press <b>Next</b> when you have read them.'],
     },
     {
@@ -91,7 +91,7 @@ function buildSteps() {
       id: 'trip-go', title: 'Suit up', target: '#station-body [data-act="outside"]', side: 'left', at: 'right', alt: skipPractice,
       hint: 'Press "Suit up and go outside", then walk out when the outer door opens.',
       text: [
-        'Press <b>Suit up and go outside</b>. Watch the bar in the corner of the screen while the doors and air pump work.',
+        'Press <b>Suit up and go outside</b>. Watch the bar in the middle of the screen while the doors and air pump work.',
         '<b>When the hatch is open, walk out onto the Moon</b> with WASD.',
       ],
       until: sim => sim.where === 'outside', noNext: true,
@@ -116,7 +116,7 @@ function buildSteps() {
   ];
 }
 
-const ARROW = '<svg viewBox="0 0 40 52" width="22" height="28" aria-hidden="true"><path d="M20 2 38 24H27v26H13V24H2z" fill="#E43700" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>';
+const ARROW = '<svg viewBox="0 0 22 28" width="22" height="28" aria-hidden="true"><path d="M11 4 18 14h-4.5v10h-5V14H4z" fill="#fff" stroke="rgba(3, 8, 24, .6)" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 
 export function createTour({ sim, game, hud }) {
   const steps = buildSteps();
@@ -144,9 +144,10 @@ export function createTour({ sim, game, hud }) {
       el.className = c.lines ? 'tour-callout group' : 'tour-callout';
       const body = c.lines ? c.lines.map(([name, what]) => `<span><em>${name}</em> ${forTouch(what)}</span>`).join('') : `<span>${forTouch(c.text)}</span>`;
       el.innerHTML = `<b>${c.title}</b>${body}<i class="c-arrow">${ARROW}</i>`;
-      const box = document.createElement('div');
+      const box = document.createElement('div'); // kept for the layout code, but never shown
       box.className = 'tour-ring-sm';
-      holder.append(box, el);
+      box.hidden = true;
+      holder.append(el);
       return { c, el, box, arrow: el.querySelector('.c-arrow') };
     });
   }
@@ -157,6 +158,8 @@ export function createTour({ sim, game, hud }) {
     if (!s) return finish();
     clearCallouts();
     if (s.callouts) buildCallouts(s.callouts);
+    // While the screen is being labelled, the base's own labels step back so nothing crowds.
+    document.body.classList.toggle('tour-labels', s.callouts === SCREEN_BOTTOM || s.callouts === SCREEN_TOP);
     setFreeze(s.freeze);
     sim.flags.tourHint = s.hint ? forTouch(s.hint) : null;
     $('tour-step').textContent = `Tour: step ${i + 1} of ${steps.length}`;
@@ -229,7 +232,7 @@ export function createTour({ sim, game, hud }) {
     const W = innerWidth, H = innerHeight, GAP = 30, placed = [];
     for (const it of callouts) {
       let r = hidden ? null : rectOf(it.c.target);
-      it.el.hidden = it.box.hidden = !r;
+      it.el.hidden = !r;
       if (r && !it.cw) { it.el.style.width = ''; it.cw = Math.ceil(it.el.getBoundingClientRect().width); } // measure once
       if (!r) { it.sr = it.dx = it.side = undefined; continue; }
       // Ease toward where the target is, so the label glides instead of jumping with the camera.
@@ -305,6 +308,7 @@ export function createTour({ sim, game, hud }) {
     setFreeze(false);
     sim.flags.tourHint = null;
     clearCallouts();
+    document.body.classList.remove('tour-labels');
     root.hidden = true;
     hud.close();
   }

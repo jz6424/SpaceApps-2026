@@ -22,7 +22,7 @@ const SUN_FULL = 3;
 
 await RAPIER.init();
 // The labels are drawn on canvases, so their typeface has to be loaded before the first one is drawn.
-await document.fonts.load('600 40px "Exo 2"').catch(() => {});
+await document.fonts.load('600 40px "Chakra Petch"').catch(() => {});
 const world = new RAPIER.World({ x: 0, y: 0, z: 0 }); // gravity is applied by hand in tick()
 const loader = new GLTFLoader();
 
@@ -191,7 +191,7 @@ habitat.traverse(o => { if (o.isMesh && o.material?.name === 'M_White') o.materi
 // casts its shadow, so the cabin is lit by these, not by the Sun pouring in through a missing roof.
 // Their reach ends at the hull, so at night the inside of the base is bright and the ground
 // around it stays dark.
-const LAMP = 8.5;        // cabin light strength
+const LAMP = 6.5;        // cabin light strength (four lamps; kept low so the white walls don't glow)
 const LAMP_ECO = 0.3;    // Eco dims the lamps to this share
 const inLights = [-5.6, -2.2, 1.2, 5.1].map(x => {
   const l = new THREE.PointLight(0xfff4dd, LAMP, 6.5, 1.2);
@@ -212,7 +212,15 @@ function addBox(node) {
   if (b.isEmpty()) return null;
   return boxCollider(b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).multiplyScalar(0.5));
 }
-for (const node of colNodes) addBox(node);
+const colliderOf = {};
+for (const node of colNodes) colliderOf[node.name] = addBox(node);
+// In the cutaway view the roof isn't drawn, so the camera may look in from above: its line of
+// sight ignores the cabin ceiling. When it is high enough to see over the cabin walls it ignores
+// them too (that is the overhead view); lower down they pull it in close, like any wall. The
+// airlock tube keeps its roof, so its walls always count.
+const CABIN_SHELL = ['COL_WallNorth', 'COL_WallSouth', 'COL_WallBack', 'COL_FrontWallNorth', 'COL_FrontWallSouth', 'COL_FrontWallTop', 'COL_DoorHead', 'COL_DoorNorth', 'COL_DoorSouth'];
+const cutawayIgnore = new Set([colliderOf.COL_Ceiling?.handle]);
+const overheadIgnore = new Set([colliderOf.COL_Ceiling?.handle, ...CABIN_SHELL.map(n => colliderOf[n]?.handle)]);
 
 // Rapier's autostep stalls on the 0.49 m steps, so an invisible ramp lies across their outer
 // corners and the astronaut walks up that. The steps run from the landing toward +Z.
@@ -236,7 +244,6 @@ const deckY = (() => {
   return b.max.y;
 })();
 const hull = new THREE.Box3().setFromObject(colNodes.find(n => n.name === 'COL_Ceiling'), true);
-const airlockX = new THREE.Box3().setFromObject(colNodes.find(n => n.name === 'COL_FrontWallTop'), true).min.x;
 hull.expandByObject(colNodes.find(n => n.name === 'COL_AirlockBase'));
 
 // --- Stations: each gets its own copy of its materials (to glow) and a floating label ---
@@ -358,7 +365,7 @@ function labelSprite(text, icon, color = '#FFFFFF') {
   const ctx = canvas.getContext('2d');
   ctx.scale(3, 3);
   const label = text.toUpperCase();
-  ctx.font = '600 44px "Exo 2", system-ui, sans-serif';
+  ctx.font = '600 44px "Chakra Petch", system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
   const PAD = 28, textMax = W - 28 - 2 * PAD;
@@ -964,6 +971,15 @@ addEventListener('blur', () => keys.clear());
 
 const DRAG_SPEED = 0.005; // radians the view turns per pixel of mouse drag
 let yaw = Math.PI / 2, pitch = 0.2, camDist = 7;
+// Zoom, like Roblox: the wheel (or a pinch) moves the camera in and out behind the astronaut, and
+// all the way in it becomes first person. Out from first person it starts again at CLOSEST.
+const CLOSEST = 1.2, FARTHEST = 60;
+function zoomBy(factor) {
+  if (camDist === 0) { if (factor > 1.0001) camDist = CLOSEST; return; }
+  const next = camDist * factor;
+  camDist = next < CLOSEST * 0.92 ? 0 : Math.min(FARTHEST, Math.max(CLOSEST, next));
+}
+const firstPerson = () => camDist === 0;
 const canvas = renderer.domElement;
 let down = null;
 // Fingers (phones and tablets): one finger drags the view, two pinch to zoom, a tap is a click.
@@ -978,10 +994,10 @@ function fingerMove(e) {
   Object.assign(f, { x: e.clientX, y: e.clientY, moved: f.moved + Math.abs(dx) + Math.abs(dy) });
   if (fingers.size === 1) {
     yaw -= dx * DRAG_SPEED * 1.4;
-    pitch = THREE.MathUtils.clamp(pitch + dy * DRAG_SPEED * 1.4, -0.6, 1.3);
+    pitch = THREE.MathUtils.clamp(pitch + dy * DRAG_SPEED * 1.4, firstPerson() ? -1.3 : -0.6, 1.3);
   } else if (fingers.size === 2) {
     const [a, b] = [...fingers.values()], apart = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinch && apart > 0) camDist = THREE.MathUtils.clamp(camDist * pinch / apart, 2, 60);
+    if (pinch && apart > 0) zoomBy(pinch / apart);
     pinch = apart;
   }
 }
@@ -1013,7 +1029,7 @@ canvas.addEventListener('pointermove', e => {
     if (down) down.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
     // Same turn per pixel sideways and up/down. Raise DRAG_SPEED to turn faster, lower it to turn slower.
     yaw -= e.movementX * DRAG_SPEED;
-    pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, -0.6, 1.3);
+    pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, firstPerson() ? -1.3 : -0.6, 1.3);
   } else hover(e);
 });
 canvas.addEventListener('pointerup', e => {
@@ -1027,7 +1043,7 @@ canvas.addEventListener('pointerup', e => {
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  camDist = THREE.MathUtils.clamp(camDist * Math.exp(e.deltaY * 0.001), 2, 60);
+  zoomBy(Math.exp(e.deltaY * 0.001));
 }, { passive: false });
 function fitWindow() {
   camera.aspect = innerWidth / innerHeight;
@@ -1081,8 +1097,7 @@ const touchPad = isTouch ? setupTouch({
   use: () => { if (state === 'play' && !hooks?.busy()) useNearest(); },
   light: () => { if (state === 'play' && !hooks?.busy()) setTorch(!torch.visible); },
 }) : null;
-const LOCK_YAW = Math.PI / 2;   // the bearing of the fixed airlock view: "up the screen" is toward the cabin
-let lockSteer = false;         // true while the keys follow the airlock view instead of the chase camera
+let camShown = 7; // how far the camera actually is: pulled in at once by walls, eased back out
 // The astronaut eases into a walk and swings round to face the way they are going, instead of
 // snapping. Higher numbers are snappier, lower ones are floatier.
 const ACCEL = 7;       // how quickly the walking speed catches up with the keys
@@ -1154,11 +1169,7 @@ function tick(dt) {
     speedWalk = lean > 0.9 ? RUN : WALK * Math.max(0.45, lean / 0.9);
   }
   let p = crewBody.translation();
-  // In the airlock the view is fixed, so the keys follow the screen: W toward the cabin door at
-  // the top, S toward the Moon door at the bottom. The switch waits until the keys are let go,
-  // so walking through a doorway never turns you round mid-step.
-  if (!fwd && !side) lockSteer = airlockZone(p).inAirlock;
-  const steer = lockSteer ? LOCK_YAW : yaw;
+  const steer = yaw;
   const fx = -Math.sin(steer), fz = -Math.cos(steer);
   let mx = fx * fwd - fz * side, mz = fz * fwd + fx * side;
   if (fwd || side) walkTo = null;
@@ -1239,44 +1250,46 @@ function tick(dt) {
   bodyLanguage(dt, pace, !isInside(now));
 
   const inside = isInside(now);
-  const inHull = inside && now.x < airlockX; // the airlock tube has its own roof, so it uses the normal camera
   const inLock = airlockZone(now).inAirlock;
   // Cutaway: inside, the roof fades away and the camera looks down from above.
   // Not drawn, but still there for the Sun: the roof keeps shading the cabin.
   roofMeshes.forEach(m => { if (m.material) { m.material.colorWrite = m.material.depthWrite = !inside; } else m.visible = !inside; });
   const closest = nearestUsable()?.id; // worked out once, not once per station
   Object.values(stations).forEach(s => {
-    s.marker.visible = inside && !(inLock && s.id === 'Airlock'); // it would hang in front of the airlock camera
+    s.marker.visible = inside && !inLock; // from inside the airlock the cabin's labels would show through its walls
     const on = inside && (hovered === s.id || closest === s.id);
     s.glow += ((on ? 1 : 0) - s.glow) * Math.min(1, dt * 8);
     s.mats.forEach(m => { m.emissive?.setRGB(0.05 * s.glow, 0.26 * s.glow, 0.55 * s.glow); });
     s.marker.on = s.glow; // the callout you point at grows and stays fully visible
   });
 
+  // One camera everywhere, inside, outside and in the airlock: it keeps your zoom and angle, and
+  // only ever comes in closer when a wall is in the way, easing back out once the way is clear.
   head.set(now.x, now.y + 0.6, now.z);
-  const viewPitch = inHull ? Math.max(pitch, 0.95) : pitch;
-  camDir.set(Math.sin(yaw) * Math.cos(viewPitch), Math.sin(viewPitch), Math.cos(yaw) * Math.cos(viewPitch));
-  if (inLock) {
-    // Between the doors there is no room for a chase camera, so a wide one looks down from the
-    // ceiling, like the cutaway view in the cabin. It never turns: the cabin door is always at the
-    // top of the screen and the Moon door at the bottom, whichever way you came in.
-    const mid = (INNER_X + OUTER_X) / 2;
-    camera.position.copy(hab(mid + 1.7, 0, DECK + 10.7));
-    head.copy(hab(mid - 0.5, 0, DECK));
-  } else if (inHull) {
-    camera.position.copy(head).addScaledVector(camDir, Math.max(camDist, 9));
-  } else {
+  camDir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+  let camWant = camDist;
+  if (camWant > 0) {
     camRay.origin = head;
     camRay.dir = camDir;
-    const want = inside ? Math.min(camDist, 4) : camDist;
-    const hit = world.castRay(camRay, want + 0.3, true, undefined, undefined, crewCollider);
-    const d = hit ? Math.max(hit.timeOfImpact - 0.3, 0.2) : want;
-    camera.position.copy(head).addScaledVector(camDir, d);
+    const overWalls = head.y + camWant * Math.sin(pitch) > hull.max.y - 0.6;
+    const ignore = inside && !inLock ? (overWalls ? overheadIgnore : cutawayIgnore) : null;
+    const hit = world.castRay(camRay, camWant + 0.3, true, undefined, undefined, crewCollider, undefined, ignore && (c => !ignore.has(c.handle)));
+    if (hit) camWant = Math.max(hit.timeOfImpact - 0.3, 0);
   }
-  // The airlock's ceiling camera is wide. Elsewhere the view eases a little wider while sprinting.
-  const fov = inLock ? 88 : camera.fov + ((sprinting ? FOV_RUN : FOV) - camera.fov) * ease(6);
+  camShown = camWant < camShown ? camWant : camShown + (camWant - camShown) * ease(5);
+  if (camShown < 0.7) {
+    // First person (zoomed all the way in, or squeezed there by walls): the camera is the visor.
+    crew.visible = false;
+    camera.position.copy(head).addScaledVector(camDir, -0.1);
+    camera.lookAt(camera.position.x - camDir.x, camera.position.y - camDir.y, camera.position.z - camDir.z);
+  } else {
+    crew.visible = true;
+    camera.position.copy(head).addScaledVector(camDir, camShown);
+    camera.lookAt(head);
+  }
+  // The view eases a little wider while sprinting.
+  const fov = camera.fov + ((sprinting ? FOV_RUN : FOV) - camera.fov) * ease(6);
   if (Math.abs(fov - camera.fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
-  camera.lookAt(head);
 
   sun.target.position.copy(head);
   sun.position.copy(head).addScaledVector(SUN_DIR, 400);
@@ -1496,7 +1509,7 @@ gameReady({
     robot.position.copy(dock);
     yaw = Math.PI / 2;
     pitch = 1;
-    camDist = 9;
+    camDist = camShown = 9;
     grounded = false;
     walkTo = null;
     hold(null);
@@ -1522,7 +1535,7 @@ gameReady({
   goInside() {
     teleport(standSpot('Airlock'));
     if (sim) { Object.assign(sim, { inAirlock: true, doorway: null }); hooks?.notice(sim.airlockStart('in')); }
-    yaw = Math.PI / 2; pitch = 0.5; camDist = 4;
+    camShown = camDist;
     state = 'play';
   },
   goToStation,

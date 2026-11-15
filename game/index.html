@@ -7,7 +7,7 @@
 <meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Titillium+Web:wght@300;400;600;700&display=swap">
 </head>
 <body>
 
@@ -22,7 +22,10 @@
   <aside id="mission-drawer" aria-label="Current mission">
     <button id="mission-handle" aria-expanded="true" aria-controls="mission-card" aria-label="Hide the mission" title="Hide the mission"></button>
     <div id="mission-card" class="panel">
-      <h2 class="mc-head"><span id="mc-pin"></span> Mission</h2>
+      <div class="mc-top">
+        <h2 class="mc-head"><span id="mc-pin"></span> Mission</h2>
+        <button class="mc-info" data-do="mission-info" aria-label="Mission details" title="Mission details">i</button>
+      </div>
       <p class="mc-name"><b id="hud-title"></b> <span id="hud-mode" class="fine"></span></p>
       <p id="hint" role="status"></p>
     </div>
@@ -120,18 +123,21 @@
 <!-- Research Tree: spend research points between missions -->
 <main id="research" class="screen" hidden>
   <canvas id="research-stars" aria-hidden="true"></canvas>
-  <div class="inner">
-    <div class="topbar">
-      <button class="btn small" data-do="open-missions">Back to missions</button>
-      <p class="score">Research points: <b id="research-points">0</b></p>
-    </div>
+  <header class="rt-top">
+    <button class="btn small" data-do="open-missions">Back to missions</button>
     <h2>Research Tree</h2>
-    <p id="research-note"></p>
-    <div class="rt-layout">
-      <div id="research-view"><div id="research-fit"><div id="research-map"></div></div></div>
-      <aside id="research-panel" aria-live="polite" aria-label="About the chosen item"></aside>
+    <div class="rt-side">
+      <p class="score">Research points: <b id="research-points">0</b></p>
+      <p id="research-note"></p>
     </div>
+  </header>
+  <!-- The whole screen is the map: drag it, zoom it (see ui.js). -->
+  <div id="research-view"><div id="research-map"></div></div>
+  <div class="rt-zoom" role="group" aria-label="Zoom">
+    <button class="icon-btn" data-do="map-zoom" data-id="in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+    <button class="icon-btn" data-do="map-zoom" data-id="out" aria-label="Zoom out" title="Zoom out (−)">−</button>
   </div>
+  <aside id="research-panel" aria-live="polite" aria-label="About this research" hidden></aside>
 </main>
 
 <!-- Scrapbook: a page about each part of the base, collected by playing -->
@@ -175,8 +181,14 @@
     <h2 id="pause-title">Game paused</h2>
     <p><b id="pause-mission"></b> Time is stopped. Take a breath.</p>
     <div class="tabs" role="tablist" aria-label="Pause menu pages">
+      <button class="seg" role="tab" id="tab-mission" data-do="pause-tab" data-id="mission" aria-selected="false" aria-controls="page-mission">Mission</button>
       <button class="seg" role="tab" id="tab-settings" data-do="pause-tab" data-id="settings" aria-selected="true" aria-controls="page-settings">Settings</button>
       <button class="seg" role="tab" id="tab-controls" data-do="pause-tab" data-id="controls" aria-selected="false" aria-controls="page-controls">Controls</button>
+    </div>
+    <div class="page" id="page-mission" role="tabpanel" aria-labelledby="tab-mission" hidden>
+      <p class="goal"><b>Goal:</b> <span id="pm-goal"></span></p>
+      <p id="pm-brief"></p>
+      <p id="pm-flare" class="fine"></p>
     </div>
     <div class="page" id="page-settings" role="tabpanel" aria-labelledby="tab-settings">
       <div class="settings" role="group" aria-label="Settings">
@@ -228,7 +240,15 @@
     <div class="row">
       <button class="btn primary" data-do="resume">Keep playing</button>
       <button class="btn" data-do="restart">Start over</button>
-      <button class="btn" data-do="leave">Mission menu</button>
+      <button class="btn danger" data-do="abandon-ask">Abandon mission</button>
+    </div>
+    <div id="abandon" class="confirm" role="alertdialog" aria-labelledby="abandon-title" hidden>
+      <h3 id="abandon-title">Abandon this mission?</h3>
+      <p id="abandon-text"></p>
+      <div class="row">
+        <button class="btn danger" data-do="leave">Yes, abandon it</button>
+        <button class="btn" data-do="abandon-no">No, keep playing</button>
+      </div>
     </div>
   </div>
 </div>
@@ -291,7 +311,7 @@
     <h3>Use of AI</h3>
     <p>We used Claude, an AI assistant made by Anthropic, to help write code, balance the game numbers, script the Blender models, check science facts and write text. Our team chose the design, directed the work and reviewed and tested the results.</p>
     <h3>Open-source tools</h3>
-    <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Font: Exo 2 (SIL Open Font License). Icons drawn in the style of Feather (MIT). Interface polish followed the unslop design checklist by Damir Sokolovsky (CC BY 4.0).</p>
+    <p class="fine">three.js (MIT), Rapier physics (Apache 2.0), Vite (MIT). Fonts: Chakra Petch and Titillium Web (SIL Open Font License). Icons drawn in the style of Feather (MIT). Interface polish followed the unslop design checklist by Damir Sokolovsky (CC BY 4.0).</p>
     <p class="fine">NASA data is public domain. This game is not affiliated with or endorsed by NASA.</p>
     <div class="row"><button class="btn primary" data-do="home">Back</button></div>
   </div>
