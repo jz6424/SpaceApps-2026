@@ -10,7 +10,7 @@
    - Spacing sits on a 4px grid. Text in the mission screen is never smaller than 14px. */
 :root {
   --deep: #050C22; --electric: #0042A6; --yonder: #2E96F5;
-  --yellow: #EAFE07; --red: #E43700; --martian: #8E1100;
+  --yellow: #EAFE07; --red: #E43700; --martian: #8E1100; --green: #3DDC84;
   --text: #fff; --soft: #C9D8F2;
   --line: rgba(201, 216, 242, .24);
   --glass: rgba(3, 8, 24, .34);        /* over the 3D view, with the view behind it blurred and dimmed */
@@ -273,11 +273,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .bar { position: relative; height: 8px; }
 .bar::before { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .2); -webkit-mask: var(--segments); mask: var(--segments); }
 .bar i { position: absolute; inset: 0 auto 0 0; background: var(--yonder); -webkit-mask: var(--segments); mask: var(--segments); }
-.meter.warn .bar i { background: var(--yellow); }
-.meter.bad .bar i { background: var(--red); }
-.meter[data-m="dose"] .bar i { background: var(--soft); }
-.meter[data-m="dose"].warn .bar i { background: var(--yellow); }
-.meter[data-m="dose"].bad .bar i { background: var(--red); }
+/* Each meter has its own colour, so you know which is which at a glance. Low and Danger are
+   said in words under the bar, never by colour alone. */
+.meter[data-m="power"] .bar i { background: var(--yellow); }
+.meter[data-m="air"] .bar i { background: var(--green); }
+.meter[data-m="dose"] .bar i { background: var(--red); }
+.meter[data-m="suit"] .bar i { background: var(--yonder); }
 .goal-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #fff; }
 .m-state { font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); display: flex; align-items: center; gap: 4px; }
 .m-state .ico { vertical-align: 0; }
@@ -288,7 +289,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* Airlock progress: one bar per step, in the middle of the screen above the hotbar, barely tinted */
 #airlock-panel {
   left: 50%; bottom: 156px; transform: translateX(-50%); width: min(400px, calc(100vw - 24px)); display: grid; gap: 8px; text-align: center;
-  --fill: rgba(3, 8, 24, .18); -webkit-backdrop-filter: blur(6px) brightness(.82); backdrop-filter: blur(6px) brightness(.82);
+  --fill: rgba(3, 8, 24, .32); -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 #airlock-panel h3 { font: 600 16px var(--head); text-transform: uppercase; letter-spacing: .1em; margin: 0; display: flex; gap: 8px; align-items: center; justify-content: center; }
 #airlock-panel h3 .ico { stroke: var(--soft); vertical-align: 0; }
@@ -337,7 +338,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #mission-handle::before, #mission-handle::after { content: ""; width: 2px; height: 100%; border-radius: 1px; background: currentColor; opacity: .85; }
 #mission-handle .ico { vertical-align: 0; stroke-width: 2; }
 #mission-handle:hover { color: var(--yellow); }
-#mission-card { position: static; width: 300px; display: grid; gap: 8px; border-radius: 4px 0 0 4px; --fill: rgba(3, 8, 24, .16); -webkit-backdrop-filter: blur(6px) brightness(.84); backdrop-filter: blur(6px) brightness(.84); }
+#mission-card { position: static; width: 300px; display: grid; gap: 8px; border-radius: 4px 0 0 4px; --fill: rgba(3, 8, 24, .3); -webkit-backdrop-filter: none; backdrop-filter: none; }
 #mission-card h2 { font-size: 14px; line-height: 1.2; margin: 0; }
 .mc-head { display: flex; align-items: center; gap: 8px; color: var(--yellow); }
 .mc-head .ico { vertical-align: 0; }
@@ -370,14 +371,15 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .msg.warn { --k: var(--yellow); }
 .msg.bad { --k: var(--red); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } }
-/* Hotbar: four see-through slots at the bottom of the screen. The one in use lifts and brightens. */
+/* Hotbar: four see-through slots at the bottom of the screen. The one in use lifts and brightens.
+   Small things that are always on screen (these slots, the mission box, the prompt) are tinted
+   rather than blurred: blurring the moving 3D view behind them every frame costs speed. */
 #hotbar-wrap { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; }
 #hotbar-name { margin: 0; min-height: 20px; font: 600 14px/20px var(--head); text-transform: uppercase; letter-spacing: .1em; text-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 0 6px rgba(0, 0, 0, .3); }
 #hotbar { display: flex; gap: 8px; }
 .slot {
   position: relative; width: 56px; height: 56px; padding: 0; display: grid; place-items: center; color: var(--text); cursor: pointer;
-  background: rgba(3, 8, 24, .22); border: 1px solid rgba(255, 255, 255, .26); border-radius: 8px;
-  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+  background: rgba(3, 8, 24, .34); border: 1px solid rgba(255, 255, 255, .26); border-radius: 8px;
   transition: transform .15s var(--ease), border-color .15s var(--ease), background-color .15s var(--ease);
 }
 .slot .ico { vertical-align: 0; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
@@ -385,8 +387,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .slot.on { transform: translateY(-4px); border-color: #fff; background: rgba(255, 255, 255, .16); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
 .slot.empty { cursor: default; border-color: rgba(255, 255, 255, .14); background: rgba(3, 8, 24, .12); }
 .slot-key { position: absolute; left: 6px; top: 2px; font: 500 14px var(--body); color: var(--soft); opacity: .8; }
-.low .slot { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(3, 8, 24, .6); }
-#prompt { left: 50%; bottom: 104px; transform: translateX(-50%); font-weight: 600; margin: 0; }
+#prompt { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: rgba(3, 8, 24, .5); left: 50%; bottom: 104px; transform: translateX(-50%); font-weight: 600; margin: 0; }
 
 /* A solar storm is live danger, so this is the one thing on screen that pulses. */
 #storm-frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 6px var(--red), inset 0 0 120px rgba(228, 55, 0, .45); animation: throb 1.2s ease-in-out infinite alternate; }
@@ -546,16 +547,14 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 /* The joystick: a ring with a knob that follows the thumb. */
 .touch #touch-stick {
   grid-area: stick; display: block; align-self: end; justify-self: start; position: relative; width: 124px; height: 124px; border-radius: 50%;
-  pointer-events: auto; touch-action: none; background: rgba(3, 8, 24, .2); border: 1.5px solid rgba(255, 255, 255, .34);
-  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+  pointer-events: auto; touch-action: none; background: rgba(3, 8, 24, .3); border: 1.5px solid rgba(255, 255, 255, .34);
 }
 #touch-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255, 255, 255, .3); border: 1.5px solid rgba(255, 255, 255, .7); pointer-events: none; }
 .touch #touch-actions { grid-area: actions; display: flex; align-items: flex-end; gap: 12px; align-self: end; justify-self: end; pointer-events: auto; }
 .touch-btn {
   width: 64px; height: 64px; border-radius: 50%; padding: 0; color: var(--text); cursor: pointer; touch-action: none;
   font: 600 14px var(--head); text-transform: uppercase; letter-spacing: .08em;
-  background: rgba(3, 8, 24, .22); border: 1.5px solid rgba(255, 255, 255, .34);
-  -webkit-backdrop-filter: blur(6px) brightness(.85); backdrop-filter: blur(6px) brightness(.85);
+  background: rgba(3, 8, 24, .32); border: 1.5px solid rgba(255, 255, 255, .34);
 }
 .touch-btn:active { background: rgba(255, 255, 255, .22); transform: scale(.95); }
 #touch-use { width: 80px; height: 80px; }

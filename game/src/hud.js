@@ -50,6 +50,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   let seen = 0;           // messages already shown
   let speed = 1;
   const notice = text => { if (text) sim.say(text, 'warn'); };
+  // The meters, clock and so on are redrawn five times a second. Most of those times nothing has
+  // changed, so the page is only touched when the drawing is different from what is showing.
+  const showing = new Map();
+  const put = (id, html) => { if (showing.get(id) !== html) { showing.set(id, html); $(id).innerHTML = html; } };
 
   // Fixed parts of the HUD.
   $('hud-title').textContent = sim.mission.name;
@@ -125,10 +129,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const next = MISSIONS.map(m => m.requires).filter(r => r && !unlocks.includes(r.id)).sort((a, b) => a.cost - b.cost)[0];
     const goal = next?.cost ?? 0;
     const pct = next ? Math.min(100, total / goal * 100) : 100;
-    $('rp-bar').innerHTML = `
+    put('rp-bar', `
       <div class="rp-top">${icon('star', 16)}<span>Research points</span><b>${next ? `${total} / ${goal}` : `${total} · MAX`}</b></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
-      ${next ? `<div class="rp-next">Next unlock: ${next.name}</div>` : ''}`;
+      ${next ? `<div class="rp-next">Next unlock: ${next.name}</div>` : ''}`);
   }
 
   // --- Low suit air warnings, shown once per level ---
@@ -171,14 +175,14 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}%`, aState)
       + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} / 100`, dState, goalMark, sim.mission.goalType === 'dose' ? `Goal: finish at ${sim.goalValue} or less (the white mark)` : '');
     if (sim.where === 'outside') html += meter('suit', 'wind', 'Suit air', sim.suit, C.suit.seconds, `${Math.ceil(sim.suit)} s`, sim.suit < 20 ? 'bad' : sim.suit < 40 ? 'warn' : 'ok');
-    $('meters').innerHTML = html;
+    put('meters', html);
   }
 
   // --- Supplies, in the corner above the research points ---
   function renderSupplies() {
     const rows = [['box', 'Moon dirt', Math.floor(sim.regolith)]];
     if (sim.food !== null) rows.push(['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`], ['droplet', 'Water', Math.floor(sim.water ?? 0)]);
-    $('supplies').innerHTML = rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join('');
+    put('supplies', rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join(''));
   }
 
   // --- Sun clock across the top ---
@@ -192,10 +196,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const earth = `<b class="earth-gap" style="left:${sim.earthGap[0] / sim.total * 100}%;width:${(sim.earthGap[1] - sim.earthGap[0]) / sim.total * 100}%" title="Earth below the horizon"></b>`;
     const when = sim.t < sim.day ? `${icon('sun', 18)} Sunset in ${clock(sim.timeToSunset)}` : `${icon('moon', 18)} Sunrise in ${clock(sim.timeToSunrise)}`;
     const storm = sim.stormNow;
-    $('clock').innerHTML = `
+    put('clock', `
       <div class="c-row"><span>${when}</span><span class="${sim.earthUp ? '' : 'dim'}">${icon('globe', 18)} Earth ${sim.earthUp ? 'up' : 'set'}</span>
       ${storm ? `<span class="hot">${icon('radiation', 18)} Storm! ${Math.ceil(storm.at + storm.length - sim.t)} s</span>` : ''}</div>
-      <div class="track"><b class="night" style="left:${pDay}%"></b>${earth}${storms}<i style="left:${pNow}%"></i></div>`;
+      <div class="track"><b class="night" style="left:${pDay}%"></b>${earth}${storms}<i style="left:${pNow}%"></i></div>`);
     $('storm-frame').hidden = !storm;
     $('storm-frame').classList.toggle('safe', sim.where === 'shelter');
     $('storm-text').textContent = sim.where === 'shelter' ? 'Solar storm: you are safe in the shelter' : 'Solar storm: get to the shelter!';

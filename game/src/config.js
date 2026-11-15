@@ -17,12 +17,15 @@ export const CONFIG = {
   solar: { panels: 3, perPanel: 0.42 },
 
   // What each system draws from the battery, per second.
+  // Tuned so a full battery lasts the night on Normal with nothing else on (about 170 s against
+  // a night of 140 to 150 s), but not with the antenna, the robot and the grow lights all running:
+  // that still empties it before sunrise, so there is still something to decide.
   power: {
-    lifeSupport: { eco: 0.22, normal: 0.42, boost: 0.75 },
-    heaters: 0.35,    // night only, automatic: the lunar night is colder than -170 C
-    comms: 0.2,       // antenna on
-    greenhouse: 0.3,  // grow lights on
-    robot: 0.25,      // robot working outside
+    lifeSupport: { eco: 0.16, normal: 0.32, boost: 0.58 },
+    heaters: 0.26,    // night only, automatic: the lunar night is colder than -170 C
+    comms: 0.15,      // antenna on
+    greenhouse: 0.22, // grow lights on
+    robot: 0.19,      // robot working outside
     sendData: 6,      // one burst per science upload
     forecast: 2,      // one burst per question to Mission Control
   },

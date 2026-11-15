@@ -80,7 +80,13 @@ function groundAt(x, z) {
 }
 
 // --- Scene ---
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: false });
+// Two choices here decide most of the game's speed:
+//  - A plain depth buffer. The logarithmic one stops the graphics card from skipping hidden
+//    pixels, which more than halved the frame rate. A plain one is exact to a few millimetres
+//    near the base and well under a metre at the far hills, which is all this scene needs.
+//  - Edge smoothing only on ordinary screens. A Retina-class screen already draws four pixels for
+//    every point, so smoothing on top of that costs a lot and shows very little.
+const renderer = new THREE.WebGLRenderer({ antialias: devicePixelRatio < 2, logarithmicDepthBuffer: false, preserveDrawingBuffer: false });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -302,13 +308,13 @@ function iconPath(ctx, name, x, y, s, width = 2) {
   ctx.restore();
 }
 
-// A callout: a ring with a dot sits on the thing itself, a thin line leads up and away from it,
+// A callout: a dot sits on the thing itself, a thin line leads up and away from it,
 // and the name is at the end of the line on a faint see-through plate (no border). The sprite is
 // pinned by its dot, so the dot stays on the object from every angle. Stations get a white line
 // and a yellow icon; a coloured line marks something special (red = broken, blue = ice).
 function calloutSprite(text, icon, color = '#FFFFFF') {
   const CALLOUT = 0.0056; // metres of sprite per pixel of drawing
-  const H = 128, AX = 22, AY = H - 22, EX = 68, EY = 60, LX = 94, RING = 12; // dot, elbow, where the name starts
+  const H = 128, AX = 22, AY = H - 22, EX = 68, EY = 60, LX = 94, DOT = 7; // dot, elbow, where the name starts
   const ICON = 40, GAP = 10, PAD = 14, FONT = '600 40px "Exo 2", system-ui, sans-serif';
   const label = text.toUpperCase();
   const canvas = document.createElement('canvas');
@@ -329,17 +335,14 @@ function calloutSprite(text, icon, color = '#FFFFFF') {
   ctx.fillStyle = 'rgba(5, 14, 40, .58)';
   ctx.beginPath(); ctx.roundRect(LX, EY - 30, W - LX - 10, 60, 6); ctx.fill();
   ctx.restore();
-  // The line, the ring and the dot: a dark edge first so they show on pale walls, then the colour.
+  // The line and the dot: a dark edge first so they show on pale walls, then the colour.
   const k = Math.SQRT1_2;
-  const lines = () => {
-    ctx.beginPath(); ctx.moveTo(AX + RING * k, AY - RING * k); ctx.lineTo(EX, EY); ctx.lineTo(LX, EY); ctx.stroke();
-    ctx.beginPath(); ctx.arc(AX, AY, RING, 0, Math.PI * 2); ctx.stroke();
-  };
+  const lines = () => { ctx.beginPath(); ctx.moveTo(AX + DOT * k, AY - DOT * k); ctx.lineTo(EX, EY); ctx.lineTo(LX, EY); ctx.stroke(); };
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(3, 8, 24, .6)'; ctx.lineWidth = 6; lines();
   ctx.strokeStyle = color; ctx.lineWidth = 3; lines();
-  ctx.fillStyle = 'rgba(3, 8, 24, .6)'; ctx.beginPath(); ctx.arc(AX, AY, 6.6, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(AX, AY, 4.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(3, 8, 24, .6)'; ctx.beginPath(); ctx.arc(AX, AY, DOT + 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(AX, AY, DOT, 0, Math.PI * 2); ctx.fill();
   // Icon and name.
   ctx.strokeStyle = color === '#FFFFFF' ? '#EAFE07' : '#FFFFFF';
   iconPath(ctx, icon, LX + PAD, EY - ICON / 2, ICON, 2);
@@ -1224,9 +1227,10 @@ function tick(dt) {
   const inLock = airlockZone(now).inAirlock;
   // Cutaway: inside, the roof fades away and the camera looks down from above.
   roofMeshes.forEach(m => { m.visible = !inside; });
+  const closest = nearestUsable()?.id; // worked out once, not once per station
   Object.values(stations).forEach(s => {
     s.marker.visible = inside && !(inLock && s.id === 'Airlock'); // it would hang in front of the airlock camera
-    const on = inside && (hovered === s.id || nearestUsable()?.id === s.id);
+    const on = inside && (hovered === s.id || closest === s.id);
     s.glow += ((on ? 1 : 0) - s.glow) * Math.min(1, dt * 8);
     s.mats.forEach(m => { m.emissive?.setRGB(0.05 * s.glow, 0.26 * s.glow, 0.55 * s.glow); });
     s.marker.scale.copy(s.marker.userData.size).multiplyScalar(1 + 0.15 * s.glow); // the tag you point at grows
@@ -1324,8 +1328,12 @@ renderer.setAnimationLoop(t => {
     if (t - lastPlayed > 500) { frames = 0; slowSince = t; }
     lastPlayed = t;
     frames++;
-    if (t - slowSince > 4000) {
-      if (frames / ((t - slowSince) / 1000) < 24) lowGraphics();
+    if (t - slowSince > 3000) {
+      // Too slow to feel smooth: draw a little less sharply, a step at a time, and only as far as
+      // needed. Very slow (a school Chromebook): switch to simple graphics outright.
+      const rate = frames / ((t - slowSince) / 1000);
+      if (rate < 24) lowGraphics();
+      else if (rate < 45 && renderer.getPixelRatio() > 1) { renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() - 0.25)); fitWindow(); }
       frames = 0; slowSince = t;
     }
   }
