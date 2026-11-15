@@ -1,7 +1,7 @@
 // The Scrapbook screen. It opens on the contents, which lists every page (locked ones included)
 // across both pages of the open book.
 // Coming in from another screen, the book starts shut: its cover shows for a moment, then swings
-// open onto the left page.
+// open onto the left page. Going back to the mission menu, the cover swings shut again first.
 // Picking a page opens it as a two-page spread: pictures on the left, the write-up on the right.
 // A locked page opens too, but it only shows the picture from the game: the other pictures are
 // question marks, the write-up is covered, and it says how to unlock it.
@@ -259,6 +259,30 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     for (const type of ['animationend', 'animationcancel', 'click']) front.addEventListener(type, done);
   }
 
+  // Shuts the book before leaving: the opening played backwards, a little faster. done is called
+  // once the cover is down, or straight away if the book is asked to shut again (that skips it),
+  // if the cover is clicked, or with reduced motion.
+  let shutNow = null;
+  function close(done) {
+    if (shutNow) return shutNow();
+    const spread = $('scrapbook-book').querySelector('.sb-spread');
+    if (!spread || matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
+    spread.querySelector('.sb-cover')?.remove();   // it may still have been opening
+    spread.insertAdjacentHTML('beforeend', coverHtml());
+    spread.classList.remove('opening', 'opened');
+    spread.classList.add('closing');
+    const front = spread.lastElementChild;
+    const finish = e => {
+      if (shutNow !== finish || (e && e.type !== 'click' && (e.target !== front || e.pseudoElement))) return;
+      clearTimeout(timer);
+      shutNow = null;
+      done();
+    };
+    const timer = setTimeout(finish, 1200);   // in case the animation never reports back
+    shutNow = finish;
+    for (const type of ['animationend', 'animationcancel', 'click']) front.addEventListener(type, finish);
+  }
+
   function render() {
     const page = at && pageById(at);
     $('scrapbook-points').textContent = getSave().points;
@@ -269,6 +293,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
   // closed: start with the book shut and open its cover first.
   function open(id, { closed = false } = {}) {
     const page = id && pageById(id), save = getSave();
+    shutNow = null;   // a page opened while the book was shutting keeps it open
     at = page ? page.id : null;
     paid = null;
     if (page && isOpen(page) && !save.read.includes(at)) {
@@ -313,7 +338,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
   });
 
   return {
-    open, setLevel, collect,
+    open, close, setLevel, collect,
     // Pages in the book that have not been read yet.
     unread: () => openPages().filter(page => !isRead(page)).length,
   };

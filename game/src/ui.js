@@ -46,9 +46,37 @@ const scrapbook = createScrapbook({
 let newPages = [];     // Scrapbook pages collected in the mission being played
 const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]);
 
-function show(name) {
+// Most screens swap with a plain cut. A few swaps are a move instead, named here with how long
+// they take in milliseconds (the moves themselves are in ui.css, "Moving between screens"):
+//   up    the view tips up to the sky: the old screen sinks away as the new one comes down
+//   down  the same, back down again
+//   fade  the old screen fades away over the new one
+const MOVES = { up: 900, down: 900, fade: 350 };
+const showing = () => SCREENS.find(key => !$(key).hidden && !$(key).classList.contains('leaving'));
+let moving = null;   // { from, to, timer } while a move is playing
+function settle() {
+  if (!moving) return;
+  clearTimeout(moving.timer);
+  const { from, to } = moving;
+  moving = null;
+  for (const key of [from, to]) $(key).classList.remove('leaving', 'arriving', 'move-up', 'move-down', 'move-fade');
+  $(from).hidden = true;
+  if (to !== 'missions') moonMenu?.stop();
+}
+function show(name, move) {
+  settle();   // a move that is still playing ends here
+  const from = showing();
   for (const key of SCREENS) $(key).hidden = key !== name;
-  if (name !== 'missions') moonMenu?.stop();   // the Moon only turns while it is on screen
+  if (move && from && name && from !== name && !calm) {
+    // The old screen stays until the move is over. It can no longer be clicked.
+    const old = $(from);
+    old.hidden = false;
+    old.style.setProperty('--scrolled', `${old.scrollTop}px`);
+    old.classList.add('leaving', `move-${move}`);
+    $(name).classList.add('arriving', `move-${move}`);
+    moving = { from, to: name, timer: setTimeout(settle, MOVES[move] + 40) };
+  }
+  if (name !== 'missions' && !moving) moonMenu?.stop();   // the Moon only turns while it is on screen
   // Every screen opens at its top (you can scroll down from there), and starts on its main button
   // so Enter does the expected thing, without that moving the page.
   const screen = $(name ?? '');
@@ -140,13 +168,15 @@ function renderMissions() {
     : '<button class="link" data-do="erase-ask">Erase my save</button>';
 }
 
+// Coming back from the Research Tree the view tips back down from the sky; coming back from the
+// Scrapbook, the shut book fades away. From anywhere else it is a cut.
 function openMissions() {
   if (hud) endMission();
   confirmErase = false;
   selected = null;
   diving = false;
   $('dive').classList.remove('on');
-  show('missions');
+  show('missions', { research: 'down', scrapbook: 'fade' }[showing()]);
   // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
   moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
   renderMissions();
@@ -237,7 +267,7 @@ const isShut = state => state === 'locked' || state === 'soon';
 
 function mapHtml() {
   const state = node => nodeState(node, unlocksNow(), save.points);
-  const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px`;
+  const at = id => `left:${SPOTS[id].x}px;top:${SPOTS[id].y}px;--ring:${SPOTS[id].ring}`;
   const line = (id, kind, from = SPOTS[id].parent) => {
     const a = SPOTS[from], b = SPOTS[id];
     return `<line class="${kind}" data-a="${from}" data-b="${id}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
@@ -507,13 +537,53 @@ function jiggle(dt) {
   }
 }
 
-// One loop for the Research Tree screen while it is open: the twinkle and the jiggle.
+// --- Arriving: the tree is traced out like a constellation. At first each circle is only a point
+// of light among the stars. Then the lines are drawn outward from your base, one ring at a time,
+// and each point grows into its circle as its line reaches it. A click on the map ends it early.
+// The circles and names are animated in ui.css from the three times set here; the lines are drawn here.
+const TRACE = { step: 0.26, draw: 0.34 };   // seconds between rings, and to draw one line
+let trace = null;                           // { t0, start } while the tree is being traced
+function startTrace(start) {
+  if (calm) return;
+  const map = $('research-map');
+  for (const [name, seconds] of [['start', start], ['step', TRACE.step], ['draw', TRACE.draw]]) map.style.setProperty(`--trace-${name}`, `${seconds}s`);
+  map.classList.add('tracing');
+  trace = { t0: performance.now(), start };
+  drawTrace(trace.t0);   // so no line shows before the first frame
+}
+function drawTrace(now) {
+  if (!trace) return;
+  const t = (now - trace.t0) / 1000;
+  for (const l of wobbleLines) {
+    const a = SPOTS[l.a], b = SPOTS[l.b];
+    // A line to a ring starts when the ring before it is done. Lines that join two paths come last.
+    const from = trace.start + (b.ring - 1) * TRACE.step + (l.a === b.parent ? 0 : TRACE.step);
+    const k = Math.min(1, Math.max(0, (t - from) / TRACE.draw)), e = k * k * (3 - 2 * k);
+    l.el.setAttribute('x2', (a.x + (b.x - a.x) * e).toFixed(2));
+    l.el.setAttribute('y2', (a.y + (b.y - a.y) * e).toFixed(2));
+    l.el.style.visibility = k ? '' : 'hidden';
+  }
+  if (t > trace.start + 3 * TRACE.step + TRACE.draw + 0.6) endTrace();
+}
+function endTrace() {
+  if (!trace) return;
+  trace = null;
+  $('research-map').classList.remove('tracing');
+  for (const l of wobbleLines) {
+    l.el.setAttribute('x2', SPOTS[l.b].x); l.el.setAttribute('y2', SPOTS[l.b].y);
+    l.el.style.visibility = '';
+  }
+  motion.still = 0;   // the jiggle redraws the lines where they hang
+}
+
+// One loop for the Research Tree screen while it is open: the twinkle, the jiggle and the tracing.
 let treeLoop = 0, treeLast = 0;
 function treeFrame(now) {
   if ($('research').hidden) { treeLoop = 0; return; }
   const dt = Math.min(0.05, (now - treeLast) / 1000 || 0.016);
   treeLast = now;
   jiggle(dt);
+  drawTrace(now);
   if (!calm) paintStars(now / 1000);
   treeLoop = requestAnimationFrame(treeFrame);
 }
@@ -524,6 +594,7 @@ function startTreeLoop() {
 }
 
 function renderResearch() {
+  endTrace();   // the map is made again below, so a tracing in progress ends here
   $('research-points').textContent = save.points;
   $('research-note').textContent = (UPGRADES_LIVE
     ? 'Point at a circle to see what it does, and click it to research it. '
@@ -535,13 +606,16 @@ function renderResearch() {
   showPanel(picked);
 }
 
+// From the mission menu the view tips up to the sky, where the tree is waiting as points of light.
 function openResearch() {
+  const from = showing(), up = from === 'missions';
   picked = null;
   renderResearch();
-  show('research');
+  show('research', up ? 'up' : undefined);
   fitMap();
   drawStars();
   startTreeLoop();
+  if (from !== 'research') startTrace(up && !calm ? MOVES.up / 1000 - 0.25 : 0.15);
 }
 
 // Clicking a circle keeps its details showing; clicking it again puts them away.
@@ -568,7 +642,7 @@ function buy(id) {
 function openScrapbook(id) {
   if (hud) endMission();
   const closed = $('scrapbook').hidden;
-  show('scrapbook');
+  show('scrapbook', showing() === 'missions' ? 'fade' : undefined);
   scrapbook.open(id, { closed });
 }
 
@@ -805,7 +879,8 @@ function renderCredits() {
 
 // --- Buttons ---
 const actions = {
-  'open-missions': openMissions,
+  // Leaving the Scrapbook, the book shuts first.
+  'open-missions': () => (showing() === 'scrapbook' ? scrapbook.close(openMissions) : openMissions()),
   home: () => { renderStart(); show('start'); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },

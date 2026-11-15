@@ -164,10 +164,19 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
   animation: sb-book-in .3s var(--ease) both, sb-book-slide var(--flip) ease-in-out var(--hold) both;
 }
 .sb-spread.opened { animation: none; }
+/* Shutting the book, on the way back to the mission menu: the same moves played backwards and a
+   little faster, with no wait. The left-hand page folds up, the cover comes down over the
+   right-hand page, and the book slides back to the middle of the desk. */
+.sb-spread.closing {
+  --hold: 0s; --flip: .6s;
+  perspective: 3000px; perspective-origin: 50% 320px;
+  animation: sb-book-slide var(--flip) ease-in-out reverse both;
+}
+.sb-spread.closing .sb-cover, .sb-spread.closing .sb-cover::after { animation-direction: reverse; }
 @keyframes sb-book-in { from { opacity: 0; translate: 0 12px; } }
 @keyframes sb-book-slide { from { transform: translateX(-25%); } }
 /* The swing would otherwise make the screen a little longer for a moment. */
-#scrapbook .inner:has(.opening) { overflow: clip; }
+#scrapbook .inner:has(.opening, .closing) { overflow: clip; }
 
 /* The cover: a blue binder with a dark spine and two rivets, a paper label and a taped picture. */
 .sb-cover {
@@ -199,7 +208,8 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
 .sb-cover-foot { font: 700 .9rem var(--head); text-transform: uppercase; letter-spacing: .14em; }
 
 /* The left-hand page waits edge-on until the cover is edge-on too, then comes down in its place. */
-.sb-spread.opening .sb-leaf:first-of-type { transform-origin: 100% 50%; animation: sb-leaf-open var(--flip) var(--hold) both; }
+.sb-spread:is(.opening, .closing) .sb-leaf:first-of-type { transform-origin: 100% 50%; animation: sb-leaf-open var(--flip) var(--hold) both; }
+.sb-spread.closing .sb-leaf:first-of-type { animation-direction: reverse; }
 @keyframes sb-leaf-open {
   0% { transform: rotateY(90deg); opacity: 0; filter: brightness(.7); animation-timing-function: step-end; }
   50% { transform: rotateY(90deg); opacity: 1; filter: brightness(.7); animation-timing-function: ease-out; }
@@ -208,7 +218,8 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
 /* A stamp for new points waits until the page can be seen. */
 .sb-spread.opening .sb-stamp.new { animation-delay: calc(var(--hold) + var(--flip)); }
 /* The rings show once the cover has lifted off them. */
-.sb-spread.opening::before { animation: sb-rings var(--flip) var(--hold) both; }
+.sb-spread:is(.opening, .closing)::before { animation: sb-rings var(--flip) var(--hold) both; }
+.sb-spread.closing::before { animation-direction: reverse; }
 @keyframes sb-rings { 0%, 44% { opacity: 0; } 56% { opacity: 1; } }
 
 /* The "3 new" marker on the Scrapbook button in the mission menu. */
@@ -226,7 +237,8 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
   .sb-nav > * { justify-self: stretch !important; }
   /* The cover lies over the whole stack of pages and swings off to the left. */
   .sb-spread.opening { perspective-origin: 0 320px; animation: sb-book-in .3s var(--ease) both; }
-  .sb-spread.opening .sb-leaf:first-of-type { animation: none; }
+  .sb-spread.closing { perspective-origin: 0 320px; animation: none; }
+  .sb-spread:is(.opening, .closing) .sb-leaf:first-of-type { animation: none; }
   .sb-cover { left: 0; width: 100%; border-radius: 6px; padding: 48px 24px 32px 60px; animation-name: sb-cover-swing; }
   .sb-cover::after { animation-name: sb-cover-swing-shade; }
 }

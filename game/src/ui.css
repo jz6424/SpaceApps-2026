@@ -53,6 +53,27 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
   position: fixed; inset: 0; overflow-y: auto; font-size: 17px; line-height: 1.5;
   background: linear-gradient(135deg, #0A1B4D 0%, #040A1E 45%, #02040B 100%);
 }
+/* Moving between screens (ui.js picks the move). While it plays, the screen that is leaving
+   stays on top and can't be clicked.
+   - move-fade: the old screen fades away over the new one.
+   - move-up: the view tips up to the sky. The old screen sinks out of the bottom of the window
+     as the new one comes down from the top. move-down is the way back.
+   With reduced motion ui.js doesn't use these: screens cut. */
+.screen.leaving { z-index: 5; pointer-events: none; }
+.screen.arriving { z-index: 4; }
+.screen.leaving.move-fade { animation: screen-fade .35s ease both; }
+.screen.leaving.move-up { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) both; }
+.screen.arriving.move-up { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) reverse both; --dir: -1; }
+.screen.leaving.move-down { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) both; --dir: -1; }
+.screen.arriving.move-down { animation: screen-sink .9s cubic-bezier(.65, 0, .35, 1) reverse both; }
+@keyframes screen-fade { to { opacity: 0; } }
+@keyframes screen-sink { to { transform: translateY(calc(var(--dir, 1) * 100%)); } }
+/* A screen that is sliding carries its pinned parts with it. If it had been scrolled, this keeps
+   them where they were (--scrolled is set by ui.js). */
+.screen.leaving:is(.move-up, .move-down) .orbits { top: calc(var(--scrolled, 0px) - 120px); }
+@media (min-width: 901px) {
+  .screen.leaving:is(.move-up, .move-down) #moon-view { top: var(--scrolled, 0px); bottom: calc(0px - var(--scrolled, 0px)); }
+}
 /* Headings in Chakra Petch, the game's title in capitals. */
 .screen h1, .screen h2, .screen h3 { font-family: var(--head); margin: 0; line-height: 1.1; }
 .screen h1 { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: clamp(2.2rem, 7vw, 4.2rem); line-height: 1.02; }
@@ -254,6 +275,20 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .rt-node:focus-visible .rt-dot { outline: 3px solid var(--yellow); outline-offset: 4px; }
 .rt-badge { position: absolute; right: -6px; top: -6px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; background: #000; border: 1.5px solid #fff; color: #fff; display: grid; place-items: center; }
 .rt-badge .ico { stroke-width: 2; }
+/* Arriving at the tree: each circle starts as a point of light, like one more star, and grows into
+   its circle when the line being drawn from your base reaches it; then its name appears.
+   ui.js draws the lines and sets the three times. */
+#research-map.tracing .rt-dot {
+  --at: calc(var(--trace-start) + (var(--ring) - 1) * var(--trace-step) + var(--trace-draw) * .75);
+  animation: rt-star .5s var(--ease) var(--at) backwards;
+}
+@keyframes rt-star {
+  from { transform: scale(.11); background: #fff; border-color: #fff; outline-color: transparent; box-shadow: 0 0 36px 18px rgba(255, 255, 255, .85); }
+}
+#research-map.tracing .rt-name {
+  animation: rt-name .35s ease calc(var(--trace-start) + (var(--ring) - 1) * var(--trace-step) + var(--trace-draw) + .15s) backwards;
+}
+@keyframes rt-name { from { opacity: 0; } }
 /* The details box: on the right, a little above the middle, while a circle is pointed at or picked. */
 #research-panel { z-index: 2; position: absolute; right: 24px; top: 42%; transform: translateY(-50%); width: min(320px, calc(100vw - 48px)); max-height: 56vh; overflow-y: auto; --fill: rgba(3, 4, 12, .78); padding: 16px; display: grid; gap: 12px; justify-items: start; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .n-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
