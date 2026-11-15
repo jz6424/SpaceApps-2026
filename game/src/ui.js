@@ -49,9 +49,11 @@ const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} an
 function show(name) {
   for (const key of SCREENS) $(key).hidden = key !== name;
   if (name !== 'missions') moonMenu?.stop();   // the Moon only turns while it is on screen
-  // Start on the screen's main button, so Enter does the expected thing.
+  // Every screen opens at its top (you can scroll down from there), and starts on its main button
+  // so Enter does the expected thing, without that moving the page.
   const screen = $(name ?? '');
-  (screen?.querySelector('.btn.primary:not([disabled])') ?? screen?.querySelector('button:not([disabled])'))?.focus();
+  if (screen) screen.scrollTop = 0;
+  (screen?.querySelector('.btn.primary:not([disabled])') ?? screen?.querySelector('button:not([disabled])'))?.focus({ preventScroll: true });
 }
 
 const isOpen = mission => !mission.requires || unlocksNow().includes(mission.requires.id);
@@ -281,7 +283,8 @@ const ZOOM_MAX = 2.4;
 const zoomRange = () => {
   const box = $('research-view');
   // Out to where the outer ring sits just past the shorter edge of the screen.
-  return [Math.min(ZOOM_MAX, (Math.min(box.clientWidth, box.clientHeight) / 2 - 40) / (MAP.radius[3] - 30)), ZOOM_MAX];
+  const lo = 1.15 * (Math.min(box.clientWidth, box.clientHeight) / 2 - 40) / (MAP.radius[3] - 30);
+  return [lo, Math.max(ZOOM_MAX, lo * 1.9)]; // bigger screens may zoom in further, so there is always room
 };
 function placeMap() {
   const box = $('research-view'), w = box.clientWidth, h = box.clientHeight, size = MAP.size * view.s;
@@ -306,7 +309,7 @@ function zoomMap(factor, px, py) {
 // path in sight.
 function fitMap() {
   const box = $('research-view'), w = box.clientWidth, h = box.clientHeight;
-  view.s = zoomRange()[0] * 1.18; // a little closer than the furthest you can zoom out
+  view.s = zoomRange()[0] * 1.22; // a little closer than the furthest you can zoom out
   view.x = w / 2 - MAP.size / 2 * view.s;
   view.y = h / 2 + 20 - MAP.size / 2 * view.s;
   placeMap();
@@ -425,9 +428,8 @@ function drawStars() {
   }
   paintStars(0);
 }
-// The sky sits far behind the tree, so it drifts only a little when the map is dragged (it wraps
-// round at the edges, so it never runs out).
-const SKY_DRIFT = 0.05;
+// The sky could drift with the map (SKY_DRIFT above 0; it wraps round at the edges); for now it stays still.
+const SKY_DRIFT = 0; // the sky stays still behind the map
 const skyFrom = { x: 0, y: 0 };
 function paintStars(t) {
   const cv = $('research-stars'), ctx = cv.getContext('2d'), dpr = cv.width / innerWidth, w = innerWidth, h = innerHeight;
@@ -611,9 +613,9 @@ async function brief(id) {
   if (selected) chosen = id;
   renderMissions();
   const box = $('mission-list').querySelector(`[data-mission="${id}"]`);
-  box.querySelector('.m-head').focus();
+  box.querySelector('.m-head').focus({ preventScroll: true });
+  $('missions').scrollTop = 0; // the menu stays at its top, Back and the Research Tree in view
   if (!selected) return;
-  box.scrollIntoView({ block: 'nearest' });
   const mission = missionById(id), site = game.site;
   $('brief-site').innerHTML = `
     <div>${icon('sun', 24)}<b>${Math.round(site.sun * 100)}%</b><span>of the time in sunlight at your base</span></div>
@@ -793,7 +795,7 @@ const actions = {
   home: () => { renderStart(); show('start'); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },
-  mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus(); },
+  mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus({ preventScroll: true }); },
   brief,
   launch: playChosen,
   'moon-out': () => { if (selected) brief(selected); },   // back to the whole Moon: closes the open mission
