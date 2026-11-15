@@ -174,10 +174,44 @@ const earth = new THREE.Group();
 const earthBall = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 24), new THREE.MeshBasicMaterial({ color: 0x2e96f5 }));
 earth.rotation.z = THREE.MathUtils.degToRad(23.4);
 earth.add(earthBall);
-new THREE.TextureLoader().load('earth/earth.jpg', tex => {
+// The picture is redrawn in a few flat colours to match the game's low-poly look: each spot of
+// NASA's map becomes ocean, forest, desert, cloud or ice. It is sampled small (256 x 128) and then
+// smoothed, so the continents and clouds come out as soft cartoon shapes in the right places.
+const EARTH_COLOURS = [[38, 120, 222], [86, 168, 74], [214, 182, 112], [250, 252, 255], [236, 243, 252]]; // ocean, forest, desert, cloud, ice
+function cartoonEarth(img) {
+  const W = 256, H = 128, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, W, H);
+  const px = g.getImageData(0, 0, W, H), d = px.data;
+  let kind = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4, r = d[i], gr = d[i + 1], b = d[i + 2];
+    const hi = Math.max(r, gr, b), lo = Math.min(r, gr, b), sat = hi ? (hi - lo) / hi : 0, polar = y < H * 0.07 || y > H * 0.9;
+    kind[y * W + x] = polar && hi > 120 ? 4 : hi > 200 && sat < 0.2 ? 3 : b > r + 12 && b >= gr - 8 ? 0 : r > gr * 1.04 ? 2 : 1;
+  }
+  // Twice over, each spot takes the kind most of its neighbours have: speckles go, and coasts
+  // and clouds become clean, chunky shapes.
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(W * H), count = new Uint8Array(5);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      count.fill(0);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) count[kind[Math.min(H - 1, Math.max(0, y + dy)) * W + (x + dx + W) % W]]++;
+      let best = kind[y * W + x];
+      for (let k = 0; k < 5; k++) if (count[k] > count[best]) best = k;
+      next[y * W + x] = best;
+    }
+    kind = next;
+  }
+  for (let j = 0; j < W * H; j++) [d[j * 4], d[j * 4 + 1], d[j * 4 + 2]] = EARTH_COLOURS[kind[j]];
+  g.putImageData(px, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  earthBall.material.map = tex;
+  return tex;
+}
+new THREE.TextureLoader().load('earth/earth.jpg', tex => {
+  earthBall.material.map = cartoonEarth(tex.image);
+  tex.dispose();
   earthBall.material.color.set(0xffffff);
   earthBall.material.needsUpdate = true;
 });
@@ -214,20 +248,22 @@ function regolithTexture() {
   return tex;
 }
 
-// Small craters and rough ground, too small for NASA's 5 m height grid to show: made here as one
-// 64 m tile. Its colour channels are a normal map (the bumps the light picks out, strong at the
-// pole's low sun) and its alpha is a brightness pattern (fresh rims lighter, floors darker), which
-// the ground's shader multiplies in. The real terrain underneath is unchanged.
-const DETAIL_TILE = 64; // metres
+// Gentle ground detail too small for NASA's 5 m height grid to show, made here as one 96 m tile:
+// slow rises and dips, a scattering of soft, worn craters and a few small divots, like the
+// rolling, sandblasted regolith in Apollo photos (most lunar craters are old and smoothed by
+// billions of years of tiny impacts). Its colour channels are a normal map (the bumps the low
+// polar sun picks out) and its alpha a light/dark pattern the ground's shader multiplies in.
+// The real terrain underneath is unchanged.
+const DETAIL_TILE = 96; // metres
 function groundDetail() {
   const N = 1024, perM = N / DETAIL_TILE;
   let seed = 4721;
   const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
   const h = new Float32Array(N * N), tone = new Float32Array(N * N);
-  // Rolling, lumpy ground: smooth noise at five sizes, each half as tall as the last. It wraps, so
-  // the tile repeats without a seam.
-  let amp = 0.14;
-  for (const cells of [8, 16, 32, 64, 128]) {
+  // Slow rises and dips: smooth noise from about 24 m across down to 3 m, each size half as tall.
+  // It wraps, so the tile repeats without a seam.
+  let amp = 0.32;
+  for (const cells of [4, 8, 16, 32]) {
     const g = Float32Array.from({ length: cells * cells }, () => rnd() * 2 - 1), step = N / cells;
     for (let y = 0; y < N; y++) {
       const fy = y / step, y0 = fy | 0, ty = fy - y0, sy = ty * ty * (3 - 2 * ty);
@@ -237,25 +273,33 @@ function groundDetail() {
         const a = g[r0 + c0], b = g[r0 + c1], c = g[r1 + c0], d = g[r1 + c1];
         const v = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
         h[y * N + x] += amp * v;
-        if (cells === 16) tone[y * N + x] += 0.06 * v; // broad light and dark patches
+        if (cells === 8) tone[y * N + x] += 0.04 * v; // broad, faint light and dark patches
       }
     }
     amp *= 0.5;
   }
-  // Craters: many small, a few big (0.3 to 6 m radius). A bowl a fifth as deep as it is wide
-  // (shallower when old and worn), a raised rim, and a brighter ring of thrown-out dirt.
-  for (let k = 0; k < 230; k++) {
-    const r = 0.3 * Math.pow(20, Math.pow(rnd(), 2.4)), fresh = rnd();
-    const depth = 2 * r * (0.07 + 0.13 * fresh), rim = 2 * r * (0.02 + 0.03 * fresh);
-    const cx = rnd() * N, cy = rnd() * N, rp = r * perM, reach = Math.ceil(rp * 1.8);
+  // A dent in the ground: a soft bowl (no sharp edge), a low rounded rim, and on fresher ones a
+  // slightly lighter ring of thrown-out dirt.
+  const dent = (r, depth, rim, glow) => {
+    const cx = rnd() * N, cy = rnd() * N, rp = r * perM, reach = Math.ceil(rp * 1.7);
     for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
       const q = Math.hypot(dx, dy) / rp;
-      if (q > 1.8) continue;
+      if (q > 1.7) continue;
       const x = ((Math.floor(cx) + dx) % N + N) % N, y = ((Math.floor(cy) + dy) % N + N) % N, i = y * N + x;
-      const bowl = q < 1 ? depth * (q * q - 1) : 0, ring = Math.exp(-(((q - 1) / 0.28) ** 2));
+      const bowl = q < 1 ? -depth * (1 - q * q) ** 1.5 : 0, ring = Math.exp(-(((q - 1) / 0.38) ** 2));
       h[i] += bowl + rim * ring;
-      tone[i] += (0.05 + 0.1 * fresh) * ring * (q > 1 ? 1 : 0.6) - (q < 0.8 ? 0.05 * fresh : 0);
+      tone[i] += glow * ring - (q < 0.7 ? glow * 0.4 : 0);
     }
+  };
+  // Craters: few and wide (2 to 18 m across), most of them old and shallow.
+  for (let k = 0; k < 55; k++) {
+    const r = Math.pow(9, Math.pow(rnd(), 1.4)), fresh = rnd() ** 2;
+    dent(r, 2 * r * (0.03 + 0.08 * fresh), 2 * r * (0.006 + 0.018 * fresh), 0.02 + 0.05 * fresh);
+  }
+  // Divots: small shallow pits, half a metre to a metre and a half across.
+  for (let k = 0; k < 60; k++) {
+    const r = 0.25 + rnd() * 0.5;
+    dent(r, 2 * r * 0.07, 0, 0.015);
   }
   // Slopes to normals: x along u, rows along v (a DataTexture is not flipped).
   const data = new Uint8Array(N * N * 4), span = 2 / perM;
@@ -291,13 +335,13 @@ for (let i = 0; i < posAttr.count; i++) {
   tint.set([1 - 0.35 * ice, 1 - 0.2 * ice, 1 + 0.1 * ice], i * 3);
 }
 terrainGeo.setAttribute('color', new THREE.BufferAttribute(tint, 3));
-const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true, normalMap: groundDetail(), normalScale: new THREE.Vector2(1.5, 1.5) });
+const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true, normalMap: groundDetail(), normalScale: new THREE.Vector2(1.25, 1.25) });
 // The detail tile's alpha lightens and darkens the ground: once at its own size, and once much
-// larger and offset, so the 64 m repeat doesn't show as a pattern from far away.
+// larger and offset, so the 96 m repeat doesn't show as a pattern from far away.
 terrainMat.onBeforeCompile = shader => {
   shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
     #ifdef USE_NORMALMAP
-    diffuseColor.rgb *= (0.6 + 0.8 * texture2D(normalMap, vNormalMapUv).a) * (0.85 + 0.3 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);
+    diffuseColor.rgb *= (0.75 + 0.5 * texture2D(normalMap, vNormalMapUv).a) * (0.88 + 0.24 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);
     #endif`);
 };
 const terrain = new THREE.Mesh(terrainGeo, terrainMat);
