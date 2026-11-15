@@ -423,11 +423,16 @@ function fitMap() {
   });
   $('research-panel').addEventListener('pointerenter', () => clearTimeout(leaveTimer));
   $('research-panel').addEventListener('pointerleave', () => { leaveTimer = setTimeout(() => showPanel(picked), 280); });
-  // Tabbing to a circle shows its details and brings it into view.
+  // Tabbing to a circle shows its details and brings it into view. A circle that was clicked or
+  // tapped is left where it is: moving it from under the pointer would lose the click.
+  let byKey = false;
+  addEventListener('keydown', () => { byKey = true; }, true);
+  addEventListener('pointerdown', () => { byKey = false; }, true);
   box.addEventListener('focusin', e => {
     const node = e.target.closest('.rt-node');
     if (!node) return;
     showPanel(node.dataset.id);
+    if (!byKey) return;
     const dot = node.querySelector('.rt-dot').getBoundingClientRect(), edge = 96;
     if (dot.left < edge) view.x += edge - dot.left;
     if (dot.right > innerWidth - edge) view.x -= dot.right - (innerWidth - edge);
