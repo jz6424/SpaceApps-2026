@@ -444,13 +444,14 @@ const calloutLayer = document.createElement('div');
 calloutLayer.id = 'callouts';
 renderer.domElement.after(calloutLayer); // under the HUD and the menus, over the 3D view
 
-// --- Particle hits during a solar storm ---
-// The storm's particles can't be seen, and the Moon has no air for an aurora. But in a big storm,
-// cameras in space get speckled with white dots and streaks as particles strike their sensors
-// (NASA's SOHO telescope's pictures fill with "snow"), and astronauts see tiny flashes of light
-// when particles pass through their eyes (Apollo crews reported them). So the view gets specks:
-// as many as the dose you are taking, so outside is a blizzard, the shelter a few, and the
-// moon-dirt shield fewer still. With reduced motion they are dots only, no streaks.
+// --- Light flashes during a solar storm ---
+// A storm's particles are invisible, and the Moon has no air for an aurora. But astronauts do see
+// tiny flashes of light when space radiation passes through their eyes: Apollo crews described
+// dots, short streaks and faint clouds of light. In the game the flashes come much more often
+// than in real life (real ones are about one every couple of minutes, mostly in the dark), so you
+// can see the storm: their rate follows the extra storm dose where you are. A strong storm outside
+// gives about four a second, the Habitat one or two, the shelter fewer, the full dirt shield
+// hardly any. With reduced motion there are no streaks.
 const hitLayer = document.createElement('canvas');
 hitLayer.id = 'particle-hits';
 hitLayer.setAttribute('aria-hidden', 'true');
@@ -461,8 +462,7 @@ let hitDebt = 0, hitsDrawn = false;
 function stormHits(dt) {
   const storm = state === 'play' ? sim?.stormNow : null;
   const D = sim?.C.dose;
-  // Specks a second: in step with the extra storm dose where you are (strong storm, outside: ~60).
-  const rate = storm ? Math.min(60, 20 * D.storm[sim.where] * STRENGTH[storm.strength] * (sim.where === 'shelter' ? sim.shieldMult : 1)) : 0;
+  const rate = storm ? Math.min(4, 1.4 * D.storm[sim.where] * STRENGTH[storm.strength] * (sim.where === 'shelter' ? sim.shieldMult : 1)) : 0;
   if (!rate && !hits.length) {
     if (hitsDrawn) { hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); hitsDrawn = false; }
     return;
@@ -471,26 +471,36 @@ function stormHits(dt) {
   if (hitLayer.width !== w || hitLayer.height !== h) { hitLayer.width = w; hitLayer.height = h; }
   if (rate && !sim.flags.hitsTold) {
     sim.flags.hitsTold = true;
-    sim.say('Those white specks are the storm. You can\'t see its particles, but they speckle camera pictures in space, and astronauts see tiny flashes when particles pass through their eyes. More specks means more radiation: the shelter and its moon-dirt shield cut them down.', 'info');
+    sim.say('See those flashes? Astronauts really do see tiny flashes of light when space radiation passes through their eyes. Apollo crews reported them. In the game they come faster than in real life, so you can see the storm: the more flashes, the more radiation. The shelter and its moon-dirt shield cut them down.', 'info');
   }
   for (hitDebt += rate * dt; hitDebt >= 1; hitDebt--) {
-    const streak = !stillLights && Math.random() < 0.35, turn = Math.random() * Math.PI;
-    hits.push({ x: Math.random() * w, y: Math.random() * h, life: 0.22 + Math.random() * 0.28, age: 0,
-      size: (streak ? 20 + Math.random() * 45 : 2.5 + Math.random() * 2.5) * dpr, dx: Math.cos(turn), dy: Math.sin(turn), streak });
+    const roll = Math.random(), kind = roll < 0.15 ? 'cloud' : roll < 0.5 && !stillLights ? 'streak' : 'dot', turn = Math.random() * Math.PI;
+    hits.push({ kind, x: Math.random() * w, y: Math.random() * h, age: 0, dx: Math.cos(turn), dy: Math.sin(turn),
+      life: kind === 'cloud' ? 0.3 + Math.random() * 0.25 : 0.15 + Math.random() * 0.2,
+      size: (kind === 'cloud' ? 26 + Math.random() * 30 : kind === 'streak' ? 18 + Math.random() * 30 : 2.5 + Math.random() * 2) * dpr });
   }
   const g = hitLayer.getContext('2d');
   g.clearRect(0, 0, w, h);
   g.lineCap = 'round';
-  g.shadowColor = 'rgba(170, 215, 255, 1)'; // a blue-white glow round each hit
-  g.shadowBlur = 10 * dpr;
   for (let i = hits.length - 1; i >= 0; i--) {
     const p = hits[i];
     p.age += dt;
     if (p.age >= p.life) { hits.splice(i, 1); continue; }
-    const a = 0.95 * (1 - p.age / p.life) ** 0.7;
-    g.strokeStyle = g.fillStyle = `rgba(245, 250, 255, ${a.toFixed(3)})`;
-    if (p.streak) {
-      g.lineWidth = 2.4 * dpr;
+    const fade = (1 - p.age / p.life) ** 0.7;
+    if (p.kind === 'cloud') { // a faint, soft patch of light
+      const glow = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      glow.addColorStop(0, `rgba(235, 244, 255, ${(0.3 * fade).toFixed(3)})`);
+      glow.addColorStop(1, 'rgba(235, 244, 255, 0)');
+      g.shadowBlur = 0;
+      g.fillStyle = glow;
+      g.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+      continue;
+    }
+    g.shadowColor = 'rgba(170, 215, 255, 1)'; // a blue-white glow round each flash
+    g.shadowBlur = 10 * dpr;
+    g.strokeStyle = g.fillStyle = `rgba(245, 250, 255, ${(0.95 * fade).toFixed(3)})`;
+    if (p.kind === 'streak') {
+      g.lineWidth = 2.2 * dpr;
       g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x + p.dx * p.size, p.y + p.dy * p.size); g.stroke();
     } else {
       g.beginPath(); g.arc(p.x, p.y, p.size, 0, 7); g.fill();
