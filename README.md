@@ -64,7 +64,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
   science at two reading levels (Easy read for ages 7 to 9, Deep dive for 10 and up) and links to
   NASA pages. Reading a page for the first time pays 2 research points (`science.pageRP` in
   `src/config.js`). The words are in `src/scrapbook.js`; `npm run scrapbook` checks that every
-  NASA link still works and prints the reading grade of each write-up.
+  NASA link still works and prints the reading grade of each write-up. Coming into the Scrapbook,
+  the binder is shut for a moment and its cover swings open onto the contents (a click on the cover
+  skips this; with reduced motion it fades instead).
 * **For teachers and judges:** "Open every mission now" at the bottom of the mission menu, or add
   `?all` to the game's address, opens every mission and every Scrapbook page without earning points.
 

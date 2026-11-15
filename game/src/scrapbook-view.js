@@ -1,5 +1,7 @@
 // The Scrapbook screen. It opens on the contents, which lists every page (locked ones included)
 // across both pages of the open book.
+// Coming in from another screen, the book starts shut: its cover shows for a moment, then swings
+// open onto the left page.
 // Picking a page opens it as a two-page spread: pictures on the left, the write-up on the right.
 // A locked page opens too, but it only shows the picture from the game: the other pictures are
 // question marks, the write-up is covered, and it says how to unlock it.
@@ -227,6 +229,36 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     ${navHtml(page)}`;
   }
 
+  // The front of the binder: a label with the book's name and the picture of the base.
+  // It is only for show, so it is hidden from screen readers; the page under it has the same title.
+  function coverHtml() {
+    const picture = cover();
+    return `<div class="sb-cover" aria-hidden="true">
+      <div class="sb-cover-name">
+        <p class="sb-label">Mission scrapbook</p>
+        <p class="sb-cover-title">My Moon Base Scrapbook</p>
+      </div>
+      ${picture ? `<figure class="sb-photo tilt-r"><img src="${picture}" width="800" height="800" alt=""></figure>` : ''}
+      <p class="sb-cover-foot">Moon Base Trainer</p>
+    </div>`;
+  }
+
+  // Lays the cover over the book and lets scrapbook.css swing it open. The cover's own animation
+  // lasts as long as the whole opening, so when it ends (or is cut short by leaving the screen,
+  // or by a click on the cover) the cover is taken away and the book is left open as usual.
+  function shut() {
+    const spread = $('scrapbook-book').querySelector('.sb-spread');
+    spread.insertAdjacentHTML('beforeend', coverHtml());
+    spread.classList.add('opening');
+    const front = spread.lastElementChild;
+    const done = e => {
+      if (e.type !== 'click' && (e.target !== front || e.pseudoElement)) return;
+      front.remove();
+      spread.classList.replace('opening', 'opened');
+    };
+    for (const type of ['animationend', 'animationcancel', 'click']) front.addEventListener(type, done);
+  }
+
   function render() {
     const page = at && pageById(at);
     $('scrapbook-points').textContent = getSave().points;
@@ -234,7 +266,8 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
   }
 
   // Opens the contents, or one page. A locked page opens as a locked page, and pays nothing.
-  function open(id) {
+  // closed: start with the book shut and open its cover first.
+  function open(id, { closed = false } = {}) {
     const page = id && pageById(id), save = getSave();
     at = page ? page.id : null;
     paid = null;
@@ -246,6 +279,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
       sampleSound();
     }
     render();
+    if (closed) shut();
     $('scrapbook').scrollTop = 0;
     $('sb-title').focus({ preventScroll: true });
   }

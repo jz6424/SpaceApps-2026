@@ -563,10 +563,13 @@ function buy(id) {
 
 // --- Scrapbook ---
 // With no id it opens on the contents; with one, on that page.
+// Coming from another screen the book starts shut and its cover swings open; turning pages
+// inside the book does not shut it again.
 function openScrapbook(id) {
   if (hud) endMission();
+  const closed = $('scrapbook').hidden;
   show('scrapbook');
-  scrapbook.open(id);
+  scrapbook.open(id, { closed });
 }
 
 // --- Briefing ---
