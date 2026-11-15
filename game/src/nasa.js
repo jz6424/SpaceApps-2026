@@ -177,5 +177,5 @@ export const SOURCES = [
   ['Life support numbers', 'Ewert and Stromgren (2019), NASA Technical Reports Server 20190027563', 'https://ntrs.nasa.gov/citations/20190027563'],
   ['Airlock and prebreathe', 'Quest airlock on the International Space Station and oxygen prebreathe, NASA Human Research Program', 'https://humanresearchroadmap.nasa.gov/evidence/reports/DCS.pdf'],
   ['Ice in craters', 'NASA LCROSS mission results (2009)', 'https://www.nasa.gov/mission/lcross/'],
-  ['Base site', 'Connecting Ridge was one of NASA\'s Artemis III candidate landing regions (2022)', 'https://www.nasa.gov/artemis/'],
+  ['Base site', 'Connecting Ridge was one of NASA\'s 13 Artemis III candidate landing regions in 2022. NASA\'s 2024 shortlist of nine does not include it', 'https://www.nasa.gov/news-release/nasa-identifies-candidate-regions-for-landing-next-americans-on-Moon/'],
 ];

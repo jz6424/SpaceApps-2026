@@ -29,14 +29,21 @@ const loader = new GLTFLoader();
 
 const MODULE_FILES = ['Solar', 'Battery', 'Digger', 'OxygenMaker', 'IceDrill', 'Antenna', 'CargoLander'];
 const [heightBuf, habGltf, maps, crewGltf, ...moduleGltfs] = await Promise.all([
-  fetch('terrain/ridge_heights.f32').then(r => { if (!r.ok) throw new Error('terrain'); return r.arrayBuffer(); }),
+  fetch('terrain/ridge_heights.u16').then(r => { if (!r.ok) throw new Error('terrain'); return r.arrayBuffer(); }),
   loader.loadAsync('models/Habitat.glb'),
   readSiteMaps(),
   loader.loadAsync('models/Astronaut.glb'),
   ...MODULE_FILES.map(f => loader.loadAsync(`models/${f}.glb`)),
 ]);
 const models = Object.fromEntries(MODULE_FILES.map((f, i) => [f, moduleGltfs[i].scene]));
-const heights = new Float32Array(heightBuf);
+// The heights come as whole steps (16-bit, about 5 mm each) after a 4-byte float giving the step
+// in metres: half the download of plain floats, and far finer than anything you can see or feel.
+const heights = (() => {
+  const step = new DataView(heightBuf).getFloat32(0, true), raw = new DataView(heightBuf, 4);
+  const out = new Float32Array((heightBuf.byteLength - 4) / 2);
+  for (let i = 0; i < out.length; i++) out[i] = raw.getUint16(i * 2, true) * step;
+  return out;
+})();
 const toWorld = i => (i - (GRID - 1) / 2) * POST;
 const toIndex = w => w / POST + (GRID - 1) / 2;
 
@@ -1517,6 +1524,8 @@ function openStation(id) {
 }
 
 function tick(dt) {
+  // Q and R turn the view, for players without a mouse or trackpad (about a half turn a second).
+  yaw += ((keys.has('KeyQ') ? 1 : 0) - (keys.has('KeyR') ? 1 : 0)) * 2.4 * dt;
   let fwd = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   let side = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   let speedWalk = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
@@ -1876,6 +1885,9 @@ function snapshot(name) {
 }
 
 await document.fonts.ready;
+// Build the materials' shaders now, while "Loading the Moon" shows (in parallel where the browser
+// can), instead of as a stutter in the first seconds of play.
+try { await renderer.compileAsync(scene, camera); } catch { /* older browsers: compiled on first use */ }
 
 gameReady({
   site: { ...siteData, iceDistance, maps, worldX: site.x, worldZ: site.z, ice: iceSpot, robot: () => robot.position },

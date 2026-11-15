@@ -21,7 +21,11 @@ const SPIN = 0.1;              // radians a second about its own axis while noth
 const SLOP = 6;                // pixels the pointer may wander and still count as a click
 const HOME = new THREE.Vector3(0, 0.05, 4.7);   // where the camera rests: far enough back that no flag is cut off
 const REACH = 1.34;            // how far the flags and the axis line stick out, in Moon radii from the middle
-const DETAIL = 60;             // how finely the globe is cut up: fine enough for the real seas and big craters to show
+// How finely the globe is cut up: 60 is fine enough for the real seas and big craters to show.
+// Shaping it runs through every corner in JavaScript (about 220,000 at 60), so small computers
+// (4 cores or fewer, like most school Chromebooks) and ?low get 40 (about 100,000) to start faster.
+const small = new URLSearchParams(location.search).has('low') || (navigator.hardwareConcurrency || 8) <= 4;
+const DETAIL = small ? 40 : 60;
 const RELIEF = 5;              // real heights are stretched this many times, or the Moon would look like a smooth ball
 const MOON_KM = 1737.4;        // the radius the height map is measured from
 const HEIGHT_KM = [-9.17, 10.79];   // the heights that black and white stand for in ldem_3_8bit.jpg (fitted against NASA's ldem_4.tif, which is in km)
@@ -148,7 +152,7 @@ function numberSprite(n) {
   const ctx = cv.getContext('2d');
   ctx.fillStyle = '#07173F'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 6;
   ctx.beginPath(); ctx.arc(48, 48, 40, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = '900 54px "Fira Sans", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff'; ctx.font = '700 54px "Chakra Petch", system-ui, sans-serif'; // the game's heading font (Fira Sans is never loaded here) ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(String(n), 48, 52);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;

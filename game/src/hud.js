@@ -48,6 +48,8 @@ const fixed = v => (Math.round(v * 100) / 100).toFixed(2);
 const per = (v, what) => `${fixed(v)} ${what} per second`;
 
 export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
+  // The numbers this mission really runs on, research upgrades included, so every panel shows them.
+  const C = sim.C;
   const hud = $('hud');
   hud.hidden = false;
   let open = null;        // station id with its panel showing

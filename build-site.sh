@@ -8,7 +8,8 @@ cd "$(dirname "$0")"
 
 rm -rf _site
 mkdir -p _site/img
-cp site/index.html site/site.css site/site.js _site/
+cp site/index.html site/site.css site/site.js site/fonts.css _site/
+cp -R site/fonts _site/fonts
 cp -R game/dist _site/play
 for shot in 14-warning 11-power 12-map 16-outside; do
   cp "docs/screenshots/$shot.png" _site/img/

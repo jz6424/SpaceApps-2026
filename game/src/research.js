@@ -6,13 +6,9 @@
 //     save.unlocks for 'Shielding' and 'Greenhouse'.
 //   - upgrade nodes change one number in CONFIG, listed in `effects`.
 //
-// Upgrades are NOT wired into the mission rules yet, because sim.js is being reworked. Until
-// they are, UPGRADES_LIVE stays false and the menu shows them as "Coming soon" so nobody spends
-// points on something that does nothing. To switch them on:
-//   1. in sim.js, read numbers from researchConfig(CONFIG, save.unlocks) instead of CONFIG
-//      (ui.js would pass save.unlocks, or the finished config, into `new Sim(...)`)
-//   2. set UPGRADES_LIVE = true
-//   3. run `npm run balance`
+// Upgrades are live: ui.js builds each mission's numbers with researchConfig(CONFIG, save.unlocks)
+// and passes them into `new Sim(...)`, and the HUD reads the same numbers (sim.C). After changing
+// an effect, run `npm run balance`. UPGRADES_LIVE = false would show them as "Coming soon" again.
 //
 // `needs` names the node that must be researched first. It can sit in another branch: the
 // Greenhouse needs Regolith Shielding, so the missions open in order.
@@ -20,7 +16,7 @@
 // Every owned node id lives in save.unlocks, next to the two mission unlocks.
 import { MISSIONS } from './config.js';
 
-export const UPGRADES_LIVE = false;
+export const UPGRADES_LIVE = true;
 
 // effects: { path, times } multiplies CONFIG[path]; { path, add } adds to it. A path that points
 // at a group of numbers (like air.make) changes every number in the group.

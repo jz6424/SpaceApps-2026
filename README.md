@@ -51,9 +51,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Missions:** First Night (tutorial; goal: 5 rock samples and reach sunrise), Solar Storm (needs
   Regolith Shielding), Ice and Greens (needs Greenhouse). Modes: Cadet, Explorer, Commander.
 * **Research Tree:** spend research points between missions. Regolith Shielding and Greenhouse open
-  missions 2 and 3. Thirteen upgrades (each with the real science and the exact change) are listed in
-  `game/src/research.js` but not switched on yet; the steps to wire them into the rules are at the top
-  of that file.
+  missions 2 and 3. Thirteen upgrades (each with the real science and the exact change, listed in
+  `game/src/research.js`) change the numbers the next missions run on: warmer blankets, a dish
+  antenna, a bigger suit tank and so on.
 * **Scrapbook:** a ring binder with a page for each big part of the base (14 pages: Habitat, Life
   Support, solar panels, airlock, robot and so on; upgrades don't get their own page). A page is
   added the first time you use that part in a mission, and two (Regolith shielding, Greenhouse)
@@ -74,7 +74,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 
 | Where | Data |
 |---|---|
-| Terrain you walk on | LRO LOLA 5 m elevation model, Connecting Ridge (PGDA product 78) -> `game/public/terrain/ridge_heights.f32` |
+| Terrain you walk on | LRO LOLA 5 m elevation model, Connecting Ridge (PGDA product 78) -> `game/public/terrain/ridge_heights.u16` |
 | Base spot, solar output, comms gaps | LOLA sunlight and Earth-visibility maps (PGDA product 69) -> `sun.png`, `earth.png` |
 | Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
 | The Moon on the mission menu | [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/) from NASA's Scientific Visualization Studio: the LROC brightness map and the LOLA height map of the whole Moon -> `game/public/moon/` (NASA's files, unchanged). The globe's seas and craters are the real ones, with heights stretched 5 times so they show. The blue crater by the flags is our own marker for the icy craters |
@@ -104,7 +104,7 @@ pip install rasterio numpy pillow scipy
 Keep the file names exactly as above (the scripts look for them). Product pages:
 [LOLA 5 m site models (78)](https://pgda.gsfc.nasa.gov/products/78),
 [south pole illumination maps (69)](https://pgda.gsfc.nasa.gov/products/69).
-Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_heights.f32`, and
+Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_heights.u16`, and
 `python nasa-data/lola_to_roblox.py -h` shows how to cut a new area.
 
 ## Folders
@@ -120,8 +120,14 @@ Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_hei
 | `docs/` | Design hub, mission planner, Space Apps brand style. |
 | `reference/` | The paused Roblox prototype, for reference only. |
 
-## AI disclosure
+## AI disclosure (Super Intelligence tools)
 
-Built with help from Claude (Anthropic) for code, balancing, Blender scripts, fact checks and text.
-The team chose the design, directed the work, and reviewed and tested it. This is also stated in the
-in-game credits.
+Space Apps 2026 calls AI tools "Super Intelligence (SI)" and asks every project to say how they were
+used. We used one SI tool: Claude (Anthropic), for code, balancing, Blender scripts, fact checks and
+text. The team chose the design, directed the work, and reviewed and tested it. This is also stated
+in the in-game credits, and the same paragraph goes on our project submission form.
+
+## License
+
+The team's code, models and text are under the MIT License (see `LICENSE`). NASA data and photos,
+the fonts, and the open-source libraries keep their own terms and are credited above and in the game.

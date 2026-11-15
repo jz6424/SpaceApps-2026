@@ -62,7 +62,10 @@ export function planRun(mission, flares = [], rnd = Math.random) {
 export class Sim {
   // site: { sun, earth } shares from NASA's maps at the base (0 to 1).
   // plan: this playthrough's storms and space rocks from planRun(); without one, the mission's own.
-  constructor(mission, modeName, site = { sun: 0.75, earth: 0.5 }, plan = null) {
+  // config: the game's numbers with the player's research upgrades applied (researchConfig in
+  // research.js). Left out, the plain numbers from config.js are used, as the balance checks do.
+  constructor(mission, modeName, site = { sun: 0.75, earth: 0.5 }, plan = null, config = C) {
+    this.C = config;
     const mode = MODES[modeName];
     this.mission = mission;
     this.modeName = modeName;
@@ -82,13 +85,13 @@ export class Sim {
     this.food = s.food ?? null;   // only Ice and Greens counts meals
     this.water = s.water ?? null;
     this.rp = 0;
-    this.suit = C.suit.seconds;
+    this.suit = this.C.suit.seconds;
 
     this.ls = 'normal';
     this.comms = false;
     this.greenhouse = false;
     this.robot = { task: 'idle', offline: 0, progress: 0, target: -1, paidFor: -1 };
-    this.panels = Array(C.solar.panels).fill(true);
+    this.panels = Array(this.C.solar.panels).fill(true);
     this.shielding = 0;
     this.where = 'inside';
     // The airlock: two doors that are never open together, and the air between them.
@@ -134,7 +137,7 @@ export class Sim {
 
   // --- What the world looks like right now ---
   get sunlight() {
-    const tw = C.twilightSeconds;
+    const tw = this.C.twilightSeconds;
     if (this.t < this.day - tw) return 1;
     if (this.t < this.day) return (this.day - this.t) / tw;
     return 0;
@@ -147,20 +150,20 @@ export class Sim {
   get timeToSunset() { return Math.max(0, this.day - this.t); }
   get panelsWorking() { return this.panels.filter(Boolean).length; }
   get robotWorking() { return this.robot.task !== 'idle' && this.robot.offline <= 0 && !this.stormNow; }
-  get shieldMult() { return C.dose.shielding[this.shielding]; }
+  get shieldMult() { return this.C.dose.shielding[this.shielding]; }
   // What the next level of the dirt shield costs in moon dirt (undefined once it is fully built).
-  get shieldCost() { return C.dose.shieldingCost[this.shielding]; }
+  get shieldCost() { return this.C.dose.shieldingCost[this.shielding]; }
   get goalValue() {
     const v = this.mission.goalValue;
     if (this.mission.goalType === 'dose') return Math.round(v * this.mode.doseGoal);
     return typeof v === 'object' ? v[this.modeName] : v;
   }
   // What the solar panels make and what the base draws, per second, as things stand right now.
-  get gen() { return this.panelsWorking * C.solar.perPanel * this.sunlight * this.siteSun * this.mode.solar; }
+  get gen() { return this.panelsWorking * this.C.solar.perPanel * this.sunlight * this.siteSun * this.mode.solar; }
   // Boost with no moon dirt left works (and is charged) like Normal.
   get boostEmpty() { return this.ls === 'boost' && this.regolith <= 0; }
   get demand() {
-    const P = C.power, ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
+    const P = this.C.power, ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
     return (P.lifeSupport[this.boostEmpty ? 'normal' : this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
       + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
   }
@@ -171,7 +174,7 @@ export class Sim {
 
   say(text, kind = 'info', from = 'Base computer') { this.messages.push({ from, text, kind, t: this.t }); }
   // Mission Control is on Earth, so whatever it says arrives one light-trip later.
-  fromEarth(text, kind = 'info', delay = C.commsRoundTrip / 2) {
+  fromEarth(text, kind = 'info', delay = this.C.commsRoundTrip / 2) {
     this.pending.push({ at: this.t + delay, from: 'Mission Control', text, kind });
   }
 
@@ -193,8 +196,8 @@ export class Sim {
       // A repair is paid for once: pressing the button again, or carrying on after parking for a
       // storm, picks up where the robot left off.
       if (this.robot.paidFor !== target) {
-        if (this.regolith < C.robot.repairRegolith) return `Not enough moon dirt. Repairs need ${C.robot.repairRegolith}.`;
-        this.regolith -= C.robot.repairRegolith;
+        if (this.regolith < this.C.robot.repairRegolith) return `Not enough moon dirt. Repairs need ${this.C.robot.repairRegolith}.`;
+        this.regolith -= this.C.robot.repairRegolith;
         this.robot.paidFor = target;
         this.robot.progress = 0;
       }
@@ -215,11 +218,11 @@ export class Sim {
   }
   repairPanelByHand(i) {
     if (this.panels[i]) return 'This panel works fine.';
-    if (this.regolith < C.evaRepairRegolith) return `You need ${C.evaRepairRegolith} moon dirt to patch it.`;
-    this.regolith -= C.evaRepairRegolith;
+    if (this.regolith < this.C.evaRepairRegolith) return `You need ${this.C.evaRepairRegolith} moon dirt to patch it.`;
+    this.regolith -= this.C.evaRepairRegolith;
     this.panels[i] = true;
     if (this.robot.paidFor === i) { // the robot's moon dirt for this panel goes back in the store
-      this.regolith += C.robot.repairRegolith;
+      this.regolith += this.C.robot.repairRegolith;
       this.robot.paidFor = -1;
     }
     if (this.robot.task === 'repair' && this.robot.target === i) this.robot.task = 'idle';
@@ -229,31 +232,31 @@ export class Sim {
   collectSample(id) {
     if (this.samples.has(id)) return;
     this.samples.add(id);
-    this.rp += C.science.sampleRP;
-    this.say(`Rock sample collected. +${C.science.sampleRP} research points.`, 'good');
+    this.rp += this.C.science.sampleRP;
+    this.say(`Rock sample collected. +${this.C.science.sampleRP} research points.`, 'good');
   }
   sendData() {
     if (!this.comms) return 'Turn the antenna on first.';
     if (!this.earthUp) return 'Earth is below the horizon. Wait for it to rise.';
     if (this.uploadReady > this.t) return `Antenna busy. Try again in ${Math.ceil(this.uploadReady - this.t)} s.`;
-    if (this.power < C.power.sendData) return 'Not enough power to send.';
-    this.power -= C.power.sendData;
-    this.uploadReady = this.t + C.science.uploadCooldown;
-    this.rp += C.science.uploadRP;
-    this.fromEarth(`Science data received. +${C.science.uploadRP} research point. (It took ${C.commsRoundTrip / 2} s to reach us.)`, 'good', C.commsRoundTrip);
+    if (this.power < this.C.power.sendData) return 'Not enough power to send.';
+    this.power -= this.C.power.sendData;
+    this.uploadReady = this.t + this.C.science.uploadCooldown;
+    this.rp += this.C.science.uploadRP;
+    this.fromEarth(`Science data received. +${this.C.science.uploadRP} research point. (It took ${this.C.commsRoundTrip / 2} s to reach us.)`, 'good', this.C.commsRoundTrip);
     return null;
   }
   askForecast() {
     if (!this.comms) return 'Turn the antenna on first.';
     if (!this.earthUp) return 'Earth is below the horizon.';
-    if (this.power < C.power.forecast) return 'Not enough power to send the question.';
-    this.power -= C.power.forecast;
+    if (this.power < this.C.power.forecast) return 'Not enough power to send the question.';
+    this.power -= this.C.power.forecast;
     const next = this.nextStorm;
     const text = next
-      ? `${next.flare ? `Our satellites saw a flare like the real ${flareLabel(next.flare)}. ` : ''}A ${next.strength.toLowerCase()} solar storm will reach you in about ${Math.max(0, Math.round(next.at - this.t - C.commsRoundTrip))} s. It is on your sun clock now.`
+      ? `${next.flare ? `Our satellites saw a flare like the real ${flareLabel(next.flare)}. ` : ''}A ${next.strength.toLowerCase()} solar storm will reach you in about ${Math.max(0, Math.round(next.at - this.t - this.C.commsRoundTrip))} s. It is on your sun clock now.`
       : 'The Sun looks calm for the rest of your mission.';
-    if (next) next.forecastAt ??= this.t + C.commsRoundTrip;
-    this.fromEarth(text, next ? 'warn' : 'info', C.commsRoundTrip);
+    if (next) next.forecastAt ??= this.t + this.C.commsRoundTrip;
+    this.fromEarth(text, next ? 'warn' : 'info', this.C.commsRoundTrip);
     return null;
   }
 
@@ -267,7 +270,7 @@ export class Sim {
   // fromOutside: someone on the Moon side asks for the hatch, so the chamber empties with nobody
   // in it (no prebreathe to wait for) and a storm is no reason to keep them out.
   airlockStart(dir, fromOutside = false) {
-    const lock = this.airlock, A = C.airlock;
+    const lock = this.airlock, A = this.C.airlock;
     if (lock.cycle) return 'The airlock is busy. Hang on!';
     if (dir === 'out' && this.stormNow && !fromOutside) return 'Not during a solar storm!';
     const [shut, open, goal] = dir === 'out' ? ['inner', 'outer', 'vacuum'] : ['outer', 'inner', 'pressurized'];
@@ -289,7 +292,7 @@ export class Sim {
     if (lock.cycle) return 'The airlock is busy. Hang on!';
     if (lock[other]) return `Close the ${other} door first!`;
     if (lock[door]) {
-      lock.cycle = { dir: null, steps: [{ kind: 'close', door, length: C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
+      lock.cycle = { dir: null, steps: [{ kind: 'close', door, length: this.C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
       return null;
     }
     return this.airlockStart(door === 'outer' ? 'out' : 'in');
@@ -307,7 +310,7 @@ export class Sim {
     else if (this.where !== 'outside' || !lock.outer) lock.passing = false; // back in the cabin, or already shut
     else if (lock.passing && !lock.cycle) {
       lock.passing = false;
-      lock.cycle = { dir: null, steps: [{ kind: 'close', door: 'outer', length: C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
+      lock.cycle = { dir: null, steps: [{ kind: 'close', door: 'outer', length: this.C.airlock.doorSeconds }], i: 0, t: 0, crew: false };
     }
   }
   airlockTick(dt) {
@@ -322,7 +325,7 @@ export class Sim {
       if (step.kind === 'close') lock[step.door] = false;
       if (step.kind === 'open' && !lock[step.door === 'inner' ? 'outer' : 'inner']) lock[step.door] = true;
       if (step.kind === 'pump' && cy.dir === 'out') {
-        this.air = Math.max(0, this.air - C.airlock.cycleAir);
+        this.air = Math.max(0, this.air - this.C.airlock.cycleAir);
         lock.uses++;
       }
     }
@@ -345,7 +348,7 @@ export class Sim {
   tick(dt) {
     if (this.over) return;
     this.t += dt;
-    const C_ = C, mode = this.mode;
+    const C_ = this.C, mode = this.mode;
     this.airlockTick(dt);
 
     // Messages from Earth land after their light delay.
@@ -503,8 +506,8 @@ export class Sim {
         const toGo = s.at - this.t;
         if (toGo <= lead && this.comms && this.earthUp) {
           s.warnedBy = 'earth';
-          this.fromEarth(`Solar storm warning! ${s.flare ? `A flare like the real ${flareLabel(s.flare)} just went off. ` : ''}A ${s.strength.toLowerCase()} storm of fast particles will reach you in about ${Math.round(toGo - C.commsRoundTrip / 2)} s. Get to the shelter and park the robot.`, 'bad');
-        } else if (toGo <= C.ownSensorWarning) {
+          this.fromEarth(`Solar storm warning! ${s.flare ? `A flare like the real ${flareLabel(s.flare)} just went off. ` : ''}A ${s.strength.toLowerCase()} storm of fast particles will reach you in about ${Math.round(toGo - this.C.commsRoundTrip / 2)} s. Get to the shelter and park the robot.`, 'bad');
+        } else if (toGo <= this.C.ownSensorWarning) {
           s.warnedBy = 'sensor';
           this.say('Radiation sensor alarm! A solar storm is starting. Get to the shelter now!', 'bad');
         }
@@ -514,9 +517,9 @@ export class Sim {
         this.flags.stormSeen = true;
         const robotOut = this.robot.task !== 'idle' && this.robot.offline <= 0;
         if (robotOut && !this.mode.robotAutoPark) {
-          this.robot.offline = C.robot.stormDamageSeconds;
+          this.robot.offline = this.C.robot.stormDamageSeconds;
           this.robot.task = 'idle';
-          this.say(`The robot was caught outside in the storm and needs ${C.robot.stormDamageSeconds} s of repairs.`, 'bad');
+          this.say(`The robot was caught outside in the storm and needs ${this.C.robot.stormDamageSeconds} s of repairs.`, 'bad');
         } else if (robotOut) {
           this.say('The robot parked itself until the storm is over.', 'info');
         }

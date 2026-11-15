@@ -7,12 +7,13 @@ import { createHud, icon } from './hud.js';
 import { createTour } from './tour.js';
 import { getFlares, dataCard, SOURCES, PAST_FLARES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
-import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
+import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState, researchConfig } from './research.js';
 import { PAGES } from './scrapbook.js';
 import { createScrapbook } from './scrapbook-view.js';
 import * as sound from './sound.js';
 import { isTouch as isTouchScreen } from './touch.js';
 import { createMoonMenu } from './moon-menu.js';
+import './speak.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'debrief', 'how', 'credits'];
@@ -31,6 +32,19 @@ const allOpen = () => openAllHere || save.openAll;
 const unlockIds = MISSIONS.map(m => m.requires?.id).filter(Boolean);
 const unlocksNow = () => allOpen() ? [...new Set([...save.unlocks, ...unlockIds])] : save.unlocks;
 const flaresReady = getFlares().then(f => { flares = f; return f; });
+// "The Sun right now": the newest flare in NASA's live feed, on the mission menu. Only shown when
+// the feed really answered, so archived flares are never passed off as today's Sun.
+flaresReady.then(({ live, flares: list }) => {
+  if (!live || !list.length) return;
+  const newest = list.reduce((a, b) => (b.date > a.date ? b : a));
+  const days = Math.max(0, Math.round((Date.now() - Date.parse(`${newest.date}T12:00Z`)) / 86400000));
+  const month = list.filter(f => Date.now() - Date.parse(`${f.date}T12:00Z`) < 30 * 86400000).length;
+  const when = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  $('sun-now').innerHTML = `<b>The Sun right now</b> (live from NASA DONKI): its latest big flare was the ${flareLabel(newest)}, ${when}. `
+    + `${month ? `That makes ${month} big flare${month === 1 ? '' : 's'} in the last 30 days.` : 'It has been quiet for the last 30 days.'} `
+    + 'A flare is a sudden flash of energy from the Sun, and a big one can send a radiation storm toward the Moon.';
+  $('sun-now').hidden = false;
+});
 
 const commit = () => { saveWorks = writeSave(save); };
 
@@ -663,6 +677,7 @@ function endTrace() {
 
 // One loop for the Research Tree screen while it is open: the twinkle, the jiggle and the tracing.
 let treeLoop = 0, treeLast = 0;
+let starsPainted = 0;
 function treeFrame(now) {
   if ($('research').hidden) { treeLoop = 0; return; }
   const dt = Math.min(0.05, (now - treeLast) / 1000 || 0.016);
@@ -670,7 +685,9 @@ function treeFrame(now) {
   jiggle(dt);
   panTo(now);
   drawTrace(now);
-  if (!calm) paintStars(now / 1000);
+  // The twinkle is slow (one beat every few seconds), so the star field is repainted 20 times a
+  // second, which looks the same and costs far less. While the sky pans it is painted every frame.
+  if (!calm && (panAt.speed || now - starsPainted >= 50)) { starsPainted = now; paintStars(now / 1000); }
   treeLoop = requestAnimationFrame(treeFrame);
 }
 function startTreeLoop() {
@@ -825,7 +842,7 @@ function launch(id = chosen) {
   let frames = 0;
   // A new plan every time: different real flares, and storms at slightly different times.
   // If the live check hasn't answered yet, the storms come from NASA's archived flares instead.
-  sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? PAST_FLARES));
+  sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? PAST_FLARES), researchConfig(C, save.unlocks));
   sim.say(mission.brief, 'info');
   hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false, points: save.points });
   tour?.destroy();
@@ -936,6 +953,7 @@ function finish() {
   const facts = [
     ['Lowest life support', `${Math.round(sim.lowestAir)}%`],
     ['Radiation dose', `${Math.round(sim.dose)} of 100${mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`],
+    ['Real dose limit', 'The meter counts this mission\'s share of a safe dose, out of 100. NASA caps a real astronaut\'s whole career at 600 millisieverts (the unit for radiation dose), so every mission has to stay well under it.'],
     ['Battery empty for', `${Math.round(sim.blackout)} s`],
     ...(sim.food !== null ? [['Meals at the end', `${sim.food} (goal ${sim.goalValue})`]] : []),
     ...(mission.goalType === 'samples' ? [['Rock samples', `${sim.samples.size} of ${sim.goalValue}`]] : []),
@@ -1016,7 +1034,14 @@ document.addEventListener('click', e => {
 });
 
 addEventListener('keydown', e => {
-  if (e.code !== 'Escape' || !game || e.repeat) return;
+  if (e.code !== 'Escape' || e.repeat) return;
+  // Between missions Esc is the Back button of whatever menu is showing.
+  if (!hud) {
+    const back = { research: 'open-missions', scrapbook: 'open-missions', how: 'home', credits: 'home', missions: selected ? 'moon-out' : 'home' }[showing()];
+    if (back && !diving) { e.preventDefault(); actions[back](); }
+    return;
+  }
+  if (!game) return;
   if (hud?.open) { hud.close(); return; }
   if (hud && $('pause').hidden) pause();
   else if (!$('pause').hidden) resume();

@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Junior Astronaut Moon Base Trainer</title>
 <meta name="description" content="Run a moon base at the real lunar south pole. A NASA Space Apps 2026 game for kids 7 to 12, built from NASA data.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Titillium+Web:wght@300;400;600;700&display=swap">
+<!-- The fonts are served with the game (public/fonts), so nothing is requested from a font server. -->
+<link rel="stylesheet" href="/fonts/fonts.css">
 </head>
 <body>
 
@@ -79,14 +78,14 @@
       <p id="tour-step" class="fine"></p>
       <h3 id="tour-title"></h3>
       <div id="tour-text"></div>
-      <div class="row"><button class="btn primary small" id="tour-next">Next</button><button class="btn small" id="tour-more">More details</button><button class="btn small" id="tour-alt" hidden></button><button class="btn small" id="tour-skip">Skip tour</button></div>
+      <div class="row"><button class="btn primary small" id="tour-next">Next</button><button class="btn small read-aloud" data-read="#tour-card" aria-pressed="false" title="Read this card out loud">Read aloud</button><button class="btn small" id="tour-more">More details</button><button class="btn small" id="tour-alt" hidden></button><button class="btn small" id="tour-skip">Skip tour</button></div>
     </section>
   </div>
 </div>
 <div id="storm-frame" hidden><p id="storm-text"></p></div>
 
 <div id="station" class="panel" role="dialog" aria-modal="false" aria-labelledby="station-title" hidden>
-  <div class="st-head"><h3 id="station-title"></h3><button id="station-close" class="btn small" aria-label="Close station">Close</button></div>
+  <div class="st-head"><h3 id="station-title"></h3><button class="btn small read-aloud" data-read="#station" aria-pressed="false" title="Read this panel out loud">Read aloud</button><button id="station-close" class="btn small" aria-label="Close station">Close</button></div>
   <div id="station-body"></div>
 </div>
 
@@ -131,6 +130,7 @@
       <section id="mission-list" aria-label="Missions"></section>
       <div id="moon-notes">
         <p id="moon-caption" class="fine">Your base is on Connecting Ridge, near the Moon's south pole. The dashed line is the axis the Moon spins on. Drag the Moon to tip it. Pick a mission to see where you will land.</p>
+        <p id="sun-now" class="fine" role="status" hidden></p>
         <p id="brief-flare" class="fine" hidden></p>
       </div>
       <div id="moon-view">
@@ -254,6 +254,7 @@
         <div><dt><kbd>Shift</kbd></dt><dd>Run</dd></div>
         <div><dt><kbd>Space</kbd></dt><dd>Jump</dd></div>
         <div><dt>Drag the mouse</dt><dd>Look around</dd></div>
+        <div><dt><kbd>Q</kbd><kbd>R</kbd></dt><dd>Turn the view left and right (no mouse needed)</dd></div>
         <div><dt>Mouse wheel</dt><dd>Zoom in and out</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>Use what you are next to</dd></div>
         <div><dt>Click a label</dt><dd>Walk there and open it</dd></div>
@@ -262,7 +263,7 @@
         <div><dt>Click the Power bar</dt><dd>See what is using power</dd></div>
         <div><dt><kbd>F</kbd></dt><dd>Chest light on and off</dd></div>
         <div><dt><kbd>T</kbd></dt><dd>Speed up time: 2x, then 3x, then back to normal</dd></div>
-        <div><dt><kbd>Esc</kbd></dt><dd>Pause and settings</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Pause and settings; in the menus, go back</dd></div>
       </dl>
     </div>
     <div class="row">
