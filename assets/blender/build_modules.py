@@ -35,7 +35,11 @@ PALETTE = {
     "Glow": (255, 250, 225),
     "Tan": (190, 140, 90),
     "Hot": (255, 120, 30),
+    "Cell": (18, 32, 82),      # solar cells: deep navy under glass
+    "Silver": (196, 202, 212), # the bright lines between cells, bus bars
+    "Dish": (232, 236, 242),   # the antenna's reflector (its own material, so the game's panel seams skip it)
 }
+ROUGHNESS = {"Cell": .3, "Silver": .4, "Dish": .5}
 
 
 def material(name):
@@ -44,7 +48,7 @@ def material(name):
     mat.use_nodes = True
     bsdf = mat.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = srgb(*PALETTE[name])
-    bsdf.inputs["Roughness"].default_value = 0.65
+    bsdf.inputs["Roughness"].default_value = ROUGHNESS.get(name, 0.65)
     if name in ("Glow", "Hot"):
         bsdf.inputs["Emission Color"].default_value = srgb(*PALETTE[name])
         bsdf.inputs["Emission Strength"].default_value = 3
@@ -155,24 +159,37 @@ def Solar():
         x, y = 2.4 * math.cos(math.radians(a)), 2.4 * math.sin(math.radians(a))
         strut("Leg", (x * .3, y * .3, .7), (x, y, .2), .13, "Grey")
         foot(x, y)
-    strut("Mast", (0, 0, .8), (0, 0, 9.6), .2, "Grey", 10)
+    strut("Mast", (0, 0, .8), (0, 0, 9.6), .2, "Grey", 16)
     for z in (2.6, 5):
-        lathe("MastBand", [(0, 0), (0, .3), (.3, .3), (.3, 0)], "Blue", (0, 0, z), sides=10)
-    lathe("Motor", [(0, 0), (0, .45), (.8, .45), (.8, 0)], "Red", (0, 0, 9.4), sides=10)
-    # The panel: blue cells in a gold frame, facing +X.
-    box("PanelBack", (.18, 7, 4.2), (.1, 0, 8), "Dark", .05)
-    box("PanelFrame", (.1, 7.2, .22), (.2, 0, 10.2), "Yellow", .03)
-    box("PanelFrame", (.1, 7.2, .22), (.2, 0, 5.8), "Yellow", .03)
-    box("PanelFrame", (.1, .22, 4.6), (.2, 3.55, 8), "Yellow", .03)
-    box("PanelFrame", (.1, .22, 4.6), (.2, -3.55, 8), "Yellow", .03)
-    for i in range(6):
-        for j in range(3):
-            box("Cell", (.06, 1.05, 1.25), (.24, -2.85 + i * 1.14, 6.6 + j * 1.4), "Blue" if (i + j) % 2 else "Sky", .02)
+        lathe("MastBand", [(0, 0), (0, .3), (.3, .3), (.3, 0)], "Blue", (0, 0, z), sides=16)
+    lathe("Motor", [(0, 0), (0, .45), (.8, .45), (.8, 0)], "Red", (0, 0, 9.4), sides=16)
+    # The panel, facing +X: a silver backing sheet carrying 12 x 6 dark solar cells with thin
+    # silver lines between them, two silver bus bars across, and a slim yellow frame. Behind it,
+    # a grey truss and an arm to the turning motor on the mast.
+    px = .55                                            # the panel stands this far forward of the mast
+    box("PanelBack", (.14, 7, 4.2), (px + .1, 0, 8), "Dark", .04)
+    box("PanelSheet", (.04, 6.9, 4.1), (px + .19, 0, 8), "Silver", .01)
+    cols, rows, gap = 12, 6, .05
+    cw, ch = (6.8 - gap * (cols - 1)) / cols, (4.0 - gap * (rows - 1)) / rows
+    for i in range(cols):
+        for j in range(rows):
+            box("Cell", (.03, cw, ch), (px + .225, -3.4 + cw / 2 + i * (cw + gap), 6 + ch / 2 + j * (ch + gap)), "Cell", 0)
+    for z in (6 + 2 * (ch + gap) - gap / 2, 6 + 4 * (ch + gap) - gap / 2):
+        box("BusBar", (.02, 6.9, .035), (px + .245, 0, z), "Silver", 0)
+    for z, dz in ((10.08, .12), (5.92, .12)):
+        box("PanelFrame", (.12, 7.12, dz), (px + .2, 0, z), "Yellow", .02)
+    for y in (3.5, -3.5):
+        box("PanelFrame", (.12, .12, 4.28), (px + .2, y, 8), "Yellow", .02)
+    for y in (-2.4, 0, 2.4):
+        strut("Truss", (px - .02, y, 6.1), (px - .02, y, 9.9), .05, "Grey", 8)
+    strut("Truss", (px - .02, -3.2, 8), (px - .02, 3.2, 8), .05, "Grey", 8)
+    strut("Arm", (.3, 0, 9.8), (px - .02, 0, 9.8), .12, "Grey", 10)
+    strut("Arm", (0, 0, 8.4), (px - .02, 0, 8.4), .1, "Grey", 10)
     box("PowerBox", (.9, 1, .7), (.8, .9, .45), "Gold", .08)
     strut("Cable", (.5, .5, .5), (.1, .1, 1), .05, "Dark", 6)
     col("Mast", -.5, .5, -.5, .5, 0, 10.4)
     col("Base", -1, 1, -1, 1, 0, .95)
-    col("Panel", -.1, .35, -3.7, 3.7, 5.6, 10.4)
+    col("Panel", .45, .9, -3.7, 3.7, 5.6, 10.4)
     col("PowerBox", .3, 1.3, .4, 1.4, 0, .85)
 
 
@@ -382,52 +399,44 @@ def Antenna():
     box("PackLight", (.03, .25, .14), (-.03, 0, 2.5), "Green", .01)
     lathe("Beacon", [(0, 0), (0, .15), (.2, .15), (.3, .08), (.3, 0)], "Red", (-.5, 0, 2.95), sides=8)
     lathe("Pivot", [(-.35, 0), (-.35, .3), (.35, .3), (.35, 0)], "Dark", (0, 0, 4.85), (0, 1, 0), 10)
-    # Dish, tilted low and pointing +X: a real bowl (hollow at the front), its face in rings of
-    # panels (grey centre plate, blue panels, white outer band) with eight ribs across it, a raised
-    # rim, a frame of struts behind, and a yellow feed arm holding a gold receiver and a small
-    # white sub-reflector at the focus. Chunky, in the base's style, not every bolt.
+    # Dish, tilted low and pointing +X: a smooth white parabolic reflector, thin grey seams where
+    # its panels meet, a slim rim, a small hub in the middle, and four struts holding the feed horn
+    # at the focus, where the radio waves bounce to. A frame of struts holds it from behind.
     d = Vector((1, 0, .32)).normalized()
     p = Vector((.1, 0, 5))
     u = Vector((0, 1, 0))
     v = d.cross(u)
-    face = [(0, .28), (.4, .3), (1.0, .42), (1.6, .62), (2.05, .82)]   # (radius, depth) of the bowl's front
+    R, F = 2.15, 2.1                                    # dish radius and focal length (m)
 
-    def depth(r):
-        for (r0, a0), (r1, a1) in zip(face, face[1:]):
-            if r <= r1:
-                return a0 + (a1 - a0) * (r - r0) / (r1 - r0)
-        return face[-1][1]
+    def depth(r):                                       # the front face is a paraboloid
+        return .26 + r * r / (4 * F)
 
-    def on_face(r, ang, lift=.03):   # a point just in front of the bowl's face
+    def on_face(r, ang, lift=.02):
         return p + d * (depth(r) + lift) + (u * math.cos(ang) + v * math.sin(ang)) * r
 
-    lathe("Dish", [(0, 0), (0, .55), (.25, 1.2), (.55, 1.8), (.75, 2.15), (.86, 2.2)]
-          + [(a, r) for r, a in reversed(face)], "White", p, d, 24)
-
-    def band(name, r0, r1, mat, steps=6):   # a thin ring of panel lying on the bowl's face
-        rs = [r0 + (r1 - r0) * k / steps for k in range(steps + 1)]
-        ring(name, [(depth(r) + .015, r) for r in rs] + [(depth(r) + .045, r) for r in reversed(rs)], mat, p, d, 24)
-
-    band("DishHub", .05, .62, "Grey", 3)
-    band("DishPanels", .66, 1.72, "Sky")
-    band("DishSeam", .62, .66, "Dark", 1)
-    band("DishSeam", 1.72, 1.77, "Dark", 1)
-    for k in range(8):
-        ang = k * math.pi / 4
-        strut("DishRib", on_face(.6, ang, .05), on_face(2.04, ang, .05), .035, "Grey", 5)
-    ring("DishRim", [(.8, 2.1), (.8, 2.3), (.93, 2.3), (.93, 2.1)], "Grey", p, d, 24)
-    # The frame behind: struts from a hub behind the pivot out to the back of the rim, clear of
-    # the bowl so they show.
-    lathe("DishBackHub", [(-.42, 0), (-.42, .32), (-.1, .32), (-.1, 0)], "Grey", p, d, 10)
+    rs = [R * k / 16 for k in range(1, 17)]
+    lathe("Dish", [(depth(r) - .14, r) for r in rs] + [(depth(R) + .02, R + .04)] + [(depth(r), r) for r in reversed(rs)],
+          "Dish", p, d, 48)
+    for r0 in (.95, 1.6):                               # seams between the rings of panels
+        ring("DishSeam", [(depth(r0) + .006, r0), (depth(r0 + .02) + .006, r0 + .02), (depth(r0 + .02) + .016, r0 + .02), (depth(r0) + .016, r0)], "Silver", p, d, 48)
+    for k in range(8):                                  # seams between the panels in each ring
+        ang = k * math.pi / 4 + math.pi / 8
+        strut("DishSeam", on_face(.32, ang, .01), on_face(R - .05, ang, .01), .01, "Silver", 4)
+    ring("DishRim", [(depth(R) - .02, R - .02), (depth(R) - .02, R + .1), (depth(R) + .08, R + .1), (depth(R) + .08, R - .02)], "Grey", p, d, 48)
+    lathe("DishHub", [(depth(0), 0), (depth(0), .3), (depth(0) + .06, .3), (depth(0) + .1, 0)], "Grey", p, d, 24)
+    # The frame behind: struts from a hub behind the pivot out to the back of the rim.
+    lathe("DishBackHub", [(-.42, 0), (-.42, .32), (-.1, .32), (-.1, 0)], "Grey", p, d, 16)
     for k in range(6):
         ang = k * math.pi / 3 + math.pi / 6
         out = u * math.cos(ang) + v * math.sin(ang)
-        strut("DishFrame", p - d * .3 + out * .28, p + d * .5 + out * 1.98, .05, "Grey", 6)
-    for a in (90, 210, 330):
-        o = Vector((0, math.cos(math.radians(a)), math.sin(math.radians(a)))) * 1.7
-        strut("FeedArm", p + d * .7 + o, p + d * 2.1, .04, "Yellow", 6)
-    lathe("Receiver", [(0, 0), (0, .22), (.3, .22), (.45, 0)], "Gold", p + d * 2, d, 10)
-    lathe("SubReflector", [(0, 0), (0, .36), (.08, .36), (.14, 0)], "White", p + d * 2.45, -d, 14)
+        strut("DishFrame", p - d * .3 + out * .28, p + d * (depth(R) - .3) + out * (R - .15), .05, "Grey", 6)
+    # Four feed struts from the rim to the feed horn at the focus.
+    focus = p + d * (depth(0) + F)
+    for k in range(4):
+        ang = k * math.pi / 2 + math.pi / 4
+        strut("FeedArm", on_face(R - .1, ang, .05), focus - d * .2, .035, "Grey", 6)
+    lathe("FeedHorn", [(0, 0), (0, .12), (.35, .24), (.35, 0)], "Grey", focus - d * .45, d, 16)
+    lathe("Receiver", [(0, 0), (0, .2), (.22, .2), (.28, 0)], "Gold", focus - d * .1, d, 16)
     # A cable from the equipment pack up the mast to the dish.
     strut("Cable", (-.08, -.18, 2.95), (-.08, -.18, 4.75), .04, "Dark", 6)
     col("Base", -.75, .75, -.75, .75, 0, 3.4)

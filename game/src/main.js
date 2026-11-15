@@ -741,6 +741,7 @@ function wear(model) {
     if (!o.isMesh || o.name.startsWith('COL_')) return;
     const m = o.material;
     if (!m || m.userData.worn || m.transparent || (m.emissive && m.emissive.getHex() !== 0) || !m.isMeshStandardMaterial) return;
+    if (/Cell|Dish|Silver/.test(m.name)) return; // solar cells and the dish have their own lines already
     m.userData.worn = true;
     const foil = /Gold/.test(m.name) ? '0.22' : '0.0';
     m.onBeforeCompile = shader => {
