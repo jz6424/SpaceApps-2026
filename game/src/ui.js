@@ -272,14 +272,16 @@ function panelHtml(node) {
 
 // The whole screen is the map. Drag anywhere that isn't a circle or a button to move it; zoom with
 // the wheel, a trackpad pinch, two fingers on a touch screen, or the + and - keys. It opens zoomed
-// in on your base, its five branches and the start of each path. It can't be zoomed out further
-// than the whole tree, nor in further than 2.4 times, nor dragged so far that the tree leaves the
-// screen.
+// in on your base, its five branches and the start of each path. Zoomed all the way out, the
+// outermost circles still run off the top and bottom of the screen, so the whole tree is never in
+// view at once: you explore it by dragging. It can't be zoomed in further than 2.4 times, nor
+// dragged so far that the tree leaves the screen.
 const view = { x: 0, y: 0, s: 1 };
 const ZOOM_MAX = 2.4;
 const zoomRange = () => {
   const box = $('research-view');
-  return [Math.min(box.clientWidth, box.clientHeight - 120) / (MAP.size + 80), ZOOM_MAX];
+  // Out to where the outer ring sits just past the shorter edge of the screen.
+  return [Math.min(ZOOM_MAX, (Math.min(box.clientWidth, box.clientHeight) / 2 - 40) / (MAP.radius[3] - 30)), ZOOM_MAX];
 };
 function placeMap() {
   const box = $('research-view'), w = box.clientWidth, h = box.clientHeight, size = MAP.size * view.s;
@@ -304,8 +306,7 @@ function zoomMap(factor, px, py) {
 // path in sight.
 function fitMap() {
   const box = $('research-view'), w = box.clientWidth, h = box.clientHeight;
-  const show = 2 * (MAP.radius[2] + 40); // out to just past the first circle of every path
-  view.s = Math.min(1.6, Math.max(0.7, Math.min(w, h - 150) / show));
+  view.s = zoomRange()[0] * 1.18; // a little closer than the furthest you can zoom out
   view.x = w / 2 - MAP.size / 2 * view.s;
   view.y = h / 2 + 20 - MAP.size / 2 * view.s;
   placeMap();
@@ -424,12 +425,19 @@ function drawStars() {
   }
   paintStars(0);
 }
+// The sky sits far behind the tree, so it drifts only a little when the map is dragged (it wraps
+// round at the edges, so it never runs out).
+const SKY_DRIFT = 0.05;
+const skyFrom = { x: 0, y: 0 };
 function paintStars(t) {
-  const cv = $('research-stars'), ctx = cv.getContext('2d'), dpr = cv.width / innerWidth;
+  const cv = $('research-stars'), ctx = cv.getContext('2d'), dpr = cv.width / innerWidth, w = innerWidth, h = innerHeight;
+  const px = calm ? 0 : (view.x - skyFrom.x) * SKY_DRIFT, py = calm ? 0 : (view.y - skyFrom.y) * SKY_DRIFT;
+  const wrap = (v, size) => ((v % size) + size) % size;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  ctx.clearRect(0, 0, w, h);
   for (const st of sky) {
     const glow = calm ? 1 : 1 - st.depth * (0.5 + 0.5 * Math.sin(t * st.speed + st.phase));
+    ctx.setTransform(dpr, 0, 0, dpr, (wrap(st.x + px, w) - st.x) * dpr, (wrap(st.y + py, h) - st.y) * dpr);
     ctx.globalAlpha = st.alpha * glow;
     if (st.halo) { ctx.fillStyle = st.halo; ctx.beginPath(); ctx.arc(st.x, st.y, st.r * 4, 0, 7); ctx.fill(); }
     ctx.fillStyle = st.fill;
@@ -438,10 +446,10 @@ function paintStars(t) {
   ctx.globalAlpha = 1;
 }
 
-// --- The jiggle: the circles hang on springs. When the map is dragged they lag a little behind,
-// swing past and settle, the outer ones more than the inner ones. Each frame the map's change of
-// speed pushes on every circle; a spring pulls it home and damping calms it.
-const SPRING = 130, DAMP = 7, SWAY = [0, 0.4, 0.62, 0.75]; // stiffness, damping, how much each ring moves
+// --- The jiggle: the circles hang on springs. While the map is dragged they trail a little behind,
+// further the faster it moves; when it stops they swing past and settle. The outer circles move
+// more than the inner ones and the centre not at all.
+const SPRING = 120, DAMP = 5, LAG = 0.009, SWAY = [0, 0.5, 0.78, 0.95]; // stiffness, damping, trail per px/s, share per ring
 let wobble = new Map(); // spot id -> { el, w, k, ox, oy, vx, vy }
 let wobbleLines = [];
 function wireWobble() {
@@ -457,25 +465,22 @@ function wireWobble() {
 const motion = { x: 0, y: 0, s: 0, vx: 0, vy: 0, still: 0 };
 function jiggle(dt) {
   if (calm || !wobble.size) return;
-  // How fast the map is moving on screen, and how fast that is changing. A zoom isn't a drag.
-  let ax = 0, ay = 0;
-  if (view.s === motion.s) {
-    const vx = (view.x - motion.x) / dt, vy = (view.y - motion.y) / dt;
-    ax = (vx - motion.vx) / dt; ay = (vy - motion.vy) / dt;
-    const most = 9000, a = Math.hypot(ax, ay);
-    if (a > most) { ax *= most / a; ay *= most / a; }
-    motion.vx = vx; motion.vy = vy;
-  } else { motion.vx = motion.vy = 0; }
+  // How fast the map is moving on screen, smoothed over a few frames. A zoom isn't a drag.
+  const vx = view.s === motion.s ? (view.x - motion.x) / dt : 0, vy = view.s === motion.s ? (view.y - motion.y) / dt : 0;
+  const smooth = 1 - Math.exp(-dt * 22), fastest = 2500;
+  motion.vx += (Math.max(-fastest, Math.min(fastest, vx)) - motion.vx) * smooth;
+  motion.vy += (Math.max(-fastest, Math.min(fastest, vy)) - motion.vy) * smooth;
   Object.assign(motion, { x: view.x, y: view.y, s: view.s });
   let busy = false;
   for (const n of wobble.values()) {
     if (!n.w) continue;
-    // In map units: the push is the map's acceleration on screen, divided by the zoom.
-    n.vx += (-n.k * n.ox - DAMP * n.vx - n.w * ax / view.s) * dt;
-    n.vy += (-n.k * n.oy - DAMP * n.vy - n.w * ay / view.s) * dt;
-    n.ox = Math.max(-18, Math.min(18, n.ox + n.vx * dt));
-    n.oy = Math.max(-18, Math.min(18, n.oy + n.vy * dt));
-    if (Math.abs(n.ox) + Math.abs(n.oy) > 0.05 || Math.abs(n.vx) + Math.abs(n.vy) > 0.5) busy = true;
+    // Where it would hang while the map moves (in map units), and the spring that pulls it there.
+    const tx = -n.w * motion.vx * LAG / view.s, ty = -n.w * motion.vy * LAG / view.s;
+    n.vx += (n.k * (tx - n.ox) - DAMP * n.vx) * dt;
+    n.vy += (n.k * (ty - n.oy) - DAMP * n.vy) * dt;
+    n.ox = Math.max(-14, Math.min(14, n.ox + n.vx * dt));
+    n.oy = Math.max(-14, Math.min(14, n.oy + n.vy * dt));
+    if (Math.abs(n.ox) + Math.abs(n.oy) > 0.05 || Math.abs(n.vx) + Math.abs(n.vy) > 0.5 || Math.abs(motion.vx) + Math.abs(motion.vy) > 1) busy = true;
     else { n.ox = n.oy = n.vx = n.vy = 0; }
   }
   if (!busy && motion.still) return; // everything at rest, and already drawn at rest
@@ -501,6 +506,7 @@ function treeFrame(now) {
 }
 function startTreeLoop() {
   Object.assign(motion, { x: view.x, y: view.y, s: view.s, vx: 0, vy: 0, still: 0 });
+  Object.assign(skyFrom, { x: view.x, y: view.y });
   if (!treeLoop) { treeLast = performance.now(); treeLoop = requestAnimationFrame(treeFrame); }
 }
 
