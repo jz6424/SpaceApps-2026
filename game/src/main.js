@@ -587,6 +587,13 @@ for (const [id, node] of Object.entries(stationNodes)) {
   node.traverse(o => { if (o.isMesh && !o.name.endsWith('_Stand')) body.expandByObject(o); });
   const dot = body.isEmpty() ? pos.clone().add(new THREE.Vector3(0, 1.4, 0))
     : new THREE.Vector3((body.min.x + body.max.x) / 2, Math.min(body.min.y + (body.max.y - body.min.y) * 0.8, pos.y + 2.2), (body.min.z + body.max.z) / 2);
+  // A station built on both walls (the Galley: lockers and grow lights on one side, a counter on
+  // the other) would put its dot in the empty aisle between them, so it goes instead on the
+  // counter right in front of where you stand to use it, like the other wall stations.
+  if (!body.isEmpty() && body.min.z < site.z - 0.5 && body.max.z > site.z + 0.5 && Math.abs(pos.z - site.z) > 0.5) {
+    dot.x = pos.x;
+    dot.z = pos.z + Math.sign(pos.z - site.z) * 0.7;
+  }
   const marker = makeCallout(STATION_INFO[id].label, { near: 1.8, far: 6.5, faint: 0, station: id });
   marker.position.copy(dot);
   stations[id] = { id, ...STATION_INFO[id], stand: pos, mats, marker, glow: 0 };
