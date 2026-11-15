@@ -361,11 +361,13 @@ const terrainGeo = new THREE.PlaneGeometry(SPAN, SPAN, GRID - 1, GRID - 1).rotat
 const posAttr = terrainGeo.attributes.position;
 for (let i = 0; i < posAttr.count; i++) posAttr.setY(i, heights[i]);
 terrainGeo.computeVertexNormals();
-// Permanently shadowed ground (from NASA's PSR map) gets a frosty blue tint.
+// Permanently shadowed ground (from NASA's PSR map) is a little darker, as it never sees the Sun,
+// with a faint cool tint to mark where the ice is. Kept subtle: the real ice is tiny grains mixed
+// into grey regolith, not blue (NASA's ShadowCam pictures of these craters show grey ground).
 const tint = new Float32Array(posAttr.count * 3);
 for (let i = 0; i < posAttr.count; i++) {
-  const r = Math.floor(i / GRID), c = i % GRID, ice = maps.psrAt(r, c);
-  tint.set([1 - 0.35 * ice, 1 - 0.2 * ice, 1 + 0.1 * ice], i * 3);
+  const r = Math.floor(i / GRID), c = i % GRID, ice = maps.psrAt(r, c), dim = 1 - 0.22 * ice;
+  tint.set([dim * (1 - 0.12 * ice), dim * (1 - 0.05 * ice), dim * (1 + 0.08 * ice)], i * 3);
 }
 terrainGeo.setAttribute('color', new THREE.BufferAttribute(tint, 3));
 const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true, normalMap: groundDetail(), normalScale: new THREE.Vector2(1.25, 1.25) });
