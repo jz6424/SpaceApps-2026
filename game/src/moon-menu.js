@@ -116,7 +116,8 @@ function buildFlag(place, number) {
   return { flag, mast, cloth, ring, badge, reach, up };
 }
 
-// missions: [{ id, place: { lat, lon } }]. onPick(id) is called when a flag is clicked.
+// missions: [{ id, place: { lat, lon } }]. onPick(id) is called when a flag is clicked, and
+// onPick(null) when the Moon is clicked away from the flags while one is picked.
 export function createMoonMenu(canvas, missions, onPick) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
@@ -222,7 +223,8 @@ export function createMoonMenu(canvas, missions, onPick) {
     ray.setFromCamera(mouse, camera);
     return ray.intersectObjects(Object.values(flags).map(f => f.reach), false)[0]?.object.userData.id ?? null;
   }
-  canvas.addEventListener('click', e => { const id = flagAt(e); if (id && !diveDone) onPick(id); });
+  // A click on a flag picks it. A click anywhere else while zoomed in goes back to the whole Moon.
+  canvas.addEventListener('click', e => { const id = flagAt(e); if (!diveDone && (id || picked)) onPick(id); });
   canvas.addEventListener('pointermove', e => { canvas.style.cursor = flagAt(e) ? 'pointer' : ''; });
 
   paint();

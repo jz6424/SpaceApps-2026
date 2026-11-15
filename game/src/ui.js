@@ -113,6 +113,7 @@ function renderMissions() {
   }
   $('moon-caption').hidden = !!mission;
   $('moon-info').hidden = !mission;
+  $('moon-out').hidden = !mission;
   moonMenu?.setLocked(MISSIONS.filter(m => !isOpen(m)).map(m => m.id));
   moonMenu?.pick(selected);
   $('save-note').textContent = saveWorks
@@ -134,7 +135,7 @@ function openMissions() {
   $('dive').classList.remove('on');
   show('missions');
   // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
-  moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id !== selected) brief(id); });
+  moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
   renderMissions();
   moonMenu.start();
 }
@@ -581,7 +582,7 @@ function goalText(mission, mode) {
 function renderBriefMode() {
   const mission = missionById(chosen);
   $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
-    `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}">${mode.label} · ${mode.level}</button>`).join('');
+    `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}"><b>${mode.label}</b><small>${mode.level}</small></button>`).join('');
   $('mode-about').textContent = MODES[save.mode].about;
   // The three star tests, one under the other. A star is filled in only if that test has been
   // passed before in this mode, so a filled second star can sit between two empty ones.
@@ -789,6 +790,7 @@ const actions = {
   mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus(); },
   brief,
   launch: playChosen,
+  'moon-out': () => { if (selected) brief(selected); },   // back to the whole Moon: closes the open mission
   again: id => launch(id),
   restart: () => launch(sim.mission.id),
   research: openResearch,

@@ -122,7 +122,11 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .score b { color: var(--yellow); font: 500 1.25rem var(--mono); }
 #brief-mode { display: grid; gap: 8px; width: 100%; }
 #brief-mode h3 { font-size: 1.1rem; }
-#mode-choice { display: flex; flex-wrap: wrap; gap: 8px; }
+/* The three difficulties always sit side by side: name on top, level under it. */
+#mode-choice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+#mode-choice .seg { display: grid; gap: 2px; justify-items: center; align-content: center; padding: 8px 4px; min-height: 56px; line-height: 1.1; }
+#mode-choice .seg b { font-weight: inherit; }
+#mode-choice .seg small { font: 400 .8rem var(--body); letter-spacing: 0; text-transform: none; opacity: .85; }
 .seg {
   font: 500 .875rem var(--head); text-transform: uppercase; letter-spacing: .08em; color: var(--text);
   --fill: rgba(255, 255, 255, .07); padding: 0 16px; min-height: 44px; cursor: pointer;
@@ -156,6 +160,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #moon-view { position: sticky; top: 16px; display: grid; gap: 12px; justify-items: center; }
 #moon { display: block; width: 100%; max-width: 640px; aspect-ratio: 1; max-height: max(320px, calc(100vh - 300px)); }
 #moon-caption { text-align: center; max-width: 30em; }
+/* Shown while zoomed in on a flag: goes back to the whole Moon. */
+#moon-out { position: absolute; left: 12px; top: 12px; z-index: 1; }
 #moon-info { display: grid; gap: 12px; width: 100%; }
 /* Play: the screen goes dark as the camera reaches the flag, then clears over the base. */
 #dive { position: fixed; inset: 0; z-index: 60; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
@@ -163,7 +169,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 @media (prefers-reduced-motion: reduce) { #dive, #dive.on { transition: none; } }
 @media (max-width: 900px) {
   .mission-layout { grid-template-columns: 1fr; }
-  #moon-view { position: static; order: -1; }
+  #moon-view { position: relative; top: auto; order: -1; }
   #moon { max-width: 320px; }
 }
 .stars { font-weight: 600; }
