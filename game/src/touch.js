@@ -14,7 +14,7 @@ const REWORD = [
   [/press E\b/g, 'tap Use'],
   [/Press E\b/g, 'Tap Use'],
   [/ with WASD/g, ' with the joystick'],
-  [/ Press (<b>T<\/b>|T) to speed up time( \(now \dx\))?\./g, ' You can speed up time in the settings.'],
+  [/ Press (<b>T<\/b>|T) to speed up time( \(now \dx\))?\./g, ' Tap the speed button at the top to speed up time.'],
   [/, and <b>T<\/b> speeds up time/g, ''],
   [/<b>F<\/b> switches your chest light on/g, 'The <b>Light</b> button switches your chest light on'],
   [/press F for your chest light/g, 'tap Light for your chest light'],

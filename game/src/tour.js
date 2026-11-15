@@ -35,7 +35,7 @@ const SCREEN_TOP = [
   { target: '#feed', side: 'below', title: 'Messages', text: 'From the base computer and Mission Control.' },
   { target: '#clock', side: 'below', title: 'Sun clock', text: 'Yellow is day, blue is night, red is a storm.' },
   { target: ['#mission-handle', '#mission-card'], side: 'below', title: 'Mission', text: 'Your goal and your next step. The arrow slides it away.' },
-  { target: '#settings', side: 'left', title: 'Settings', text: 'Pause, speed, sound and controls.' },
+  { target: ['#speed-chip', '#settings'], side: 'left', title: 'Speed and settings', text: 'The left button shows the game speed. The gear pauses, and has sound and controls.' },
 ];
 
 // The stations, in two groups, each labelled at its floating label in the base.
@@ -153,17 +153,18 @@ const HOWTOS = [
     known: (sim, hud) => hud.speed > 1,
     steps: sim => [
       {
-        title: 'Speed up time', at: 'right', nextLabel: 'Set 2x speed', action: hud => hud.setSpeed(2), until: (s, hud) => hud.speed > 1,
-        hint: isTouch ? 'Tap "Set 2x speed" on the card to make time go faster.' : 'Press T to make time go 2x as fast.',
+        title: 'Speed up time', at: 'right', target: '#speed-chip', side: 'left',
+        nextLabel: 'Set 2x speed', action: hud => hud.setSpeed(2), until: (s, hud) => hud.speed > 1,
+        hint: isTouch ? 'Tap the speed button at the top of the screen to make time go faster.' : 'Press T to make time go 2x as fast.',
         text: [
           sim.samples.size >= sim.goalValue ? `All ${sim.goalValue} rocks are in. Now the base only has to last until sunrise.` : 'Night has fallen. Once the base is set for the night, sunrise is a long wait.',
-          isTouch ? 'Tap <b>Set 2x speed</b> to make time go <b>2x</b> as fast.' : 'Press <b>T</b> to make time go <b>2x</b> as fast.',
+          isTouch ? 'Tap the <b>speed button</b> at the top of the screen to make time go <b>2x</b> as fast.' : 'Press <b>T</b>, or click the <b>speed button</b> at the top of the screen, to make time go <b>2x</b> as fast.',
         ],
       },
       {
         title: 'Time is going 2x as fast', at: 'right', nextLabel: 'Got it',
         text: [
-          isTouch ? 'The <b>Game speed</b> button in Settings (the gear) steps through 2x, 3x and back to normal.' : '<b>T</b> again makes it 3x, and once more takes it back to normal. The same button is in Settings (the gear).',
+          isTouch ? 'The speed button always shows the speed. Tap it again for 3x, and once more for normal.' : 'The speed button always shows the speed. <b>T</b> (or a click on it) again makes it 3x, and once more takes it back to normal.',
           'A solar storm always sets time back to normal, so you can get to the shelter.',
         ],
       },

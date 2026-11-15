@@ -523,10 +523,11 @@ function block(x0, x1, y0, y1, z0, z1, mat) {
 const DOOR_HALF = 2.2;                    // half the doorway width: each door is two leaves this wide
 const INNER_X = 13.2, OUTER_X = 19.8;     // where the two doors stand: a wall inside the tube, the hatch on its end
 const INNER_TALL = 8.4, OUTER_TALL = 8.95;
-// The hatch is one slab that slides along the hull to open. It is wider and taller than the
-// doorway and stands just in front of the grey door frame, so shut it covers the opening with no
-// gap, and open it slides past the frame without cutting through it.
-const HATCH_WIDE = 6.2, HATCH_TALL = 9.0, HATCH_SLIDE = 5.9;
+// The hatch is a plug door: one slab that fits inside the grey door frame, its face level with the
+// frame's, with a finger's width of clearance all round. To open it first comes straight out of
+// the frame (HATCH_OUT), then slides along the hull (HATCH_SLIDE), so it never cuts through the frame.
+// The frame's opening is 5.7 wide and 8.75 tall, and its front face is 0.15 behind OUTER_X.
+const HATCH_WIDE = 5.66, HATCH_TALL = 8.73, HATCH_FRONT = -0.17, HATCH_BACK = -0.38, HATCH_OUT = 0.34, HATCH_SLIDE = 5.9;
 const LOCK_LOOK = {                       // light colour and label for each state. Never colour alone.
   pressurized: { text: 'Pressurized', color: 0x2e96f5 },
   cycling: { text: 'Cycling...', color: 0xeafe07 },
@@ -586,7 +587,7 @@ function makeDoor(which, x, tall, lamps) {
 }
 
 // The outer door is the big white hatch on the end of the airlock: a round window, a red hub and
-// a handle. Shut, it covers the doorway. Open, it sits against the hull beside it.
+// a handle. Shut, it fills its frame. Open, it sits against the hull beside the doorway.
 function makeHatch(which, x, tall, lamps) {
   const leaf = new THREE.Group();
   scene.add(leaf);
@@ -599,18 +600,19 @@ function makeHatch(which, x, tall, lamps) {
     return disc;
   };
   [
-    // The frame's front face is at x - 0.15; the slab starts just clear of it, and of the yellow tread.
-    block(x - 0.13, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.13, DECK + HATCH_TALL, PAINT.white),
-    round(1.1, 0.15, PAINT.glass, [x + 0.28, 0, DECK + 6]),
-    round(1.1, 0.15, PAINT.glass, [x - 0.16, 0, DECK + 6]),
-    round(0.65, 0.5, PAINT.red, [x + 0.45, 0, DECK + 3]),
-    block(x + 0.6, x + 0.9, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
-    block(x - 0.5, x - 0.11, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
+    // Its foot is just clear of the yellow tread on the landing.
+    block(x + HATCH_BACK, x + HATCH_FRONT, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.11, DECK + HATCH_TALL, PAINT.white),
+    round(1.1, 0.15, PAINT.glass, [x + HATCH_FRONT + 0.03, 0, DECK + 6]),
+    round(1.1, 0.15, PAINT.glass, [x + HATCH_BACK - 0.03, 0, DECK + 6]),
+    round(0.65, 0.5, PAINT.red, [x + HATCH_FRONT + 0.2, 0, DECK + 3]),
+    block(x + HATCH_FRONT + 0.35, x + HATCH_FRONT + 0.65, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
+    block(x + HATCH_BACK - 0.37, x + HATCH_BACK + 0.02, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
   ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
-  return finishDoor(which, x, tall, lamps, [{ leaf, travel: HATCH_SLIDE }], HATCH_WIDE / 2, 0.25);
+  return finishDoor(which, x, tall, lamps, [{ leaf, travel: HATCH_SLIDE, out: HATCH_OUT }], HATCH_WIDE / 2, 0.14, x + (HATCH_FRONT + HATCH_BACK) / 2);
 }
 
-function finishDoor(which, x, tall, lamps, leaves, half, thick) {
+// mid: where the solid slab stands, when that is not on the door's own line (the hatch sits back in its frame).
+function finishDoor(which, x, tall, lamps, leaves, half, thick, mid = x) {
   // One lamp on each face of the door, and a label over it that says the same thing in words.
   const lampMat = paint(0x2e96f5, { emissive: 0x2e96f5, emissiveIntensity: 1.6 });
   for (const at of lamps) {
@@ -626,7 +628,7 @@ function finishDoor(which, x, tall, lamps, leaves, half, thick) {
   // Seen from the cabin or the Moon the label hangs over the door. Seen from the chamber's ceiling
   // camera it sits beside the lamp instead.
   const labelSpots = { over: label.position.clone(), beside: hab(which === 'inner' ? x + 1 : 17.6, 0.9, DECK + 6.4) };
-  return { which, leaves, lampMat, label, labelSpots, slide: 0, collider: solid(x - thick, x + thick, -half, half, DECK, DECK + tall), at: hab(x, 0, DECK) };
+  return { which, leaves, lampMat, label, labelSpots, slide: 0, collider: solid(mid - thick, mid + thick, -half, half, DECK, DECK + tall), at: hab(x, 0, DECK) };
 }
 const doors = {
   // Lamps: above the door on the cabin and Moon sides, beside it inside the chamber (where the
@@ -678,7 +680,12 @@ function syncAirlock(dt, snap = false) {
     const goal = lock[door.which] ? 1 : 0;
     door.slide = snap ? goal : THREE.MathUtils.clamp(door.slide + Math.sign(goal - door.slide) * dt / 0.6, 0, 1);
     const eased = THREE.MathUtils.smootherstep(door.slide, 0, 1);
-    for (const { leaf, travel } of door.leaves) leaf.position.z = -eased * travel * U;
+    for (const { leaf, travel, out = 0 } of door.leaves) {
+      // A plug door spends the first part of its move coming straight out of its frame, and the rest sliding.
+      const clear = out ? THREE.MathUtils.smoothstep(eased, 0, 0.3) : 0, along = out ? THREE.MathUtils.smoothstep(eased, 0.25, 1) : eased;
+      leaf.position.x = clear * out * U;
+      leaf.position.z = -along * travel * U;
+    }
     door.collider.setEnabled(!(goal === 1 && door.slide > 0.7));
     door.lampMat.color.setHex(look.color);
     door.lampMat.emissive.setHex(look.color);

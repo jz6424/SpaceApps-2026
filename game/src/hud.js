@@ -306,8 +306,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const storm = sim.stormNow;
     put('clock', `
       <div class="c-row"><span>${when}</span><span class="${sim.earthUp ? '' : 'dim'}">${icon('globe', 18)} Earth ${sim.earthUp ? 'up' : 'set'}</span>
-      ${storm ? `<span class="hot">${icon('radiation', 18)} Storm! ${Math.ceil(storm.at + storm.length - sim.t)} s</span>` : ''}
-      ${speed > 1 ? `<span class="fast">${icon('ff', 18)} ${speed}x speed</span>` : ''}</div>
+      ${storm ? `<span class="hot">${icon('radiation', 18)} Storm! ${Math.ceil(storm.at + storm.length - sim.t)} s</span>` : ''}</div>
       <div class="track"><b class="night" style="left:${pDay}%"></b>${earth}${storms}<i style="left:${pNow}%"></i></div>`);
     $('storm-frame').hidden = !storm;
     $('storm-frame').classList.toggle('safe', sim.where === 'shelter');
@@ -663,8 +662,21 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     api.setSpeed(speed);
     $('speed').setAttribute('aria-pressed', speed > 1);
     $('speed').innerHTML = `${icon('ff', 18)} ${speed}x speed`;
-    renderClock(); // the Sun clock shows the speed while it is faster than normal
+    renderChip();
   }
+  // The speed button in the top corner always shows the speed. It is yellow while time is fast,
+  // and dimmed with a lock while a storm holds time at normal speed.
+  function renderChip() {
+    const chip = $('speed-chip'), held = stormNear();
+    const html = `${icon(held ? 'alert' : 'ff', 16)}<b>${speed}x</b><span>speed</span>`;
+    if (showing.get('speed-chip') !== html) { showing.set('speed-chip', html); chip.innerHTML = html; }
+    chip.classList.toggle('fast', speed > 1);
+    chip.classList.toggle('held', held);
+    const say = held ? 'Game speed: normal until the solar storm has passed' : `Game speed: ${speed}x. Press to change`;
+    if (chip.title !== say) { chip.title = say; chip.setAttribute('aria-label', say); }
+  }
+  const chipBtn = () => { toggleSpeed(); document.activeElement?.blur?.(); };
+  $('speed-chip').addEventListener('click', chipBtn);
   // With a storm on or on its way time stays at normal speed, and T says why instead of doing nothing.
   const stormNear = () => !!(sim.stormNow || sim.nextStorm?.warnedBy);
   let toldWhy = -Infinity;
@@ -743,6 +755,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
     if (speed > 1 && stormNear()) setSpeed(1);
+    renderChip();
     const now = performance.now();
     renderFeed(now);
     checkSuitAir(now);
@@ -781,6 +794,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('station').removeEventListener('click', onClick);
       $('station-close').removeEventListener('click', closeBtn);
       $('speed').removeEventListener('click', speedBtn);
+      $('speed-chip').removeEventListener('click', chipBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
       $('mission-handle').removeEventListener('click', missionBtn);
       $('hotbar').removeEventListener('click', slotBtn);

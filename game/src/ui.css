@@ -495,8 +495,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .c-row .ico { vertical-align: -4px; }
 .c-row .dim { color: var(--soft); font-weight: 400; }
 .c-row .hot { color: #fff; background: var(--martian); padding: 0 8px; }
-.c-row .fast { color: var(--yellow); }
-.c-row .fast .ico { stroke: currentColor; }
+
 .track { position: relative; height: 8px; background: var(--yellow); }
 .track .night { position: absolute; top: 0; bottom: 0; right: 0; background: var(--electric); }
 .track .earth-gap { position: absolute; bottom: -4px; height: 2px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }
@@ -507,6 +506,18 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .hud-icons { position: fixed; top: 8px; right: 12px; display: flex; gap: 4px; z-index: 6; }
 .icon-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; transition: color .15s var(--ease); }
 .icon-btn .ico { vertical-align: 0; }
+/* The game speed, next to the gear: always on show, and a button (T does the same). */
+#speed-chip {
+  align-self: center; height: 34px; padding: 0 10px; display: flex; align-items: center; gap: 6px; cursor: pointer;
+  color: var(--text); background: rgba(3, 8, 24, .4); border: 1px solid rgba(255, 255, 255, .35); border-radius: 4px;
+  font: 500 14px var(--head); text-transform: uppercase; letter-spacing: .08em; text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
+}
+#speed-chip b { font: 500 15px var(--mono); letter-spacing: 0; }
+#speed-chip .ico { stroke: currentColor; vertical-align: 0; }
+#speed-chip:hover { border-color: #fff; }
+#speed-chip.fast { color: var(--yellow); border-color: var(--yellow); background: rgba(234, 254, 7, .1); }
+#speed-chip.held { color: var(--soft); border-style: dashed; }
+@media (max-width: 600px) { #speed-chip span { display: none; } }
 .icon-btn:hover { color: var(--yellow); }
 .icon-btn:active { transform: scale(.96); }
 
@@ -809,7 +820,7 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
     grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
     grid-template-areas: "clock clock" "meters meters" "corner corner" "feed feed" "hotbar hotbar" "stick actions";
   }
-  .touch #clock { justify-self: stretch; width: auto; margin-right: 44px; } /* leaves the corner for the gear */
+  .touch #clock { justify-self: stretch; width: auto; margin-right: 112px; } /* leaves the corner for the speed button and the gear */
   .touch #corner { margin-top: 0; }
   .touch #feed { max-height: 16vh; justify-self: start; width: min(100%, 320px); }
   .touch #mission-card { width: min(300px, calc(100vw - 56px)); }
