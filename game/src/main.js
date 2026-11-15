@@ -183,11 +183,17 @@ const inLights = [-4.6, -1.4, 1.8].map(x => {
   return l;
 });
 
+// Every solid box is also remembered here, so walking to a station can plan a way round them.
+const navBoxes = [];
+function boxCollider(mid, half) {
+  const collider = world.createCollider(RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z).setTranslation(mid.x, mid.y, mid.z));
+  navBoxes.push({ collider, x0: mid.x - half.x, x1: mid.x + half.x, y0: mid.y - half.y, y1: mid.y + half.y, z0: mid.z - half.z, z1: mid.z + half.z });
+  return collider;
+}
 function addBox(node) {
   const b = new THREE.Box3().setFromObject(node, true);
   if (b.isEmpty()) return null;
-  const half = b.getSize(new THREE.Vector3()).multiplyScalar(0.5), mid = b.getCenter(new THREE.Vector3());
-  return world.createCollider(RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z).setTranslation(mid.x, mid.y, mid.z));
+  return boxCollider(b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).multiplyScalar(0.5));
 }
 for (const node of colNodes) addBox(node);
 
@@ -464,8 +470,8 @@ const DECK = 7.5;          // deck height, design units
 const hab = (x, y, z) => new THREE.Vector3(site.x + x * U, site.y + z * U, site.z - y * U);
 function solid(x0, x1, y0, y1, z0, z1) {
   const a = hab(x0, y0, z0), b = hab(x1, y1, z1);
-  return world.createCollider(RAPIER.ColliderDesc.cuboid(Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, Math.abs(b.z - a.z) / 2)
-    .setTranslation((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2));
+  return boxCollider({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 },
+    { x: Math.abs(b.x - a.x) / 2, y: Math.abs(b.y - a.y) / 2, z: Math.abs(b.z - a.z) / 2 });
 }
 const paint = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, ...extra });
 const PAINT = { white: paint(0xeceef2), grey: paint(0x969ca6), dark: paint(0x3c4048), blue: paint(0x0042a6), red: paint(0xe43700), glass: paint(0x14285a, { roughness: 0.3 }), gold: paint(0xd6aa3c, { roughness: 0.35 }) };
@@ -638,10 +644,104 @@ function syncAirlock(dt, snap = false) {
   }
 }
 
+// --- Finding a way round the furniture ---
+// The deck is cut into small squares. A square is blocked when a solid box at body height comes
+// within an astronaut's width of it. A* finds the shortest run of free squares, then the corners
+// that are not needed are dropped so the walk is a few straight legs.
+const NAV = { cell: 0.12, reach: CREW_RADIUS + 0.1 };
+NAV.x0 = site.x - 21.5 * U; NAV.z0 = site.z - 9.5 * U;
+NAV.cols = Math.ceil((OUTER_X + 22) * U / NAV.cell); NAV.rows = Math.ceil(19 * U / NAV.cell);
+function navGrid(throughDoors) {
+  const { cell, reach, cols, rows, x0, z0 } = NAV, blocked = new Uint8Array(cols * rows);
+  const doorColliders = Object.values(doors).map(d => d.collider);
+  for (const b of navBoxes) {
+    if (b.y1 < deckY + 0.15 || b.y0 > deckY + CREW_HEIGHT - 0.1) continue;   // under the deck or overhead
+    if (!b.collider.isEnabled()) continue;                                    // an open door
+    if (throughDoors && doorColliders.includes(b.collider)) continue;
+    const c0 = Math.max(0, Math.ceil((b.x0 - reach - x0) / cell - 0.5)), c1 = Math.min(cols - 1, Math.floor((b.x1 + reach - x0) / cell - 0.5));
+    const r0 = Math.max(0, Math.ceil((b.z0 - reach - z0) / cell - 0.5)), r1 = Math.min(rows - 1, Math.floor((b.z1 + reach - z0) / cell - 0.5));
+    if (c1 < c0) continue;   // off the side of the grid (and a negative end would make fill() wrap round)
+    for (let r = r0; r <= r1; r++) blocked.fill(1, r * cols + c0, r * cols + c1 + 1);
+  }
+  return blocked;
+}
+function findPath(from, to, throughDoors = false) {
+  const { cell, cols, rows, x0, z0 } = NAV, blocked = navGrid(throughDoors);
+  const free = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && !blocked[r * cols + c];
+  // Standing against a counter counts as blocked, so start and end on the nearest free square.
+  const nearest = pt => {
+    const c = Math.round((pt.x - x0) / cell - 0.5), r = Math.round((pt.z - z0) / cell - 0.5);
+    for (let ring = 0; ring < 8; ring++) {
+      let best = null;
+      for (let dr = -ring; dr <= ring; dr++) for (let dc = -ring; dc <= ring; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring || !free(c + dc, r + dr)) continue;
+        const d = dr * dr + dc * dc;
+        if (!best || d < best.d) best = { c: c + dc, r: r + dr, d };
+      }
+      if (best) return best;
+    }
+    return null;
+  };
+  const a = nearest(from), b = nearest(to);
+  if (!a || !b) return null;
+  const start = a.r * cols + a.c, goal = b.r * cols + b.c;
+  const cost = new Float32Array(cols * rows).fill(Infinity), came = new Int32Array(cols * rows).fill(-1);
+  const guess = i => { const dc = Math.abs(i % cols - b.c), dr = Math.abs(Math.floor(i / cols) - b.r); return Math.max(dc, dr) + 0.414 * Math.min(dc, dr); };
+  const open = [[guess(start), start]];
+  cost[start] = 0;
+  while (open.length) {
+    let pickAt = 0;
+    for (let i = 1; i < open.length; i++) if (open[i][0] < open[pickAt][0]) pickAt = i;
+    const [, at] = open.splice(pickAt, 1)[0];
+    if (at === goal) break;
+    const c = at % cols, r = Math.floor(at / cols);
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc || !free(c + dc, r + dr)) continue;
+      if (dr && dc && !(free(c + dc, r) && free(c, r + dr))) continue;   // no squeezing past a corner
+      const next = (r + dr) * cols + c + dc, g = cost[at] + (dr && dc ? 1.414 : 1);
+      if (g < cost[next]) { cost[next] = g; came[next] = at; open.push([g + guess(next), next]); }
+    }
+  }
+  if (cost[goal] === Infinity) return null;
+  const cells = [];
+  for (let at = goal; at !== -1; at = came[at]) cells.unshift(at);
+  const spot = i => ({ x: x0 + (i % cols + 0.5) * cell, z: z0 + (Math.floor(i / cols) + 0.5) * cell });
+  const clear = (p, q) => {
+    const steps = Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / (cell / 2));
+    for (let i = 1; i < steps; i++) {
+      const x = p.x + (q.x - p.x) * i / steps, z = p.z + (q.z - p.z) * i / steps;
+      if (!free(Math.floor((x - x0) / cell), Math.floor((z - z0) / cell))) return false;
+    }
+    return true;
+  };
+  // Keep only the corners: from each kept point, skip ahead to the furthest one in plain sight.
+  const points = cells.map(spot), path = [];
+  for (let i = 0; i < points.length - 1;) {
+    let j = points.length - 1;
+    while (j > i + 1 && !clear(points[i], points[j])) j--;
+    path.push(points[j]);
+    i = j;
+  }
+  // Finish on the exact spot. A station tucked in beside its furniture may not be on a free
+  // square, so the last step can end against the furniture: close enough counts (see tick).
+  path.push({ x: to.x, z: to.z });
+  return path;
+}
+
 function useDoor(which) {
   if (!sim) return;
   const p = crewBody.translation(), at = doors[which].at;
-  if (Math.hypot(p.x - at.x, p.z - at.z) > 3.5 || Math.abs(p.y - at.y) > 3) return hooks?.notice('Walk up to the door first.');
+  if (Math.hypot(p.x - at.x, p.z - at.z) > 3.5 || Math.abs(p.y - at.y) > 3) {
+    if (!isInside(p)) return hooks?.notice('Walk up to the door first.');
+    // Inside the Habitat: walk over to this side of the door, then use it.
+    const side = p.x < at.x ? -1 : 1;
+    return walkAlong({ x: at.x + side * 1.3 * U, z: at.z }, () => useDoorNow(which));
+  }
+  useDoorNow(which);
+}
+function useDoorNow(which) {
+  if (!sim) return;
+  const p = crewBody.translation();
   const zone = airlockZone(p);
   Object.assign(sim, zone);
   // From the Moon side the hatch always answers: if the cabin door is open, the airlock shuts it
@@ -924,8 +1024,17 @@ function click(e) {
   if (what?.door) return useDoor(what.door);
   if (what?.station && isInside(crewBody.translation())) goToStation(what.station);
 }
+// Walk to a spot by a planned route, then do something there.
+function walkAlong(target, arrive, hop = null) {
+  const p = crewBody.translation();
+  // A closed door on the only way there is not a dead end: plan through it and open it on arrival.
+  const path = findPath(p, target) ?? findPath(p, target, true);
+  const legs = path ? [p, ...path] : [p, target];
+  const length = legs.slice(1).reduce((sum, q, i) => sum + Math.hypot(q.x - legs[i].x, q.z - legs[i].z), 0);
+  walkTo = { target, arrive, hop, path: path ?? [target], leg: 0, since: 0, stuck: 0, limit: length / WALK * 2 + 3, triedDoor: false };
+}
 function goToStation(id) {
-  walkTo = { id, target: stations[id].stand.clone(), since: 0 };
+  walkAlong(stations[id].stand, () => openStation(id), () => teleport(standSpot(id)));
 }
 
 // --- Loop ---
@@ -1002,13 +1111,22 @@ function tick(dt) {
   let mx = fx * fwd - fz * side, mz = fz * fwd + fx * side;
   if (fwd || side) walkTo = null;
   if (walkTo) {
-    walkTo.since += dt;
-    const dx = walkTo.target.x - p.x, dz = walkTo.target.z - p.z, d = Math.hypot(dx, dz);
-    if (d < 0.5) { openStation(walkTo.id); mx = mz = 0; }
-    // Stuck behind furniture (or a closed door): hop to the station. Read the position again,
-    // or the move below would put the astronaut straight back.
-    else if (walkTo.since > 4 || walkTo.stuck > 0.8) { teleport(standSpot(walkTo.id)); p = crewBody.translation(); openStation(walkTo.id); mx = mz = 0; }
-    else { mx = dx; mz = dz; }
+    const w = walkTo;
+    w.since += dt;
+    // Head for the next corner of the route, moving on to the one after as each is reached.
+    while (w.leg < w.path.length - 1 && Math.hypot(w.path[w.leg].x - p.x, w.path[w.leg].z - p.z) < 0.25) w.leg++;
+    const next = w.path[w.leg];
+    const d = Math.hypot(w.target.x - p.x, w.target.z - p.z);
+    if (d < 0.5 || (d < 1.3 && w.leg === w.path.length - 1 && w.stuck > 0.3)) { walkTo = null; w.arrive(); mx = mz = 0; }
+    else if (w.since > w.limit || w.stuck > 0.8) {
+      // Held up. A closed door in the way gets one try at opening. After that, a station brings
+      // the astronaut to it (reading the position again, or the move below would undo the hop);
+      // anything else just stops.
+      const door = Object.values(doors).find(dr => !sim?.airlock[dr.which] && Math.hypot(p.x - dr.at.x, p.z - dr.at.z) < 1.2);
+      if (door && !w.triedDoor) { w.triedDoor = true; w.stuck = 0; w.limit += 4; useDoorNow(door.which); if (walkTo !== w) walkTo = w; mx = mz = 0; }
+      else if (door || !w.hop) { walkTo = null; mx = mz = 0; }
+      else { walkTo = null; w.hop(); p = crewBody.translation(); w.arrive(); mx = mz = 0; }
+    } else { mx = next.x - p.x; mz = next.z - p.z; }
   }
   const len = Math.hypot(mx, mz);
   if (len > 0) { mx *= speedWalk / len; mz *= speedWalk / len; }
@@ -1025,7 +1143,7 @@ function tick(dt) {
   controller.computeColliderMovement(crewCollider, want);
   const got = controller.computedMovement();
   grounded = controller.computedGrounded();
-  if (walkTo) walkTo.stuck = Math.hypot(got.x, got.z) < 0.3 * Math.hypot(want.x, want.z) ? (walkTo.stuck ?? 0) + dt : 0;
+  if (walkTo) walkTo.stuck = Math.hypot(got.x, got.z) < 0.3 * Math.hypot(want.x, want.z) ? walkTo.stuck + dt : 0;
   if (grounded && vy < 0) vy = 0;
   if (vy > 0 && got.y < want.y - 1e-4) vy = 0;
 
@@ -1256,4 +1374,4 @@ gameReady({
 });
 
 // For scripted checks from the browser console.
-window.demo = { goTo: id => goToStation(id), doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
