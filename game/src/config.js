@@ -21,6 +21,7 @@ export const CONFIG = {
   // a night of 140 to 150 s), but not with the antenna, the robot and the grow lights all running:
   // that still empties it before sunrise, so there is still something to decide.
   power: {
+    panelLeak: 0.12,  // each broken solar panel short-circuits the battery by this much per second, at night
     lifeSupport: { eco: 0.16, normal: 0.32, boost: 0.58 },
     heaters: 0.26,    // night only, automatic: the lunar night is colder than -170 C
     comms: 0.15,      // antenna on
@@ -70,10 +71,9 @@ export const CONFIG = {
 
   robot: {
     dig: 0.4,        // regolith per second (day or night, never in a storm)
-    ice: 0.12,       // water per second, hauled from the shadowed crater
+    ice: 0.35,       // water per second while the rover is AT the crater (the drive there and back takes a while)
     repairSeconds: 15,
     repairRegolith: 10,
-    stormDamageSeconds: 25, // a robot caught outside by a storm with no warning is offline this long
   },
 
   evaRepairRegolith: 3, // fixing a panel by hand is cheaper but costs suit air and dose
@@ -82,6 +82,7 @@ export const CONFIG = {
     eatEvery: 42,     // seconds per meal
     growEvery: 22,    // greenhouse makes a meal this often while lit and watered
     water: 0.06,      // greenhouse water per second
+    drink: 0.0125,    // the crew's drinking water per second: about 3.6 over a mission, one sip every 80 s
   },
 
   science: {
@@ -109,17 +110,17 @@ export const MODES = {
   Cadet: {
     label: 'Cadet', level: 'easy', points: 20,
     about: 'Long storm warnings and a robot that parks itself before storms. A good first try for ages 7 to 9.',
-    crewDrain: 0.85, solar: 1.1, stormLength: 0.75, warning: 40, robotAutoPark: true, doseGoal: 1.4,
+    crewDrain: 0.85, solar: 1.1, stormLength: 0.75, warning: 40, robotAutoPark: true, doseGoal: 1.4, thirst: 0,
   },
   Explorer: {
     label: 'Explorer', level: 'medium', points: 30,
     about: 'Normal storms. You park the robot yourself. Made for ages 10 to 12.',
-    crewDrain: 1, solar: 1, stormLength: 1, warning: 30, robotAutoPark: false, doseGoal: 1,
+    crewDrain: 1, solar: 1, stormLength: 1, warning: 30, robotAutoPark: false, doseGoal: 1, thirst: 0.2, roverTolerance: 20,
   },
   Commander: {
     label: 'Commander', level: 'hard', points: 40,
     about: 'Longer storms, short warnings and an extra space rock. For astronauts who have done it before.',
-    crewDrain: 1.08, solar: 0.95, stormLength: 1.25, warning: 20, robotAutoPark: false, doseGoal: 0.9, extraMeteoroid: true,
+    crewDrain: 1.08, solar: 0.95, stormLength: 1.25, warning: 20, robotAutoPark: false, doseGoal: 0.9, thirst: 0.3, roverTolerance: 10, extraMeteoroid: true,
   },
 };
 
@@ -182,7 +183,7 @@ export const MISSIONS = [
     requires: { id: 'Greenhouse', name: 'Greenhouse', cost: 20 },
     goal: 'Grow enough food to have meals left at sunrise.',
     brief: 'Your food supply is low and the next cargo lander is late. Send the robot for crater ice, water the greenhouse, and keep the lights on.',
-    lesson: 'Plants need light (power) and water (from crater ice). Growing food on the Moon means sharing power between plants, air and heat.',
+    lesson: 'Water from crater ice keeps you and your plants going: you drink a little, and the grow lights use more. Growing food on the Moon means sharing power and water between plants and people.',
     dataCards: ['ice'],
     day: 150, night: 140,
     start: { power: 60, air: 80, regolith: 25, food: 5, water: 4 },

@@ -74,6 +74,13 @@
     <div id="hotbar" role="toolbar" aria-label="Tools"></div>
   </div>
   <p id="air-toast" hidden role="alert"></p>
+  <div id="rover-timer" class="panel" role="status" hidden>
+    <div class="rv-top"><span id="rover-timer-icon"></span><span class="rv-label">Rover in the flare</span><b id="rover-timer-time"></b></div>
+    <div class="rv-bar"><i></i></div>
+    <p class="rv-tip">Send it home: Robot Map, Park at base.</p>
+  </div>
+  <div id="repair-bar" class="panel" role="status" hidden><span id="repair-label"></span><div class="bar"><i></i></div></div>
+  <button class="icon-btn fs-corner" id="fullscreen-corner" aria-label="Fullscreen" data-tip="Fullscreen"></button>
   <div id="tour" hidden>
     <div id="tour-ring"></div>
     <div id="tour-arrow"><svg viewBox="0 0 40 52" width="40" height="52" aria-hidden="true"><path d="M20 2 38 24H27v26H13V24H2z" fill="#E43700" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg></div>

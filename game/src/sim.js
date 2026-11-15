@@ -90,7 +90,7 @@ export class Sim {
     this.ls = 'normal';
     this.comms = false;
     this.greenhouse = false;
-    this.robot = { task: 'idle', offline: 0, progress: 0, target: -1, paidFor: -1 };
+    this.robot = { task: 'idle', broken: false, home: false, progress: 0, target: -1, paidFor: -1 }; // broken: hit by a storm; home: sent back to the base
     this.panels = Array(this.C.solar.panels).fill(true);
     this.shielding = 0;
     this.where = 'inside';
@@ -153,7 +153,9 @@ export class Sim {
   get timeToSunrise() { return Math.max(0, this.total - this.t); }
   get timeToSunset() { return Math.max(0, this.day - this.t); }
   get panelsWorking() { return this.panels.filter(Boolean).length; }
-  get robotWorking() { return this.robot.task !== 'idle' && this.robot.offline <= 0 && !this.stormNow; }
+  // Is the rover away from the base? The 3D world says how far it is; without it (in tests) any job counts.
+  get robotAway() { return this.robot.away !== undefined ? this.robot.away > 8 : this.robot.task !== 'idle'; }
+  get robotWorking() { return this.robot.task !== 'idle' && !this.robot.broken && !this.stormNow; }
   get shieldMult() { return this.C.dose.shielding[this.shielding]; }
   // What the next level of the dirt shield costs in moon dirt (undefined once it is fully built).
   get shieldCost() { return this.C.dose.shieldingCost[this.shielding]; }
@@ -166,10 +168,12 @@ export class Sim {
   get gen() { return this.panelsWorking * this.C.solar.perPanel * this.sunlight * this.siteSun * this.mode.solar; }
   // Boost with no moon dirt left works (and is charged) like Normal.
   get boostEmpty() { return this.ls === 'boost' && this.regolith <= 0; }
+  // A broken panel short-circuits and leaks the battery at night, until it is repaired.
+  get panelLeak() { return this.isNight ? (this.panels.length - this.panelsWorking) * this.C.power.panelLeak : 0; }
   get demand() {
     const P = this.C.power, ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
     return (P.lifeSupport[this.boostEmpty ? 'normal' : this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
-      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
+      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease + this.panelLeak;
   }
   get batteryForecast() { // seconds the battery lasts at the current net drain, or Infinity
     const net = this.gen - this.demand;
@@ -193,7 +197,12 @@ export class Sim {
   setGreenhouse(on) { this.greenhouse = on; this.flags.greenhouse = true; }
   setRobot(task, target = -1) {
     this.flags.robot = true;
-    if (this.robot.offline > 0) return 'The robot is still being fixed.';
+    if (this.robot.broken) {
+      // A broken robot can still drive home, and that is all it can do until it is repaired.
+      if (task !== 'idle') return 'The robot is broken. It can only drive home. Go outside and press E next to it to repair it.';
+      this.robot.home = true;
+      return null;
+    }
     if (task === 'repair') {
       if (target < 0) target = this.panels.indexOf(false);
       if (target < 0) return 'No broken panels.';
@@ -218,6 +227,17 @@ export class Sim {
     this.shielding++;
     this.flags.shielding = true;
     this.say(`${this.shielding === 1 ? 'Moon dirt is banked up round the Storm Shelter' : 'The Storm Shelter is buried in moon dirt'}. A storm in there now gives you ${Math.round(this.shieldMult * 100)}% of the dose it did.`, 'good');
+    return null;
+  }
+  // Repairing the broken robot by hand, standing next to it outside.
+  repairRobotByHand() {
+    const R = this.robot;
+    if (!R.broken) return 'The robot works fine.';
+    if (this.regolith < this.C.evaRepairRegolith) return `You need ${this.C.evaRepairRegolith} moon dirt to repair it.`;
+    this.regolith -= this.C.evaRepairRegolith;
+    R.broken = false;
+    R.home = false;
+    this.say('Robot repaired. It is back on standby.', 'good');
     return null;
   }
   repairPanelByHand(i) {
@@ -388,6 +408,11 @@ export class Sim {
 
     this.updateStorms();
 
+    // A damaged panel leaking at night.
+    if (this.panelLeak > 0 && !this.flags.leak) {
+      this.flags.leak = true;
+      this.say('A damaged solar panel is short-circuiting and draining the battery. Repair it to stop the loss.', 'warn');
+    } else if (this.panelLeak === 0) this.flags.leak = false;
     // Space rocks.
     while (this.meteoroids.length && this.meteoroids[0] <= this.t) {
       this.meteoroids.shift();
@@ -424,7 +449,9 @@ export class Sim {
       else make = A.make.normal;
     }
     make = make * this.share + (this.greenhouse ? A.greenhouse * this.share : 0);
-    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * (1 + A.coldPenalty * (1 - this.share));
+    // With no water to drink, Explorer and Commander lose extra air every second (Cadet only gets warnings).
+    const thirst = this.food !== null && this.water <= 0 ? (mode.thirst ?? 0) : 0;
+    const use = this.where === 'outside' ? 0 : A.crewUse * mode.crewDrain * (1 + A.coldPenalty * (1 - this.share)) + thirst;
     // The base leaks a little all the time. airNet is what the HUD shows: filling or draining. The
     // tutorial's ease softens only a drain, so refilling is never free.
     this.airNet = make - use - A.leak;
@@ -465,19 +492,50 @@ export class Sim {
     this.dose += rate * dt;
     if (this.dose >= C_.meters.doseLimit) return this.end(false, 'Your radiation dose reached the mission limit, so the flight doctor called you home.');
 
-    // Robot.
+    // Robot. A rover that is out in the open during a solar flare is damaged the moment it is hit,
+    // whatever it was told to do: it stays broken until it is repaired by hand.
     const R = this.robot;
-    if (R.offline > 0) {
-      R.offline -= dt;
-      if (R.offline <= 0) this.say('The robot is fixed and back on standby.', 'good');
-    } else if (this.robotWorking) {
+    // It can take a few seconds of the flare (the mode's roverTolerance) before its electronics fail,
+    // so a rover recalled when the warning comes can still get home in time.
+    if (this.stormNow && !this.mode.robotAutoPark && !R.broken) {
+      if (!this.robotAway && R.exposure > 0) {
+        // Back inside the base with time to spare.
+        this.say(`ROVER SAFE. The rover is back at the base with ${Math.max(1, Math.round((this.mode.roverTolerance ?? 0) - R.exposure))} s of its flare limit to spare.`, 'good');
+        R.exposure = 0;
+        this.flags.roverExposed = false;
+      }
+      if (this.robotAway) {
+        R.exposure = (R.exposure ?? 0) + dt;
+        const left = Math.max(0, (this.mode.roverTolerance ?? 0) - R.exposure);
+        if (!this.flags.roverExposed) {
+          this.flags.roverExposed = true;
+          this.say(`ROVER ALERT. The rover is outside in the solar flare. Its electronics can take about ${Math.round(left)} more seconds. Bring it home now.`, 'bad');
+        }
+        if (left <= 0) {
+          R.broken = true;
+          R.home = false;
+          R.task = 'idle';
+          this.say('ROVER FAULT. The rover stayed outside in the solar flare for too long and its electronics have shut down. Send it home from the Robot Map, then repair it on the surface.', 'bad');
+        }
+      }
+    } else if (!this.stormNow) {
+      if (R.exposure > 0 && !R.broken) this.say('ROVER OK. The flare passed before the rover reached its limit.', 'good');
+      R.exposure = 0;
+      this.flags.roverExposed = false;
+    }
+    if (this.robotWorking) {
       const s = this.share;
-      if (R.task === 'dig') this.regolith = Math.min(C_.meters.regolithMax, this.regolith + C_.robot.dig * s * dt);
-      if (R.task === 'ice') {
+      const onSite = R.at === undefined || R.at === R.task;
+      if (R.task === 'dig' && onSite) this.regolith = Math.min(C_.meters.regolithMax, this.regolith + C_.robot.dig * s * dt);
+      if (R.task === 'ice' && onSite) {
         if (this.water === null) this.water = 0;
         this.water = Math.min(C_.meters.waterMax, this.water + C_.robot.ice * s * dt);
+        if (this.water >= C_.meters.waterMax - 0.001) { // a full tank: the robot parks by itself
+          R.task = 'idle';
+          this.say('The water tank is full. The robot parked at the base.', 'good');
+        }
       }
-      if (R.task === 'repair') {
+      if (R.task === 'repair' && onSite) {
         R.progress += s * dt;
         if (R.progress >= C_.robot.repairSeconds) {
           if (R.target >= 0) this.panels[R.target] = true;
@@ -496,6 +554,18 @@ export class Sim {
         this.foodTimer -= C_.food.eatEvery;
         this.food = Math.max(0, this.food - 1);
         this.say(this.food > 0 ? `Meal time. ${this.food} meals left.` : 'Out of food! Grow more in the greenhouse.', this.food > 1 ? 'info' : 'bad');
+      }
+      // The crew drinks a little all the time, before the grow lights get any.
+      if (this.water > 0) this.water = Math.max(0, this.water - C_.food.drink * mode.crewDrain * dt);
+      if (this.water <= 0) {
+        if (!this.flags.thirst) {
+          this.flags.thirst = true;
+          this.say(mode.thirst > 0 ? 'The water is empty! You are thirsty and Life Support is dropping. Send the robot for crater ice.' : 'The water is empty! You are thirsty. Send the robot for crater ice.', 'bad');
+        }
+      } else {
+        if (this.water > 1) this.flags.thirst = false;
+        if (this.water < 2 && !this.flags.waterLow) { this.flags.waterLow = true; this.say('Water is getting low. Send the robot for crater ice.', 'warn'); }
+        if (this.water > 4) this.flags.waterLow = false;
       }
       if (this.greenhouse && this.water > 0) {
         this.growTimer += dt * this.share;
@@ -532,12 +602,8 @@ export class Sim {
       if (!s.started && this.t >= s.at) {
         s.started = true;
         this.flags.stormSeen = true;
-        const robotOut = this.robot.task !== 'idle' && this.robot.offline <= 0;
-        if (robotOut && !this.mode.robotAutoPark) {
-          this.robot.offline = this.C.robot.stormDamageSeconds;
-          this.robot.task = 'idle';
-          this.say(`The robot was caught outside in the storm and needs ${this.C.robot.stormDamageSeconds} s of repairs.`, 'bad');
-        } else if (robotOut) {
+        const robotOut = this.robotAway;
+        if (robotOut && this.mode.robotAutoPark) {
           this.say('The robot parked itself until the storm is over.', 'info');
         }
         this.say(`Solar storm! ${this.where === 'shelter' ? 'You are in the shelter. Stay there.' : 'Get to the shelter!'}`, 'bad');
@@ -565,7 +631,7 @@ export class Sim {
     return [
       this.goalMet(),
       this.lowestAir >= S.two.lowestAir && this.blackout <= S.two.maxBlackout,
-      this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose && this.shielding >= S.three.shielding,
+      this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose && this.shielding >= S.three.shielding && this.panelsWorking === this.panels.length,
     ];
   }
 

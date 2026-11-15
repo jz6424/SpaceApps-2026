@@ -30,6 +30,7 @@ const SCREEN_BOTTOM = [
       ['Samples picked up', 'Tonight\'s goal: 5 glowing rocks. Each earns research points, and the rare blue ones far out earn more.'],
     ],
   },
+  { target: '#fullscreen-corner', side: 'left', title: 'Fullscreen', text: 'Full screen on or off.' },
 ];
 const SCREEN_TOP = [
   { target: '#feed', side: 'below', title: 'Messages', text: 'From the base computer and Mission Control.' },

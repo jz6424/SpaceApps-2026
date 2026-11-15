@@ -499,22 +499,8 @@ function fitMap() {
     if (e.key === '+' || e.key === '=') { zoomMap(1.2); e.preventDefault(); }
     if (e.key === '-' || e.key === '_') { zoomMap(1 / 1.2); e.preventDefault(); }
   });
-  // Hovering a circle shows its details; leaving it puts them away again, unless the circle was
-  // clicked (then they stay) or the pointer has moved onto the details box itself.
-  let leaveTimer = 0;
-  box.addEventListener('pointerover', e => {
-    const node = e.target.closest('.rt-dot')?.closest('.rt-node');
-    if (!node) return;
-    clearTimeout(leaveTimer);
-    showPanel(node.dataset.id);
-  });
-  box.addEventListener('pointerout', e => {
-    if (!e.target.closest('.rt-dot')) return;
-    clearTimeout(leaveTimer);
-    leaveTimer = setTimeout(() => showPanel(picked), 280);
-  });
-  $('research-panel').addEventListener('pointerenter', () => clearTimeout(leaveTimer));
-  $('research-panel').addEventListener('pointerleave', () => { leaveTimer = setTimeout(() => showPanel(picked), 280); });
+  // Details open only when a circle is clicked (pick() below), and close when it is clicked again,
+  // when empty map is clicked, or on Esc. Pointing at a circle does nothing.
   // Tabbing to a circle shows its details and brings it into view. A circle that was clicked or
   // tapped is left where it is: moving it from under the pointer would lose the click.
   let byKey = false;
@@ -522,9 +508,8 @@ function fitMap() {
   addEventListener('pointerdown', () => { byKey = false; }, true);
   box.addEventListener('focusin', e => {
     const node = e.target.closest('.rt-node');
-    if (!node) return;
+    if (!node || !byKey) return; // a mouse click is handled by pick(); only the keyboard shows details on focus
     showPanel(node.dataset.id);
-    if (!byKey) return;
     const dot = node.querySelector('.rt-dot').getBoundingClientRect(), edge = 96;
     if (dot.left < edge) view.x += edge - dot.left;
     if (dot.right > innerWidth - edge) view.x -= dot.right - (innerWidth - edge);
@@ -745,8 +730,8 @@ function renderResearch() {
   endTrace();   // the map is made again below, so a tracing in progress ends here
   $('research-points').textContent = save.points;
   $('research-note').textContent = (UPGRADES_LIVE
-    ? 'Point at a circle to see what it does, and click it to research it. '
-    : 'Point at a circle to see what it does. For now research opens new missions; the upgrades stay locked until a later update. ')
+    ? 'Click a circle to see what it does, and to research it. '
+    : 'Click a circle to see what it does. For now research opens new missions; the upgrades stay locked until a later update. ')
     + (isTouchScreen ? 'Drag to move around, pinch to zoom.' : 'Drag to move around. Scroll or press + and − to zoom.');
   $('research-map').innerHTML = mapHtml();
   wireWobble();
@@ -854,7 +839,7 @@ function starTexts(mission, mode) {
   return [
     'Finish the mission: reach sunrise with the goal met',
     `Keep Life Support at ${S.two.lowestAir}% or more, with the battery empty for no more than ${S.two.maxBlackout} seconds`,
-    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, ${S.three.shielding ? 'build the regolith shield, ' : ''}and keep your radiation dose at ${S.three.maxDose} or less${S.three.shielding ? ' (that takes the shield and hiding in the Storm Shelter)' : ''}`,
+    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, ${S.three.shielding ? 'build the regolith shield, ' : ''}have all three solar panels working at sunrise, and keep your radiation dose at ${S.three.maxDose} or less${S.three.shielding ? ' (that takes the shield and hiding in the Storm Shelter)' : ''}`,
   ];
 }
 

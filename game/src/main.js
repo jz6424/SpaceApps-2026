@@ -641,6 +641,7 @@ function placeCallouts() {
   camera.updateMatrixWorld();
   const me = crewBody.translation(), w = innerWidth, h = innerHeight;
   for (const c of callouts) {
+    if (!!c.guide !== !!c.guided) { c.el.classList.toggle('guide', !!c.guide); c.guided = !!c.guide; }
     let show = c.visible;
     if (show) {
       toScreen.copy(c.position).project(camera);
@@ -673,6 +674,7 @@ const STATION_INFO = {
 };
 const stations = {};
 const pickables = [];
+const growLamps = [];   // the Galley's glowing lamp parts: they light up when the grow lights are on
 for (const [id, node] of Object.entries(stationNodes)) {
   if (!STATION_INFO[id]) continue;
   const stand = habitat.getObjectByName(`STATION_${id}_Stand`);
@@ -680,7 +682,9 @@ for (const [id, node] of Object.entries(stationNodes)) {
   node.traverse(o => {
     if (o.isMesh && !o.name.endsWith('_Stand')) {
       o.material = o.material.clone();
-      mats.push(o.material);
+      // The Galley's lamps are lit by the grow lights, not by pointing at the station.
+      if (id === 'Food' && (/glow/i.test(o.name) || /glow/i.test(o.material.name ?? ''))) growLamps.push(o);
+      else mats.push(o.material);
       o.userData.station = id;
       pickables.push(o);
     }
@@ -881,6 +885,17 @@ const digPatch = (() => {
 const digLabel = makeCallout('Dig site', { color: '#E8D9B0', near: 6, far: 60, faint: 0 });
 digLabel.position.copy(digSpot).y += 1.8;
 digLabel.visible = false;
+const growLabel = makeCallout('Grow lights', { color: '#FF8FE8', near: 4, far: 16, faint: 0.2 });
+growLabel.visible = false;
+growLabel.shownText = '';
+(() => {
+  const box = new THREE.Box3();
+  growLamps.forEach(l => box.expandByObject(l));
+  if (!box.isEmpty()) growLabel.position.set((box.min.x + box.max.x) / 2, box.max.y + 0.3, (box.min.z + box.max.z) / 2);
+  else if (stations.Food) growLabel.position.copy(stations.Food.stand).y += 2.2;
+})();
+const brokenLabel = makeCallout('Broken robot: press E', { color: '#E43700', near: 6, far: 90, faint: 0 });
+brokenLabel.visible = false;
 let dug = 0, nextDigDust = 0; // seconds of digging this mission, and when the next puff of dust flies
 
 // The ice drill sits at the nearest ground NASA's map says never sees sunlight.
@@ -890,6 +905,144 @@ const iceSpot = icePixel
 iceSpot.y = groundAt(iceSpot.x, iceSpot.z);
 const iceDistance = Math.round(Math.hypot(iceSpot.x - site.x, iceSpot.z - site.z));
 place('IceDrill', iceSpot);
+// Where the rover stops: beside the ice drill and the panels, not on top of them.
+const iceStop = (() => {
+  const away = new THREE.Vector3(site.x - iceSpot.x, 0, site.z - iceSpot.z).normalize();
+  const p = new THREE.Vector3(iceSpot.x + away.x * 6, 0, iceSpot.z + away.z * 6);
+  p.y = groundAt(p.x, p.z);
+  return p;
+})();
+const panelStop = i => { const at = panels[i].at; const p = new THREE.Vector3(at.x, 0, at.z + 5); p.y = groundAt(p.x, p.z); return p; };
+
+// --- Driving the rover ---
+const ROVER = { VMAX: 9.5, ACC: 2.8, DEC: 3.4, TURN: 1.7, CELL: 2, CLEAR: 3 };
+const rover = { speed: 0, heading: Math.PI / 2, key: '', path: [], leg: 0, normal: new THREE.Vector3(0, 1, 0), dustAt: 0 };
+function resetRover() {
+  Object.assign(rover, { speed: 0, heading: Math.PI / 2, key: '', path: [], leg: 0 });
+  rover.normal.set(0, 1, 0);
+}
+// A route round everything solid, on a coarse grid. A* finds it, then the corners that are not
+// needed are dropped so the drive is a few smooth legs.
+function roverPath(from, to) {
+  const { CELL, CLEAR } = ROVER, PAD = 24;
+  const x0 = Math.min(from.x, to.x) - PAD, z0 = Math.min(from.z, to.z) - PAD;
+  const cols = Math.ceil((Math.max(from.x, to.x) + PAD - x0) / CELL), rows = Math.ceil((Math.max(from.z, to.z) + PAD - z0) / CELL);
+  const straight = [{ x: to.x, z: to.z }];
+  if (cols * rows > 200000) return straight;
+  const blocked = new Uint8Array(cols * rows);
+  for (const b of navBoxes) {
+    const g = groundAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2);
+    if (b.y1 < g + 0.2 || b.y0 > g + 6) continue; // lying flat on the ground, or high overhead
+    const c0 = Math.max(0, Math.floor((b.x0 - CLEAR - x0) / CELL)), c1 = Math.min(cols - 1, Math.floor((b.x1 + CLEAR - x0) / CELL));
+    const r0 = Math.max(0, Math.floor((b.z0 - CLEAR - z0) / CELL)), r1 = Math.min(rows - 1, Math.floor((b.z1 + CLEAR - z0) / CELL));
+    if (c1 < c0 || r1 < r0) continue;
+    for (let r = r0; r <= r1; r++) blocked.fill(1, r * cols + c0, r * cols + c1 + 1);
+  }
+  const free = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && !blocked[r * cols + c];
+  const nearest = pt => {
+    const c = Math.floor((pt.x - x0) / CELL), r = Math.floor((pt.z - z0) / CELL);
+    for (let ring = 0; ring < 14; ring++) {
+      let best = null;
+      for (let dr = -ring; dr <= ring; dr++) for (let dc = -ring; dc <= ring; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring || !free(c + dc, r + dr)) continue;
+        const dd = dr * dr + dc * dc;
+        if (!best || dd < best.dd) best = { c: c + dc, r: r + dr, dd };
+      }
+      if (best) return best;
+    }
+    return null;
+  };
+  const a = nearest(from), b2 = nearest(to);
+  if (!a || !b2) return straight;
+  const start = a.r * cols + a.c, goal = b2.r * cols + b2.c;
+  const cost = new Float32Array(cols * rows).fill(Infinity), came = new Int32Array(cols * rows).fill(-1);
+  const guess = i => { const dc = Math.abs(i % cols - b2.c), dr = Math.abs(Math.floor(i / cols) - b2.r); return Math.max(dc, dr) + 0.414 * Math.min(dc, dr); };
+  // A small binary heap, so a long drive is still quick to plan.
+  const heap = [];
+  const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { let m = k; const l = 2 * k + 1, rr = l + 1; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (rr < heap.length && heap[rr][0] < heap[m][0]) m = rr; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  cost[start] = 0;
+  push(guess(start), start);
+  while (heap.length) {
+    const [, at] = pop();
+    if (at === goal) break;
+    const c = at % cols, r = Math.floor(at / cols);
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc || !free(c + dc, r + dr)) continue;
+      if (dr && dc && !(free(c + dc, r) && free(c, r + dr))) continue;
+      const next = (r + dr) * cols + c + dc, g = cost[at] + (dr && dc ? 1.414 : 1);
+      if (g < cost[next]) { cost[next] = g; came[next] = at; push(g + guess(next), next); }
+    }
+  }
+  if (cost[goal] === Infinity) return straight;
+  const cells = [];
+  for (let at = goal; at !== -1; at = came[at]) cells.unshift(at);
+  const spot = i => ({ x: x0 + (i % cols + 0.5) * CELL, z: z0 + (Math.floor(i / cols) + 0.5) * CELL });
+  const clear = (p, q) => {
+    const steps = Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / (CELL / 2));
+    for (let i = 1; i < steps; i++) {
+      const x = p.x + (q.x - p.x) * i / steps, z = p.z + (q.z - p.z) * i / steps;
+      if (!free(Math.floor((x - x0) / CELL), Math.floor((z - z0) / CELL))) return false;
+    }
+    return true;
+  };
+  const points = cells.map(spot), path = [];
+  for (let i = 0; i < points.length - 1;) {
+    let j = points.length - 1;
+    while (j > i + 1 && !clear(points[i], points[j])) j--;
+    path.push(points[j]);
+    i = j;
+  }
+  path.push({ x: to.x, z: to.z });
+  return path;
+}
+const roverF = new THREE.Vector3(), roverX = new THREE.Vector3(), roverZ = new THREE.Vector3(), roverBasis = new THREE.Matrix4();
+// Moves the rover one frame toward the goal (null = coast to a stop). Returns true once it has arrived.
+function driveRover(dt, goal) {
+  const r = robot.position, { VMAX, ACC, DEC, TURN } = ROVER;
+  let want = 0, final = false, dist = 0;
+  if (goal) {
+    const key = `${Math.round(goal.x)}|${Math.round(goal.z)}`;
+    if (key !== rover.key) { rover.key = key; rover.path = roverPath(r, goal); rover.leg = 0; }
+    const path = rover.path;
+    while (rover.leg < path.length - 1 && Math.hypot(path[rover.leg].x - r.x, path[rover.leg].z - r.z) < 2) rover.leg++;
+    const wp = path[rover.leg];
+    final = rover.leg === path.length - 1;
+    const dx = wp.x - r.x, dz = wp.z - r.z;
+    dist = Math.hypot(dx, dz);
+    if (dist > 0.05) {
+      const aim = Math.atan2(dx, dz), diff = Math.atan2(Math.sin(aim - rover.heading), Math.cos(aim - rover.heading));
+      rover.heading += THREE.MathUtils.clamp(diff, -TURN * dt, TURN * dt);
+      want = VMAX * THREE.MathUtils.clamp(1 - Math.abs(diff) / 1.1, 0.12, 1); // slow for a sharp turn
+      if (final) want = Math.min(want, Math.sqrt(2 * DEC * Math.max(0, dist - 0.3)) + 0.2); // brake to stop on the spot
+    }
+  }
+  rover.speed += THREE.MathUtils.clamp(want - rover.speed, -DEC * dt, ACC * dt);
+  if (!goal && rover.speed < 0.02) rover.speed = 0;
+  const fx = Math.sin(rover.heading), fz = Math.cos(rover.heading);
+  r.x += fx * rover.speed * dt;
+  r.z += fz * rover.speed * dt;
+  const arrived = !!goal && final && dist < 0.8 && rover.speed < 0.7;
+  // Ride the ground: the height and tilt come from the ground under its four corners, smoothed.
+  const hF = groundAt(r.x + fx * 1.6, r.z + fz * 1.6), hB = groundAt(r.x - fx * 1.6, r.z - fz * 1.6);
+  const hR = groundAt(r.x + fz * 1.2, r.z - fx * 1.2), hL = groundAt(r.x - fz * 1.2, r.z + fx * 1.2);
+  r.y = (hF + hB + hR + hL) / 4 + 0.03 * Math.sin(performance.now() / 90) * Math.min(1, rover.speed / 4);
+  const sf = (hF - hB) / 3.2, sr = (hR - hL) / 2.4;
+  roverZ.set(-(fx * sf + fz * sr), 1, -(fz * sf - fx * sr)).normalize();
+  rover.normal.lerp(roverZ, 1 - Math.exp(-5 * dt)).normalize();
+  roverF.set(fx, 0, fz);
+  roverX.copy(roverF).addScaledVector(rover.normal, -roverF.dot(rover.normal)).normalize();
+  roverZ.crossVectors(roverX, rover.normal);
+  roverBasis.makeBasis(roverX, rover.normal, roverZ);
+  robot.quaternion.setFromRotationMatrix(roverBasis);
+  // Dust kicked up by the wheels, when it is really moving.
+  const now = performance.now();
+  if (rover.speed > 2 && now > rover.dustAt) {
+    rover.dustAt = now + 160;
+    kickDust({ x: r.x - fx * 1.8, y: groundAt(r.x - fx * 1.8, r.z - fz * 1.8), z: r.z - fz * 1.8 }, 0.5 + rover.speed * 0.04, -fx * rover.speed * 0.3, -fz * rover.speed * 0.3);
+  }
+  return arrived;
+}
 const iceLabel = makeCallout('Crater ice', { color: '#2E96F5', near: 12, far: 90, faint: 0 });
 iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 
@@ -1711,10 +1864,13 @@ function driftDust(dt) {
 //   - a held tool is carried in front of the body
 const twist = new THREE.Quaternion(), aim = new THREE.Quaternion(), turnBy = new THREE.Euler(), footAt = new THREE.Vector3();
 function bend(name, x, y, z, weight) {
-  if (weight <= 0.001) return;
+  if (weight <= 0.001 || !rest[name]) return; // an unknown bone is skipped, never an error that would stop the game drawing
   aim.copy(rest[name]).multiply(twist.setFromEuler(turnBy.set(x, y, z)));
   bones[name].quaternion.slerp(aim, Math.min(1, weight));
 }
+let repair = null; // { label, at, t, done, panel }: the astronaut is kneeling at something, mending it
+const REPAIR_SECONDS = 4;
+let fixing = 0;
 let airTime = 0, air = 0, carry = 0, lope = 0, poseClock = 0, lastStep = 0, wasGrounded = true, fallSpeed = 0;
 function bodyLanguage(dt, pace, outside) {
   const ease = rate => 1 - Math.exp(-rate * dt);
@@ -1726,6 +1882,7 @@ function bodyLanguage(dt, pace, outside) {
   const running = move === 'Run' && grounded;
   lope += ((running ? 1 : 0) - lope) * ease(5);
   carry += ((holding ? 1 : 0) - carry) * ease(8);
+  fixing += ((repair ? 1 : 0) - fixing) * ease(7);
   airTime = grounded ? 0 : airTime + dt;
   air += ((airTime > 0.07 ? 1 : 0) - air) * ease(airTime > 0.07 ? 4.5 : 9);
 
@@ -1749,6 +1906,17 @@ function bodyLanguage(dt, pace, outside) {
   bend('ThighR', 0.15, 0, -0.1, air * 0.85);
   bend('ShinR', 0.45, 0, 0, air * 0.85);
   bend('Spine', -0.08, 0, 0.06 * slow, air);
+
+  // Mending something: crouched low over it, leaning in, both hands working.
+  if (fixing > 0.001) {
+    const work = Math.sin(poseClock * 11), work2 = Math.sin(poseClock * 11 + 1.7);
+    crewModel.position.y -= 0.34 * fixing;
+    bend('Spine', 0.45, 0, 0, fixing);
+    bend('ThighL', -1.2, 0, 0.08, fixing); bend('ShinL', 2.1, 0, 0, fixing);
+    bend('ThighR', -1.2, 0, -0.08, fixing); bend('ShinR', 2.1, 0, 0, fixing);
+    bend('ArmL', -1.05 + 0.12 * work, 0, 0.12, fixing); bend('ForearmL', -0.55 + 0.3 * work2, 0, 0, fixing);
+    bend('ArmR', -1.05 + 0.12 * work2, 0, -0.12, fixing); bend('ForearmR', -0.55 + 0.3 * work, 0, 0, fixing);
+  }
 
   // Dust, on open ground only: a small puff from each running step, a bigger one on landing.
   const feet = crew.position.y - CREW_HEIGHT / 2;
@@ -2020,6 +2188,7 @@ function nearestUsable() {
     }
   } else if (sim) {
     panels.forEach((pn, i) => { if (!sim.panels[i]) consider(Math.hypot(here.x - pn.at.x, here.z - pn.at.z), { kind: 'panel', i, label: `fix solar panel ${i + 1}` }); });
+    if (sim.robot.broken) consider(Math.max(0, Math.hypot(here.x - robot.position.x, here.z - robot.position.z) - 1.5), { kind: 'robot', label: 'repair the broken robot' });
     samples.forEach(s => { if (!sim.samples.has(s.id)) consider(Math.hypot(here.x - s.at.x, here.z - s.at.z), { kind: 'sample', id: s.id, rare: s.rare, label: s.rare ? 'pick up the rare rock sample' : 'pick up the rock sample' }); });
   }
   for (const door of Object.values(doors)) {
@@ -2028,11 +2197,76 @@ function nearestUsable() {
   }
   return best;
 }
+// --- Sparks while mending: bright specks that spit up and out, arc down and fade ---
+const SPARKS = 160;
+const sparkGeo = new THREE.BufferGeometry();
+const sparkPos = new Float32Array(SPARKS * 3), sparkCol = new Float32Array(SPARKS * 3);
+const sparkVel = new Float32Array(SPARKS * 3), sparkAge = new Float32Array(SPARKS).fill(99), sparkLife = new Float32Array(SPARKS).fill(1);
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkCol, 3));
+const sparkPoints = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+sparkPoints.frustumCulled = false;
+scene.add(sparkPoints);
+let sparkNext = 0;
+function emitSparks(x, y, z, count, power = 1) {
+  for (let n = 0; n < count; n++) {
+    const i = sparkNext; sparkNext = (sparkNext + 1) % SPARKS;
+    const a = Math.random() * Math.PI * 2, out = (0.6 + Math.random() * 1.6) * power;
+    sparkPos.set([x, y, z], i * 3);
+    sparkVel.set([Math.cos(a) * out, (1.6 + Math.random() * 2.6) * power, Math.sin(a) * out], i * 3);
+    sparkAge[i] = 0;
+    sparkLife[i] = 0.3 + Math.random() * 0.5;
+  }
+}
+function updateSparks(dt) {
+  for (let i = 0; i < SPARKS; i++) {
+    if (sparkAge[i] >= sparkLife[i]) { sparkCol[i * 3] = sparkCol[i * 3 + 1] = sparkCol[i * 3 + 2] = 0; continue; }
+    sparkAge[i] += dt;
+    const k = 1 - sparkAge[i] / sparkLife[i];
+    sparkVel[i * 3 + 1] -= 5 * dt;
+    sparkPos[i * 3] += sparkVel[i * 3] * dt; sparkPos[i * 3 + 1] += sparkVel[i * 3 + 1] * dt; sparkPos[i * 3 + 2] += sparkVel[i * 3 + 2] * dt;
+    // white-hot at first, then orange, then gone
+    sparkCol[i * 3] = Math.max(0, k * 1.4); sparkCol[i * 3 + 1] = Math.max(0, k * k * 1.0); sparkCol[i * 3 + 2] = Math.max(0, k * k * k * 0.55);
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkGeo.attributes.color.needsUpdate = true;
+}
+const sparkHand = new THREE.Vector3();
+function startRepair(label, at, panel, done) {
+  if (repair) return;
+  repair = { label, at, t: 0, panel, done };
+  walkTo = null;
+}
+function cancelRepair() {
+  repair = null;
+  const bar = document.getElementById('repair-bar');
+  if (bar) bar.hidden = true;
+}
+// Four seconds of kneeling (game seconds, so the speed button counts), then it is fixed.
+function updateRepair(dt) {
+  const bar = document.getElementById('repair-bar');
+  if (!repair) { if (bar && !bar.hidden) bar.hidden = true; return; }
+  repair.t += dt * speed;
+  // Sparks spit out where the hands are working: a few every frame, in short bursts like a welder.
+  bones.ForearmR.getWorldPosition(sparkHand);
+  const aimX = repair.at.x - sparkHand.x, aimZ = repair.at.z - sparkHand.z, aimLen = Math.hypot(aimX, aimZ) || 1;
+  const burst = Math.sin(repair.t * 17) > -0.2 ? 1 : 0;
+  emitSparks(sparkHand.x + aimX / aimLen * 0.35, sparkHand.y - 0.15, sparkHand.z + aimZ / aimLen * 0.35, Math.round((burst ? 70 : 12) * dt), 1);
+  bar.hidden = false;
+  document.getElementById('repair-label').textContent = repair.label;
+  bar.querySelector('i').style.width = `${Math.min(100, repair.t / REPAIR_SECONDS * 100)}%`;
+  if (repair.t >= REPAIR_SECONDS) { const r = repair; cancelRepair(); emitSparks(sparkHand.x, sparkHand.y, sparkHand.z, 60, 1.6); r.done(); } // a last shower when it comes back to life
+}
 function useNearest() {
   const it = nearestUsable();
   if (!it || !sim) return;
   if (it.kind === 'station') openStation(it.id);
-  if (it.kind === 'panel') hooks?.notice(sim.repairPanelByHand(it.i));
+  if (it.kind === 'panel' || it.kind === 'robot') {
+    const need = sim.C.evaRepairRegolith;
+    if (sim.regolith < need) return hooks?.notice(`You need ${need} moon dirt to repair it.`);
+    if (it.kind === 'panel') startRepair(`Repairing solar panel ${it.i + 1}`, panels[it.i].at, it.i, () => hooks?.notice(sim.repairPanelByHand(it.i)));
+    else startRepair('Repairing the rover', robot.position, null, () => hooks?.notice(sim.repairRobotByHand()));
+  }
   if (it.kind === 'sample') { hooks?.useTool?.('scoop'); sim.collectSample(it.id, it.rare); }
   if (it.kind === 'door') useDoor(it.id);
 }
@@ -2056,6 +2290,7 @@ function tick(dt) {
     side = stick.x / lean;
     speedWalk = lean > 0.9 ? RUN : WALK * Math.max(0.45, lean / 0.9);
   }
+  if (repair && (fwd || side || keys.has('Space') || jumpAsked || walkTo || !sim || sim.over || sim.where !== 'outside')) cancelRepair();
   let p = crewBody.translation();
   const steer = yaw;
   const fx = -Math.sin(steer), fz = -Math.cos(steer);
@@ -2129,6 +2364,11 @@ function tick(dt) {
     const turn = Math.atan2(velX, velZ) - facing;
     const step = Math.atan2(Math.sin(turn), Math.cos(turn)) * ease(TURN);
     facing += THREE.MathUtils.clamp(step, -TURN_MAX * dt, TURN_MAX * dt);
+    crew.rotation.y = facing;
+  }
+  if (repair) { // face the thing being mended
+    const want = Math.atan2(repair.at.x - now.x, repair.at.z - now.z), turn = Math.atan2(Math.sin(want - facing), Math.cos(want - facing));
+    facing += turn * ease(9);
     crew.rotation.y = facing;
   }
   setMove(pace > (WALK + RUN) / 2 ? 'Run' : pace > 0.3 ? 'Walk' : 'Idle');
@@ -2221,29 +2461,41 @@ function syncWorld(dt) {
   inLights.forEach(l => { l.intensity = lamps * (sim.share < 0.8 ? (0.5 + 0.12 * wobble(0)) * Math.max(0.4, sim.share) : 1); });
   panels.forEach((pn, i) => {
     const broken = !sim.panels[i];
-    pn.spark.intensity = broken ? 6 + 2 * wobble(i * 2.3) : 0;
+    const mending = repair?.panel === i;
+    pn.spark.color.setHex(mending ? 0xBFE6FF : 0xE43700);
+    pn.spark.intensity = mending ? 8 + 14 * Math.random() : broken ? 6 + 2 * wobble(i * 2.3) : 0;
     pn.label.visible = broken;
     pn.model.rotation.z = broken ? 0.12 : 0;
   });
   samples.forEach(s => { const got = sim.samples.has(s.id); s.mesh.visible = s.label.visible = !got; s.mesh.rotation.y += dt; });
 
-  // The robot drives out to its job and back. Parked = at the dock.
+  updateRepair(dt);
+  updateSparks(dt);
+  // The rover drives out to its job and back like a vehicle: it speeds up and slows down, turns at
+  // a sensible rate, goes round anything solid (never through the base), and tilts with the ground.
   const task = sim.robotWorking ? sim.robot.task : 'idle';
-  const goal = task === 'dig' ? digSpot : task === 'ice' ? iceSpot : task === 'repair' && sim.robot.target >= 0 ? panels[sim.robot.target].at : dock;
+  const stays = sim.robot.broken && !sim.robot.home; // a broken rover stays where the flare hit it
+  // In a storm a rover that is still working stays where it is until you send it home (Park at base);
+  // in Cadet mode it drives itself home.
+  const holds = sim.stormNow && !sim.mode.robotAutoPark && !sim.robot.broken && sim.robot.task !== 'idle';
+  const goal = stays || holds ? null : sim.robot.broken ? dock : task === 'dig' ? digSpot : task === 'ice' ? iceStop : task === 'repair' && sim.robot.target >= 0 ? panelStop(sim.robot.target) : dock;
+  const arrived = driveRover(dt, goal);
   const r = robot.position;
-  const dx = goal.x - r.x, dz = goal.z - r.z, d = Math.hypot(dx, dz);
-  const step = Math.min(d, (task === 'ice' ? 18 : 6) * dt);
-  if (d > 0.5) {
-    r.x += dx / d * step; r.z += dz / d * step;
-    robot.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
-  } else if (task !== 'idle') {
-    robotPhase += dt * 4;
-    robot.rotation.y += Math.sin(robotPhase) * dt * 0.6; // busy wiggle while working
+  const d = arrived ? 0 : 1;
+  // Tell the simulation where the rover really is: work only counts on site, and a flare breaks it if it is out.
+  sim.robot.at = arrived ? (sim.robot.broken || task === 'idle' ? 'dock' : task) : null;
+  sim.robot.away = Math.hypot(r.x - dock.x, r.z - dock.z);
+  if (arrived && task === 'repair' && sim.robot.target >= 0) {
+    const pa = panels[sim.robot.target].at;
+    if (Math.random() < dt * 14) emitSparks(pa.x + (Math.random() - 0.5) * 1.4, pa.y + 1.4, pa.z + (Math.random() - 0.5) * 1.4, 6, 0.9);
   }
-  r.y = groundAt(r.x, r.z);
+  if (arrived && task !== 'idle') {
+    robotPhase += dt * 4;
+    robot.rotateY(Math.sin(robotPhase) * 0.08); // busy wiggle while working
+  }
   // At work on site (digging, or hauling ice at the crater): the bucket drums at each end throw up
   // dust a few times a second. Digging also leaves a growing patch of turned-up dirt.
-  const atWork = (task === 'dig' || task === 'ice') && d <= 0.5 && sim.share > 0;
+  const atWork = (task === 'dig' || task === 'ice') && arrived && sim.share > 0;
   const now = performance.now();
   if (atWork && now >= nextDigDust) {
     nextDigDust = now + 140 + Math.random() * 120;
@@ -2256,6 +2508,18 @@ function syncWorld(dt) {
   digPatch.visible = dug > 0;
   digPatch.scale.setScalar(2 + 2.5 * Math.min(1, dug / 40)); // 4 m across at the first scoop, 9 m after 40 s
   digLabel.visible = task === 'dig';
+  // The Galley's grow lamps: pink and glowing while the lights are on and watered, dim red when they
+  // are on with no water, dark when off. The label says which.
+  Object.values(stations).forEach(st => { st.marker.guide = sim.flags.guide === st.id; });
+  if (sim.food !== null) {
+    const on = sim.greenhouse, wet = (sim.water ?? 0) > 0, glow = on && wet ? 1.3 + 0.2 * Math.sin(performance.now() / 400) : on ? 0.5 : 0;
+    growLamps.forEach(l => { const m = l.material; if (m.emissive) { m.emissive.set(on && wet ? 0xFF3FD0 : on ? 0x661111 : 0x000000); m.emissiveIntensity = glow; } });
+    growLabel.visible = isInside(crewBody.translation());
+    const text = on ? (wet ? 'Grow lights: on' : 'Grow lights: no water') : 'Grow lights: off';
+    if (text !== growLabel.shownText) { growLabel.shownText = text; growLabel.name.textContent = text; }
+  } else growLabel.visible = false;
+  brokenLabel.position.set(r.x, r.y + 2.6, r.z);
+  brokenLabel.visible = sim.robot.broken;
 }
 
 // Slow computers (school Chromebooks) get simpler graphics: no shadows and fewer pixels.
@@ -2457,6 +2721,7 @@ gameReady({
     scatterSamples();
     dug = 0; // a new mission starts with untouched ground at the dig site
     robot.position.copy(dock);
+    resetRover();
     yaw = Math.PI / 2;
     pitch = 1;
     camDist = camShown = 9;
@@ -2516,4 +2781,4 @@ gameReady({
 });
 
 // For scripted checks from the browser console.
-window.demo = { snapshot, dirtShield, pickAt: (x, y, throughWalls) => pick({ clientX: x, clientY: y }, throughWalls), get yaw() { return yaw; }, set yaw(v) { yaw = v; }, get pitch() { return pitch; }, set pitch(v) { pitch = v; }, get camDist() { return camDist; }, set camDist(v) { camDist = v; }, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { roverPath, rover, robot, dock, iceStop, digSpot, navBoxes, driveRover, startRepair, snapshot, dirtShield, pickAt: (x, y, throughWalls) => pick({ clientX: x, clientY: y }, throughWalls), get yaw() { return yaw; }, set yaw(v) { yaw = v; }, get pitch() { return pitch; }, set pitch(v) { pitch = v; }, get camDist() { return camDist; }, set camDist(v) { camDist = v; }, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };

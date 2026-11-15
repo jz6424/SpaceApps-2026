@@ -97,6 +97,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     else document.documentElement.requestFullscreen?.().catch(() => {});
   };
   $('fullscreen').addEventListener('click', fsBtn);
+  $('fullscreen-corner').innerHTML = icon('expand', 26);
+  $('fullscreen-corner').addEventListener('click', fsBtn);
 
   // --- Hotbar: the tools you have, at the bottom of the screen ---
   // A number key (or a click) puts a tool in the astronaut's right hand; the same key again puts
@@ -256,6 +258,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       { name: 'Antenna', state: sim.comms ? 'on' : 'off', on: sim.comms, use: P.comms, where: 'Comms station', note: 'on' },
       lights && { name: 'Grow lights', state: sim.greenhouse ? 'on' : 'off', on: sim.greenhouse, use: P.greenhouse, where: 'Galley', note: 'on' },
       { name: 'Robot', state: sim.robotWorking ? job : 'parked', on: sim.robotWorking, use: P.robot, where: 'Robot Map station', note: 'working outside' },
+      sim.panelLeak > 0 && { name: 'Broken panel', state: 'leaking at night', on: true, use: sim.panelLeak, where: 'repair it outside (press E at the panel)', note: 'short-circuit' },
     ].filter(Boolean);
   }
   function renderUses() {
@@ -293,8 +296,30 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
   // --- Supplies, in the corner above the samples bar ---
   function renderSupplies() {
     const rows = [['box', 'Moon dirt', Math.floor(sim.regolith)]];
-    if (sim.food !== null) rows.push(['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`], ['droplet', 'Water', Math.floor(sim.water ?? 0)]);
-    put('supplies', rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join(''));
+    if (sim.food !== null) {
+      const f = foodFacts();
+      rows.push(
+        ['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`, `One is eaten every ${f.eatEvery} s. Next in ${f.nextEat} s.`],
+        ['leaf', 'Grow lights', sim.greenhouse ? 'on' : 'off', !sim.greenhouse ? 'Off: no new meals. Turn them on in the Galley.' : f.wet ? `Making a meal: ready in ${f.nextGrow} s.` : 'No water, so no new meals.'],
+        ['droplet', 'Water', Math.floor(sim.water ?? 0), f.wet ? `You drink a little${sim.greenhouse ? ' and the lights use more' : ''}. It lasts about ${f.lasts} s.` : f.thirsty ? 'Empty! Life Support is dropping. Haul ice.' : 'Empty. Send the robot to haul ice.'],
+      );
+    }
+    put('supplies', rows.map(([ico, label, value, sub]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>${sub ? `<div class="supply-sub">${sub}</div>` : ''}`).join(''));
+  }
+  // The numbers behind the food loop, worked out the way the simulation does it.
+  function foodFacts() {
+    const F = sim.C.food, wet = (sim.water ?? 0) > 0;
+    return {
+      eatEvery: Math.ceil(F.eatEvery / sim.mode.crewDrain),
+      nextEat: Math.max(0, Math.ceil((F.eatEvery - sim.foodTimer) / sim.mode.crewDrain)),
+      nextGrow: Math.max(0, Math.ceil(F.growEvery - sim.growTimer)),
+      growEvery: F.growEvery, waterUse: F.water,
+      drinkEvery: Math.round(1 / (F.drink * sim.mode.crewDrain)),
+      // Water goes to your drinking first, and to the grow lights while they are on.
+      lasts: Math.floor((sim.water ?? 0) / (F.drink * sim.mode.crewDrain + (sim.greenhouse ? F.water * Math.max(0.05, sim.share) : 0))),
+      thirsty: sim.mode.thirst > 0,
+      wet,
+    };
   }
 
   // --- Sun clock across the top ---
@@ -383,6 +408,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     return `Night: the battery lasts about ${clock(sim.batteryForecast)} but sunrise is ${left} away. ${how}`;
   }
   function hintText() {
+    sim.flags.guide = null; // the station whose label should glow, if the hint points at one
     const f = sim.flags, next = sim.nextStorm, storm = sim.stormNow;
     if (storm && sim.where !== 'shelter') return 'Solar storm! Go to the Storm Shelter at the back of the Habitat.';
     if (storm) return waiting ? 'Waiting out the storm in the shelter (2x time).' : 'Stay in the shelter until the storm is over. Use the Storm Shelter to wait it out faster.';
@@ -394,6 +420,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     if (sim.where === 'outside') {
       const broken = sim.panels.indexOf(false);
       if (broken >= 0) return `Walk to solar panel ${broken + 1} (the red light) and press E to fix it.`;
+      if (sim.robot.broken) return 'Walk to the broken robot and press E to repair it.';
       const light = sim.sunlight === 0 ? ' It is dark: press F for your chest light.' : '';
       if (rocksLeft() > 0) return `Pick up the glowing rocks with E: ${sim.samples.size} of ${sim.goalValue} so far. Watch your suit air.${light}`;
       return `Collect glowing rock samples for research points. Watch your suit air.${light}`;
@@ -402,10 +429,11 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     if (sim.air < 20) return 'Life support is low. Set it to Normal or Boost.';
     if (sim.power > 0 && sim.sunlight === 0 && sim.batteryForecast < sim.timeToSunrise) return nightAdvice();
     if (sim.panels.includes(false)) return 'A solar panel is broken. Fix it outside (Airlock) or send the robot (Robot Map).';
+    if (sim.robot.broken) { sim.flags.guide = 'MapTable'; return 'The rover is broken. Send it home at the Robot Map (glowing), then go outside and press E next to it to repair it.'; }
     if (f.tourHint) return f.tourHint; // the guided tour in First Night
     if (sim.food !== null) {
-      if (!sim.greenhouse) return 'Open the Galley and turn on the grow lights.';
-      if ((sim.water ?? 0) < 3 && sim.robot.task !== 'ice') return 'The plants need water. Send the robot for crater ice.';
+      if (!sim.greenhouse) { sim.flags.guide = 'Food'; return 'Open the Galley (its label is glowing) and turn on the grow lights. They grow your meals.'; }
+      if ((sim.water ?? 0) < 3 && sim.robot.task !== 'ice') { sim.flags.guide = 'MapTable'; return 'Water is low, and you and the grow lights need it. Open the Robot Map (glowing) and haul crater ice.'; }
     }
     // The dirt shield, in the mission that is about it: dig, then build, one level at a time.
     if (sim.mission.goalType === 'dose' && sim.shieldCost !== undefined && SLOTS.some(slot => slot.id === 'builder')) {
@@ -414,7 +442,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
         if (holding() === 'builder') return `You have the moon dirt for level ${level} of the regolith shield. ${isTouch ? 'Tap Build it.' : 'Press Build it (or B).'}`;
         return `You have enough moon dirt. ${isTouch ? 'Tap the Building tool' : 'Press 2 for the Building tool'} and build level ${level} of the regolith shield.`;
       }
-      if (sim.robot.task !== 'dig' && sim.robot.offline <= 0 && (sim.t < sim.day || !sim.shielding)) return `The regolith shield needs ${cost} moon dirt and you have ${Math.floor(sim.regolith)}. Send the robot to dig at the Robot Map.`;
+      if (sim.robot.task !== 'dig' && !sim.robot.broken && (sim.t < sim.day || !sim.shielding)) return `The regolith shield needs ${cost} moon dirt and you have ${Math.floor(sim.regolith)}. Send the robot to dig at the Robot Map.`;
     }
     if (sim.t < sim.day && sim.timeToSunset < 40 && sim.ls !== 'eco') return 'Night is coming. Set Life Support to Eco and turn off what you don\'t need.';
     if (rocksLeft() > 0) return `Rock samples: ${sim.samples.size} of ${sim.goalValue}. Use the Airlock to go outside and pick up the glowing rocks.${sim.t >= sim.day ? ' They glow in the dark.' : ''}`;
@@ -488,19 +516,26 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
           ${unlocks.includes('Greenhouse') ? `<div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')}. Plants add a little air.` })}</div>` : '<p class="fine">Unlock the Greenhouse with research points to grow your own food.</p>'}`,
         };
       }
+      const f = foodFacts(), on = sim.greenhouse;
+      const state = !on ? 'The grow lights are off, so no new meals are growing.'
+        : !f.wet ? 'The grow lights are on, but the water is empty, so no new meals are growing, and you are thirsty.'
+        : `The grow lights are on and growing a meal (ready in ${f.nextGrow} s).`;
       return {
         title: 'Galley and greenhouse', icon: 'leaf',
         body: `<p class="big">${sim.food} meals left (goal: ${sim.goalValue} at sunrise)</p>
-        <dl class="facts"><dt>Water for plants</dt><dd>${Math.floor(sim.water)} of ${C.meters.waterMax}</dd>
-        <dt>Next meal eaten</dt><dd>in ${Math.ceil((C.food.eatEvery - sim.foodTimer) / sim.mode.crewDrain)} s</dd>
-        <dt>Greens ready</dt><dd>${sim.greenhouse && sim.water > 0 ? `in ${Math.ceil(C.food.growEvery - sim.growTimer)} s` : 'not growing'}</dd></dl>
-        <div class="opts">${btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')} and water. One meal every ${C.food.growEvery} s.` })}</div>
+        <p class="status ${on && f.wet ? 'ok' : 'warn'}">${state}</p>
+        <ol class="flow">
+          <li><b>1. Water</b><span>${Math.floor(sim.water)} of ${C.meters.waterMax}. <b>You drink</b> a sip about every ${f.drinkEvery} s, and the <b>grow lights</b> use ${per(f.waterUse, 'water')} while they are on${f.wet ? `, so it lasts about ${f.lasts} s` : ''}. ${f.thirsty ? 'With no water, Life Support drops.' : 'With no water you get thirsty.'} To refill it, open the Robot Map and choose <b>Haul crater ice</b>: the robot stops by itself when the tank is full.</span></li>
+          <li><b>2. Grow lights</b><span>The glowing lamps in this Galley. They use ${per(P.greenhouse, 'power')}, and while they are on and there is water they grow <b>one meal every ${f.growEvery} s</b>.</span>
+            <div class="opts">${btn('greenhouse', 'Grow lights', { arg: on ? 'off' : 'on', on, note: on ? 'Press to turn the lights off.' : 'Press to turn the lights on.' })}</div></li>
+          <li><b>3. Meals</b><span>You eat <b>one meal every ${f.eatEvery} s</b>, automatically (the next one in ${f.nextEat} s). Keep at least ${sim.goalValue} meals for sunrise.</span></li>
+        </ol>
         <p class="fine">Plants on the Space Station grow under LED lights in NASA's Veggie garden.</p>`,
       };
     },
     MapTable: () => {
       const R = sim.robot;
-      const status = R.offline > 0 ? `being fixed (${Math.ceil(R.offline)} s)` : sim.stormNow && R.task !== 'idle' ? 'sheltering from the storm' : { idle: 'parked at the base', dig: 'digging moon dirt', ice: 'hauling crater ice', repair: `fixing panel ${R.target + 1}` }[R.task];
+      const status = R.broken ? (R.home ? 'broken, driving home' : 'broken, stuck where the storm hit it') : sim.stormNow && R.task !== 'idle' ? 'sheltering from the storm' : { idle: 'parked at the base', dig: 'digging moon dirt', ice: 'hauling crater ice', repair: `fixing panel ${R.target + 1}` }[R.task];
       const broken = sim.panels.indexOf(false);
       return {
         title: 'Robot Map', icon: 'map',
@@ -509,11 +544,12 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
         <ul class="legend"><li><b class="dot base"></b> Your base</li><li><b class="dot ice"></b> Shadowed ground that may hold ice (${site.iceDistance} m away)</li><li><b class="dot bot"></b> Robot</li></ul>
         <p class="fine">Map: NASA LOLA sunlight (bright = sunny) and permanent shadow (blue), where ice can survive.</p></div></div>
         <div class="opts">
-          ${btn('robot', 'Park at base', { arg: 'idle', on: R.task === 'idle', note: 'Uses no power. Safe in storms.' })}
-          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for building, repairs and Boost.` })}
-          ${sim.water !== null ? btn('robot', 'Haul crater ice', { arg: 'ice', on: R.task === 'ice', note: `Uses ${per(P.robot, 'power')}. Brings ${per(C.robot.ice, 'water')} for the plants.` }) : ''}
-          ${btn('robot', `Fix panel ${broken >= 0 ? broken + 1 : ''}`, { arg: 'repair', on: R.task === 'repair', disabled: broken < 0 && R.task !== 'repair', note: `Costs ${C.robot.repairRegolith} moon dirt, takes ${C.robot.repairSeconds} s. No moonwalk needed.` })}
+          ${btn('robot', 'Park at base', { arg: 'idle', on: R.task === 'idle' && !R.broken, note: R.broken ? 'Sends the broken robot home so you can repair it by the base. It can do nothing else.' : 'Uses no power. Safe in storms.' })}
+          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', disabled: R.broken, note: R.broken ? 'The robot is broken. Repair it first.' : `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for building, repairs and Boost.` })}
+          ${sim.water !== null ? btn('robot', 'Haul crater ice', { arg: 'ice', on: R.task === 'ice', disabled: R.broken, note: R.broken ? 'The robot is broken. Repair it first.' : `Uses ${per(P.robot, 'power')}. Brings ${per(C.robot.ice, 'water')} for you and the plants, and parks by itself when the tank is full.` }) : ''}
+          ${btn('robot', `Fix panel ${broken >= 0 ? broken + 1 : ''}`, { arg: 'repair', on: R.task === 'repair', disabled: R.broken || (broken < 0 && R.task !== 'repair'), note: R.broken ? 'The robot is broken. Repair it first.' : `Costs ${C.robot.repairRegolith} moon dirt, takes ${C.robot.repairSeconds} s. No moonwalk needed.` })}
         </div>
+        ${R.broken ? `<p>The storm broke the robot. <b>Walk to it outside and press E</b> to repair it (${C.evaRepairRegolith} moon dirt). Until then it can only drive home.</p>` : ''}
         <p class="fine">Robots must be parked before a solar storm${sim.mode.robotAutoPark ? ' (in Cadet mode it parks itself)' : ', or the storm damages them'}.</p>`,
         after: drawMap,
       };
@@ -812,6 +848,20 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     heard.samples = sim.samples.size; heard.rp = sim.rp;
   }
 
+  // The rover's flare timer: shown while it is outside in a flare, counting down to the moment it breaks.
+  $('rover-timer-icon').innerHTML = icon('alert', 18);
+  function renderRoverTimer() {
+    const R = sim.robot, tol = sim.mode.roverTolerance ?? 0;
+    const on = sim.stormNow && !sim.mode.robotAutoPark && !R.broken && sim.robotAway && R.exposure > 0 && tol > 0;
+    const box = $('rover-timer');
+    box.hidden = !on;
+    if (!on) return;
+    const left = Math.max(0, tol - R.exposure);
+    box.classList.toggle('low', left < 8);
+    $('rover-timer-time').textContent = `${Math.ceil(left)} s`;
+    box.querySelector('i').style.width = `${left / tol * 100}%`;
+  }
+
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger, unless you are waiting it
     // out in the shelter.
@@ -823,6 +873,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
     renderFeed(now);
     checkSuitAir(now);
     watchSounds();
+    renderRoverTimer();
     renderAirlock();
     if (now - lastRender < 200) return;
     lastRender = now;
@@ -864,6 +915,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       $('speed').removeEventListener('click', speedBtn);
       $('speed-chip').removeEventListener('click', chipBtn);
       $('fullscreen').removeEventListener('click', fsBtn);
+      $('fullscreen-corner').removeEventListener('click', fsBtn);
       $('mission-handle').removeEventListener('click', missionBtn);
       $('hotbar').removeEventListener('click', slotBtn);
       $('build-go').removeEventListener('click', buildBtn);
@@ -871,6 +923,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       $('power-btn').removeEventListener('click', usesBtn);
       $('pu-close').removeEventListener('click', usesClose);
       $('power-uses').hidden = true;
+      $('rover-timer').hidden = true;
       // The Power button starts the next mission closed, not still marked open.
       $('power-btn').setAttribute('aria-expanded', 'false');
       $('power-btn').title = 'See what is using power';

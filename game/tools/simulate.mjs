@@ -36,6 +36,8 @@ const PLAYERS = {
     if (sim.t < 10) { /* still finding the way round */ }
     else if (storm || (warned && !sim.mode.robotAutoPark)) { if (sim.robot.task !== 'idle' && sim.robot.task !== 'repair') sim.robot.task = 'idle'; }
     else if (broken >= 0 && sim.robot.task !== 'repair' && sim.regolith >= 10) sim.setRobot('repair', broken);
+    // A good player goes out and mends a broken panel by hand (3 moon dirt), as soon as it is safe.
+    if (broken >= 0 && !storm && !warned && sim.t >= 10 && sim.regolith >= sim.C.evaRepairRegolith) sim.repairPanelByHand(broken);
     else if (sim.robot.task === 'idle' || (sim.robot.task === 'repair' && broken < 0)) {
       const wantIce = sim.food !== null && (sim.water ?? 0) < 12;
       if (!sim.isNight) sim.robot.task = wantIce ? 'ice' : 'dig';

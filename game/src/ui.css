@@ -515,7 +515,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .pu-sum dd { margin: 0; text-align: right; }
 #power-uses .fine { margin: 0; }
 
-#corner { position: fixed; right: 16px; bottom: 16px; width: 296px; display: flex; flex-direction: column; gap: 12px; }
+#corner { position: fixed; right: 16px; bottom: 68px; width: 296px; display: flex; flex-direction: column; gap: 12px; }
 #corner .panel { position: static; }
 /* Airlock progress: one bar per step, in the middle of the screen above the hotbar, barely tinted */
 #airlock-panel {
@@ -575,7 +575,7 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 
 /* The mission is a drawer halfway down the right edge. Its handle is an arrow with a short bar
    above and below it: ">" pushes the drawer away, "<" pulls it back out. */
-#mission-drawer { position: fixed; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; z-index: 5; transition: transform .3s var(--ease); }
+#mission-drawer { position: fixed; right: 0; top: 38%; transform: translateY(-50%); display: flex; align-items: center; z-index: 5; transition: transform .3s var(--ease); }
 #mission-drawer.shut { transform: translate(calc(100% - 44px), -50%); } /* the handle's width stays on screen */
 #mission-handle {
   width: 44px; height: 112px; /* 44 px wide: a finger-sized target */ flex: none; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer;
@@ -930,3 +930,41 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
 #rescue .dialog h2 { margin: 0; }
 #rescue-text { display: grid; gap: 10px; }
 #rescue-text p { margin: 0; }
+/* Full screen icon, bottom right, with a hover label */
+.fs-corner { position: fixed; right: 16px; bottom: 16px; z-index: 6; }
+.fs-corner::after { content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 6px); background: rgba(7, 23, 63, .96); border: 1px solid #2E96F5; color: #fff; font: 700 13px "Fira Sans", system-ui, sans-serif; padding: 3px 8px; border-radius: 4px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.fs-corner:hover::after, .fs-corner:focus-visible::after { opacity: 1; }
+
+/* Meals and water: a line of plain words under each supply, and the Galley's three steps */
+.supply-sub { margin: -4px 0 4px 26px; font: 400 12.5px/1.3 var(--body); color: var(--soft); text-transform: none; letter-spacing: 0; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.flow li { display: grid; gap: 4px; padding: 8px 10px; border-left: 3px solid #2E96F5; background: rgba(255, 255, 255, .05); border-radius: 4px; }
+.flow li > b { font: 700 14px var(--body); color: var(--yellow); }
+.flow li > span { font-size: 14px; line-height: 1.35; }
+#station-body .status { margin: 0; padding: 6px 10px; border-radius: 4px; font-weight: 700; }
+#station-body .status.ok { background: rgba(46, 150, 245, .2); }
+#station-body .status.warn { background: rgba(234, 254, 7, .15); color: var(--yellow); }
+
+/* A station the hint points at glows, so the player can find it */
+.callout.guide .co-name { color: var(--yellow); border-left-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow), 0 0 16px rgba(234, 254, 7, .55); animation: guide-pulse 1.3s ease-in-out infinite; }
+@keyframes guide-pulse { 50% { box-shadow: 0 0 0 1px var(--yellow), 0 0 4px rgba(234, 254, 7, .2); } }
+/* The repair progress, while the astronaut kneels at a panel */
+#repair-bar { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); width: 280px; display: grid; gap: 6px; padding: 8px 14px; z-index: 6; text-align: center; font-weight: 700; }
+#repair-bar .bar i { background: var(--yellow); transition: width .1s linear; }
+
+/* The rover's flare timer: counts down while it is out in a solar flare. It sits to the left of the
+   hotbar; on a narrow screen, where that would run into the meters, it sits just above the hotbar. */
+#rover-timer { position: fixed; right: calc(50% + 156px); bottom: 14px; width: 264px; box-sizing: border-box; display: block; padding: 10px 12px 9px; z-index: 6; }
+/* Three plain rows, one under the other, all inside the one box: the words, the bar, the tip. */
+#rover-timer > * { position: static; display: block; }
+#rover-timer .rv-top { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; white-space: nowrap; font: 500 13px/18px var(--head); text-transform: uppercase; letter-spacing: .08em; }
+#rover-timer .rv-top .ico { stroke: var(--yellow); vertical-align: 0; flex: none; }
+#rover-timer .rv-label { flex: 1; }
+#rover-timer .rv-top b { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; color: var(--yellow); }
+#rover-timer .rv-bar { position: relative; height: 10px; margin: 0 0 7px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+#rover-timer .rv-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--yellow); transition: width .2s linear; }
+#rover-timer .rv-tip { margin: 0; font: 400 12.5px/1.3 var(--body); color: var(--soft); text-transform: none; letter-spacing: 0; }
+#rover-timer.low .rv-top .ico { stroke: #FF6A4D; }
+#rover-timer.low .rv-top b { color: #FF6A4D; }
+#rover-timer.low .rv-bar i { background: #FF6A4D; }
+@media (max-width: 1300px) { #rover-timer { right: auto; left: 50%; transform: translateX(-50%); bottom: 96px; } }
