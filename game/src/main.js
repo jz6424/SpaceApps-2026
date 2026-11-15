@@ -511,7 +511,8 @@ let hitDebt = 0, hitsDrawn = false;
 function stormHits(dt) {
   const storm = state === 'play' ? sim?.stormNow : null;
   const D = sim?.C.dose;
-  const rate = storm ? Math.min(4, 1.4 * D.storm[sim.where] * STRENGTH[storm.strength] * (sim.where === 'shelter' ? sim.shieldMult : 1)) : 0;
+  const spot = sim?.doseSpot;
+  const rate = storm ? Math.min(4, 1.4 * D.storm[spot] * STRENGTH[storm.strength] * (spot === 'shelter' ? sim.shieldMult : 1)) : 0;
   if (!rate && !hits.length) {
     if (hitsDrawn) { hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); hitsDrawn = false; }
     return;
@@ -1186,9 +1187,9 @@ function useDoorNow(which) {
   const p = crewBody.translation();
   const zone = airlockZone(p);
   Object.assign(sim, zone);
-  // From the Moon side the hatch always answers: if the cabin door is open, the airlock shuts it
-  // and empties itself first, so nobody is left outside.
-  if (which === 'outer' && !zone.inAirlock && !isInside(p) && !sim.airlock.cycle && sim.airlock.inner) return hooks?.notice(sim.airlockStart('out', true));
+  // From the Moon side the hatch always opens, solar storm or not, so nobody is locked out: if the
+  // cabin door is open, the airlock shuts it and empties itself first.
+  if (which === 'outer' && !zone.inAirlock && !isInside(p) && !sim.airlock.cycle && !sim.airlock.outer) return hooks?.notice(sim.airlockStart('out', true));
   hooks?.notice(sim.airlockDoor(which));
 }
 

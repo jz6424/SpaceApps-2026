@@ -145,6 +145,9 @@ export class Sim {
   get isNight() { return this.sunlight < 0.5; }
   get earthUp() { return !(this.t >= this.earthGap[0] && this.t < this.earthGap[1]); }
   get stormNow() { return this.storms.find(s => s.started && !s.done) ?? null; }
+  // Where the radiation counts you as being: the airlock is only a thin tube, so standing in it is
+  // as exposed as being outside. The dose only drops once you are in the Habitat itself.
+  get doseSpot() { return this.inAirlock ? 'outside' : this.where; }
   get nextStorm() { return this.storms.find(s => !s.started) ?? null; }
   get timeToSunrise() { return Math.max(0, this.total - this.t); }
   get timeToSunset() { return Math.max(0, this.day - this.t); }
@@ -274,6 +277,7 @@ export class Sim {
   airlockStart(dir, fromOutside = false) {
     const lock = this.airlock, A = this.C.airlock;
     if (lock.cycle) return 'The airlock is busy. Hang on!';
+    // Going out is stopped during a storm, but coming back in never is: nobody gets locked out.
     if (dir === 'out' && this.stormNow && !fromOutside) return 'Not during a solar storm!';
     const [shut, open, goal] = dir === 'out' ? ['inner', 'outer', 'vacuum'] : ['outer', 'inner', 'pressurized'];
     const steps = [];
@@ -442,12 +446,12 @@ export class Sim {
     }
 
     // Radiation.
-    const D = C_.dose, storm = this.stormNow;
-    let rate = this.where === 'outside' ? D.outside : D.inside;
+    const D = C_.dose, storm = this.stormNow, spot = this.doseSpot;
+    let rate = spot === 'outside' ? D.outside : D.inside;
     if (storm) {
       const k = STRENGTH[storm.strength];
       // The dirt shield is piled on the shelter end, so it only counts in the shelter.
-      rate += D.storm[this.where] * k * (this.where === 'shelter' ? this.shieldMult : 1);
+      rate += D.storm[spot] * k * (spot === 'shelter' ? this.shieldMult : 1);
     }
     this.dose += rate * dt;
     if (this.dose >= C_.meters.doseLimit) return this.end(false, 'Your radiation dose reached the mission limit, so the flight doctor called you home.');
