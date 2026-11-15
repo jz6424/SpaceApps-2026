@@ -1,6 +1,7 @@
 // The Moon on the mission menu: a small low-poly globe in the same flat-colour style as the base,
-// turning slowly, with a flag for each mission. Dragging turns it by hand, and it keeps turning the
-// way it was last pushed. Picking a mission turns its flag to face you and moves the camera in.
+// with a flag for each mission. It always turns about its own axis, the line through its poles,
+// at one steady speed. A dashed line marks that axis. Dragging tips the whole Moon, axis and all,
+// to show another side. Picking a mission turns its flag to face you and moves the camera in.
 // Pressing Play dives the camera down to the flag before the mission starts.
 //
 // The flags stand close together near the south pole, because every mission is flown from the same
@@ -9,9 +10,7 @@ import * as THREE from 'three';
 
 const DEG = Math.PI / 180;
 const TILT = -66 * DEG;        // tips the south pole toward the camera, since that is where the base is
-const SPIN = 0.1;              // radians a second while nothing is picked
-const FLING = 5;               // the fastest a flick can spin it, in radians a second
-const SETTLE = 1.4;            // how quickly a flick slows back down to SPIN
+const SPIN = 0.1;              // radians a second about its own axis while nothing is picked
 const SLOP = 6;                // pixels the pointer may wander and still count as a click
 const HOME = new THREE.Vector3(0, 0.05, 4.3);   // where the camera rests
 const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -74,6 +73,15 @@ function buildMoon() {
   // A dark shell just behind the surface draws the outline.
   const outline = new THREE.Mesh(new THREE.IcosahedronGeometry(1.035, 5), new THREE.MeshBasicMaterial({ color: 0x07173f, side: THREE.BackSide }));
   moon.add(outline);
+  // The axis the Moon turns on: a dashed line out of each pole. It is fixed to the Moon, so it
+  // tips with it when the Moon is dragged.
+  const dash = new THREE.CylinderGeometry(0.009, 0.009, 0.07, 6), edge = new THREE.CylinderGeometry(0.017, 0.017, 0.086, 6), white = new THREE.MeshBasicMaterial({ color: 0xf2f6fc });
+  for (const end of [1, -1]) for (let y = 1.07; y < 1.5; y += 0.11) {
+    const piece = new THREE.Mesh(dash, white);
+    piece.position.y = end * y;
+    piece.add(new THREE.Mesh(edge, outline.material));   // the same dark outline as the Moon, so it shows on pale ground
+    moon.add(piece);
+  }
   return moon;
 }
 
@@ -153,15 +161,12 @@ export function createMoonMenu(canvas, missions, onPick) {
   const wantUp = new THREE.Vector3(), side = new THREE.Vector3(), seen = new THREE.Vector3(), TOWARD = new THREE.Vector3(0, 0.45, 1).normalize();
   camera.position.copy(HOME);
 
-  // The Moon turns about `axis`, a line through its middle, at `speed` radians a second. It starts
-  // out turning about its own pole. Dragging turns it by hand and leaves it turning the way it was
-  // last pushed, so any side can be brought round.
-  const axis = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
-  let speed = still ? 0 : SPIN;
-  let drag = null;          // { id, x, y, t, far } while a finger or the mouse holds the Moon
+  // Dragging turns the whole Moon by hand, so any side can be brought round. When it is let go it
+  // carries on turning about its own axis, wherever that now points.
+  let drag = null;          // { id, x, y, far } while a finger or the mouse holds the Moon
   let dragged = false;      // the last press moved far enough to be a drag, not a click
   const down = { x: 0, y: 0 };   // where the last press began
-  const push = new THREE.Vector3(), step = new THREE.Vector3(), turnBy = new THREE.Quaternion(), NONE = new THREE.Quaternion();
+  const step = new THREE.Vector3(), turnBy = new THREE.Quaternion(), NONE = new THREE.Quaternion();
   const turn = (about, angle) => { moon.quaternion.premultiply(turnBy.setFromAxisAngle(about, angle)).normalize(); };
 
   function paint() {
@@ -196,10 +201,8 @@ export function createMoonMenu(canvas, missions, onPick) {
       wantUp.copy(out);
       flags[picked].ring.scale.setScalar(1 + 0.12 * Math.sin(now / 260));
     } else {
-      if (!drag) {
-        speed += ((still ? 0 : SPIN) - speed) * (1 - Math.exp(-dt * SETTLE));
-        turn(axis, speed * dt);
-      }
+      // West to east about its own poles, the way the real Moon turns, and never faster or slower.
+      if (!drag && !still) moon.rotateY(SPIN * dt);
       wantPos.copy(HOME);
       wantLook.set(0, 0, 0);
       wantUp.set(0, 1, 0);
@@ -252,13 +255,12 @@ export function createMoonMenu(canvas, missions, onPick) {
     dragged = false;
     down.x = e.clientX; down.y = e.clientY;
     if (picked || diveDone || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), far: 0 };
-    push.set(0, 0, 0);
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, far: 0 };
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.id) { canvas.style.cursor = flagAt(e) ? 'pointer' : picked ? 'default' : ''; return; }
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y, now = performance.now();
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     drag.far += Math.hypot(dx, dy);
     if (drag.far > SLOP) { dragged = true; canvas.style.cursor = 'grabbing'; }
     // How many pixels wide the Moon's radius is, so the ground under the pointer keeps up with it.
@@ -268,20 +270,13 @@ export function createMoonMenu(canvas, missions, onPick) {
       // Sideways movement turns it about the camera's up, up-and-down movement about its right.
       step.set(dy, dx, 0).normalize().applyQuaternion(camera.quaternion);
       turn(step, angle);
-      // Remember how hard and which way it is being pushed, for when it is let go.
-      push.lerp(step.multiplyScalar(angle / Math.max(0.004, (now - drag.t) / 1000)), 0.45);
     }
-    drag.x = e.clientX; drag.y = e.clientY; drag.t = now;
+    drag.x = e.clientX; drag.y = e.clientY;
   });
   function letGo(e) {
     if (!drag || e.pointerId !== drag.id) return;
-    const resting = performance.now() - drag.t > 90;   // held still before letting go: no flick
     drag = null;
     canvas.style.cursor = '';
-    if (!dragged || push.lengthSq() < 1e-6) return;
-    // Keep turning the way it was pushed. A flick spins it fast, then it settles to the slow turn.
-    axis.copy(push).normalize();
-    speed = resting || still ? 0 : Math.min(FLING, push.length());
   }
   canvas.addEventListener('pointerup', letGo);
   canvas.addEventListener('pointercancel', letGo);
