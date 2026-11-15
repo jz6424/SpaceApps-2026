@@ -474,7 +474,6 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 #airlock-panel h3 .ico { stroke: var(--soft); vertical-align: 0; }
 #airlock-panel p { margin: 0; }
 #lock-text { font-weight: 600; }
-#lock-skip { justify-self: center; }
 #supplies { display: grid; gap: 4px; }
 .supply { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .supply .ico { stroke: var(--soft); vertical-align: 0; }

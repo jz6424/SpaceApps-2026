@@ -25,7 +25,7 @@ for (let run = 0; run < 300; run++) {
     pick([
       () => sim.airlockStart('out'), () => sim.airlockStart('in'),
       () => sim.airlockDoor('inner'), () => sim.airlockDoor('outer'),
-      () => sim.airlockSkip(), () => {},
+      () => {},
     ])();
     for (let t = 0; t < rand() * 8; t += 0.05) {
       sim.airlockTick(0.05);
@@ -57,15 +57,17 @@ const afterOut = sim.air;
 sim.airlockStart('in'); settle(sim);
 if (Math.abs(before - afterOut - C.airlock.cycleAir) > 1e-9 || sim.air !== afterOut) fail('wrong Life Support cost', sim);
 if (sim.airlockDoor('outer') !== 'Close the inner door first!') fail('no interlock hint', sim);
-// Explorers can't skip the prebreathe; Cadets can.
-for (const [mode, skips] of [['Explorer', false], ['Cadet', true]]) {
+// Nobody skips the prebreathe: in every mode it runs its full time before the pump starts.
+for (const mode of ['Cadet', 'Explorer', 'Commander']) {
   const s = new Sim(MISSIONS[0], mode);
   s.inAirlock = true;
   s.airlockStart('out');
-  for (let t = 0; t < 1; t += 0.05) s.airlockTick(0.05);
-  s.airlockSkip();
-  s.airlockTick(0.05);
-  if ((s.airlockStep.kind !== 'prebreathe') !== skips) fail(`prebreathe skip wrong for ${mode}`, s);
+  if (typeof s.airlockSkip === 'function') fail(`there is still a way to skip the prebreathe (${mode})`, s);
+  const full = C.airlock.doorSeconds + C.airlock.prebreathe;
+  for (let t = 0; t < full - 0.2; t += 0.05) s.airlockTick(0.05);
+  if (s.airlockStep?.kind !== 'prebreathe') fail(`prebreathe ended early in ${mode}`, s);
+  for (let t = 0; t < 0.5; t += 0.05) s.airlockTick(0.05);
+  if (s.airlockStep?.kind !== 'pump') fail(`prebreathe did not hand over to the pump in ${mode}`, s);
 }
 // The hatch shuts behind someone who walks out, and they can open it again from the Moon side.
 // Opened from outside, it stays open until they have stepped through.

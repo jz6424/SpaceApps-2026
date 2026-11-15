@@ -521,28 +521,32 @@ for (const look of Object.values(LOCK_LOOK)) {
 }
 
 // A wall across the tube with a doorway in it, so the cabin keeps its air when the chamber is empty.
+// No two faces here may lie in the same plane, or they flicker where they overlap. So the hole in
+// the wall is a little bigger than the doorway and its edges are hidden inside the grey frame, its
+// sill is sunk under the deck, and the wall stands clear of the door leaves and their stripes.
 (function addBulkhead() {
   const r = 7.6 * U, cy = 13.5 * U, from = Math.asin((7.3 - 13.5) / 7.6);
   const wall = new THREE.Shape();
   wall.absarc(0, cy, r, from, Math.PI - from, false);
   wall.closePath();
   const way = new THREE.Path();
-  way.moveTo(-DOOR_HALF * U, DECK * U); way.lineTo(DOOR_HALF * U, DECK * U);
-  way.lineTo(DOOR_HALF * U, (DECK + INNER_TALL) * U); way.lineTo(-DOOR_HALF * U, (DECK + INNER_TALL) * U);
+  const wide = (DOOR_HALF + 0.2) * U, sill = (DECK - 0.1) * U, head = (DECK + INNER_TALL + 0.2) * U;
+  way.moveTo(-wide, sill); way.lineTo(wide, sill);
+  way.lineTo(wide, head); way.lineTo(-wide, head);
   way.closePath();
   wall.holes.push(way);
   const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(wall, { depth: 0.3 * U, bevelEnabled: false }).rotateY(Math.PI / 2), PAINT.white);
-  mesh.position.set(site.x + (INNER_X + 0.2) * U, site.y, site.z);
+  mesh.position.set(site.x + (INNER_X + 0.3) * U, site.y, site.z);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
   for (const s of [-1, 1]) {
-    block(INNER_X + 0.15, INNER_X + 0.6, s * DOOR_HALF, s * (DOOR_HALF + 0.4), DECK, DECK + INNER_TALL, PAINT.grey);
+    block(INNER_X + 0.26, INNER_X + 0.66, Math.min(s * DOOR_HALF, s * (DOOR_HALF + 0.4)), Math.max(s * DOOR_HALF, s * (DOOR_HALF + 0.4)), DECK - 0.05, DECK + INNER_TALL, PAINT.grey);
     solid(INNER_X - 0.2, INNER_X + 0.6, Math.min(s * DOOR_HALF, s * 4.4), Math.max(s * DOOR_HALF, s * 4.4), DECK, DECK + 10);
     // The outer doorway is narrowed to match, with a fixed panel each side.
     block(18.75, 19.35, Math.min(s * DOOR_HALF, s * 3.05), Math.max(s * DOOR_HALF, s * 3.05), DECK, DECK + OUTER_TALL, PAINT.white);
     solid(18.6, 19.4, Math.min(s * DOOR_HALF, s * 3.05), Math.max(s * DOOR_HALF, s * 3.05), DECK, DECK + OUTER_TALL);
   }
-  block(INNER_X + 0.15, INNER_X + 0.6, -DOOR_HALF - 0.4, DOOR_HALF + 0.4, DECK + INNER_TALL, DECK + INNER_TALL + 0.4, PAINT.grey);
+  block(INNER_X + 0.26, INNER_X + 0.66, -DOOR_HALF - 0.42, DOOR_HALF + 0.42, DECK + INNER_TALL, DECK + INNER_TALL + 0.4, PAINT.grey);
   solid(INNER_X - 0.2, INNER_X + 0.6, -DOOR_HALF, DOOR_HALF, DECK + INNER_TALL, DECK + 10);
 })();
 
@@ -555,9 +559,9 @@ function makeDoor(which, x, tall, lamps) {
     const lo = Math.min(0, side * DOOR_HALF), hi = Math.max(0, side * DOOR_HALF);
     [
       block(x - 0.15, x + 0.15, lo, hi, DECK, DECK + tall, PAINT.white),
-      block(x - 0.2, x + 0.2, lo, hi, DECK + 2.5, DECK + 3.2, PAINT.blue),
+      block(x - 0.2, x + 0.2, lo + 0.04, hi - 0.04, DECK + 2.5, DECK + 3.2, PAINT.blue), // stops short of the leaf's edges
       block(x - 0.2, x + 0.2, Math.min(side * 0.5, side * 1.7), Math.max(side * 0.5, side * 1.7), DECK + 4.8, DECK + 6.6, PAINT.glass),
-      block(x - 0.3, x + 0.3, Math.min(side * 0.15, side * 0.4), Math.max(side * 0.15, side * 0.4), DECK + 3.5, DECK + 4.5, PAINT.grey),
+      block(x - 0.25, x + 0.25, Math.min(side * 0.15, side * 0.37), Math.max(side * 0.15, side * 0.37), DECK + 3.5, DECK + 4.5, PAINT.grey),
     ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
     return { leaf, travel: side * DOOR_HALF };
   });
@@ -577,7 +581,7 @@ function makeHatch(which, x, tall, lamps) {
     return disc;
   };
   [
-    block(x - 0.25, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.1, DECK + 8.5, PAINT.white),
+    block(x - 0.25, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.13, DECK + 8.5, PAINT.white), // just clear of the yellow tread
     round(1.1, 0.15, PAINT.glass, [x + 0.28, 0, DECK + 6]),
     round(1.1, 0.15, PAINT.glass, [x - 0.28, 0, DECK + 6]),
     round(0.65, 0.5, PAINT.red, [x + 0.45, 0, DECK + 3]),
@@ -618,7 +622,7 @@ block(17.0, 17.25, 3.1, 4.2, DECK, DECK + 1.2, PAINT.grey);
 block(17.75, 18.0, 3.1, 4.2, DECK, DECK + 1.2, PAINT.grey);
 solid(16.9, 18.1, 3.0, 4.4, DECK, DECK + 1.5);
 block(16.9, 18.1, -4.3, -3.3, DECK, DECK + 0.3, PAINT.dark);
-block(17.4, 17.6, -4.3, -4.1, DECK, DECK + 6.4, PAINT.grey);
+block(17.4, 17.6, -4.28, -4.12, DECK + 0.3, DECK + 6.1, PAINT.grey);
 block(16.95, 18.05, -4.3, -4.1, DECK + 6.1, DECK + 6.4, PAINT.grey);
 block(17.05, 17.95, -4.1, -3.4, DECK + 1.6, DECK + 3.9, PAINT.white);
 block(17.03, 17.97, -4.12, -3.38, DECK + 2.6, DECK + 2.9, PAINT.red);

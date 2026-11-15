@@ -58,7 +58,7 @@ export const CONFIG = {
   // The airlock between the cabin and the surface. Times are game seconds.
   airlock: {
     doorSeconds: 0.6, // a door sliding open or shut
-    prebreathe: 6,    // breathing pure oxygen before going out (Cadets may skip it)
+    prebreathe: 6,    // breathing pure oxygen before going out (nobody may skip it)
     pump: 4,          // pumping the air out, or letting it back in
     cycleAir: 1.5,    // Life Support lost each time the air is pumped out: the pump can't save it all
   },
@@ -184,8 +184,8 @@ export const MISSIONS = [
   },
 ];
 
-// Short how-to cards that appear once, the first time they are needed (see tour.js).
-export const HOWTOS = ['speed', 'build'];
+// Short how-to cards that appear once ever, the first time they are needed (see tour.js).
+export const HOWTOS = ['speed'];
 
 export const STAR_SHARE = { 1: 0.5, 2: 0.75, 3: 1 };
 export const missionById = id => MISSIONS.find(m => m.id === id);

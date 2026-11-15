@@ -697,13 +697,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('lock-text').textContent = step.waiting ? 'Step away from the door so it can close!' : text;
       $('lock-fact').textContent = fact;
       $('lock-fact').hidden = !fact;
-      $('lock-skip').hidden = !(step.kind === 'prebreathe' && sim.modeName === 'Cadet');
     }
     $('lock-bar').setAttribute('aria-valuenow', Math.round(step.progress * 100));
     $('lock-bar').firstElementChild.style.width = `${step.progress * 100}%`;
   }
-  const skipBtn = () => sim.airlockSkip();
-  $('lock-skip').addEventListener('click', skipBtn);
   const showSound = () => {
     $('sound').setAttribute('aria-pressed', soundOn());
     $('sound').textContent = soundOn() ? 'Sound on' : 'Sound off';
@@ -787,7 +784,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       list.removeEventListener('wheel', wakeFeed);
       list.classList.remove('quiet');
       $('air-toast').hidden = true;
-      $('lock-skip').removeEventListener('click', skipBtn);
       $('airlock-panel').hidden = true;
     },
   };

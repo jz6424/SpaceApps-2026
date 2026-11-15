@@ -294,10 +294,6 @@ export class Sim {
     }
     return this.airlockStart(door === 'outer' ? 'out' : 'in');
   }
-  airlockSkip() {
-    const cy = this.airlock.cycle;
-    if (cy && cy.steps[cy.i].kind === 'prebreathe' && this.modeName === 'Cadet') cy.t = cy.steps[cy.i].length;
-  }
   // Jump straight to a resting state, for when the astronaut is moved without walking through.
   airlockSet(pressure) {
     Object.assign(this.airlock, { inner: pressure === 'pressurized', outer: pressure === 'vacuum', pressure, cycle: null });

@@ -139,8 +139,9 @@ function buildSteps() {
   ];
 }
 
-// How-to cards. Each is shown once (the save remembers), when `when` first comes true and nothing
-// else is on screen. `known` skips one the player has plainly worked out already.
+// How-to cards. Each is shown when `when` first comes true and nothing else is on screen: once
+// ever (the save remembers), or once every mission if it is marked `always`. `known` skips one
+// the player has plainly worked out already.
 const calm = sim => !sim.stormNow && !sim.nextStorm?.warnedBy;
 const HOWTOS = [
   {
@@ -169,25 +170,34 @@ const HOWTOS = [
     ],
   },
   {
-    // The mission about the regolith shield: show the new tool in slot 2 and what it builds.
-    id: 'build',
+    // The mission about the regolith shield. The clock runs from the moment you arrive, so this
+    // sits in the corner and never stops the game: send the robot to dig, then meet the new tool.
+    // It is there every time the mission starts, like the First Night tour.
+    id: 'build', always: true,
     when: (sim, hud) => hud.hasTool('builder') && sim.mission.goalType === 'dose' && sim.where !== 'outside' && calm(sim),
     known: sim => sim.shielding > 0,
     steps: sim => [
       {
-        title: 'New tool: the Building tool', at: 'right', freeze: true, target: '#hotbar [data-tool="builder"]', side: 'above',
+        title: 'Send the robot out to dig', at: 'right', target: { station: 'MapTable' }, side: 'above',
+        hint: 'Click the Robot Map label and choose "Dig moon dirt".', until: s => s.robot.task === 'dig',
+        text: [
+          '<b>The clock is running.</b> A solar storm is on its way, and a shield of moon dirt (regolith) over the Storm Shelter will protect you.',
+          `The shield needs ${sim.shieldCost} moon dirt and you have ${Math.floor(sim.regolith)}. <b>Click the Robot Map label</b> and choose <b>Dig moon dirt</b>.`,
+        ],
+      },
+      {
+        title: 'Your new Building tool', at: 'right', closeStation: true, target: '#hotbar [data-tool="builder"]', side: 'above',
         nextLabel: 'Take it out', action: hud => hud.holdTool('builder'), until: (s, hud) => hud.holding === 'builder',
         text: [
-          'Your Regolith Shielding research came with a <b>Building tool</b>. It is in slot 2 at the bottom of your screen.',
+          'The robot is digging. Your Regolith Shielding research also came with a <b>Building tool</b>, in slot 2 at the bottom of your screen.',
           isTouch ? '<b>Tap the slot</b> to take it out.' : 'Press <b>2</b> (or click the slot) to take it out.',
         ],
       },
       {
-        title: 'Build a regolith shield', at: 'right', freeze: true, target: '#build-card', side: 'above', nextLabel: 'Got it',
+        title: 'Build the regolith shield', at: 'right', target: '#build-card', side: 'above', nextLabel: 'Got it',
         text: [
-          'With the tool out, this card shows what you can build: a shield of moon dirt (regolith) piled over the Storm Shelter. A blue outline at the back of the Habitat shows where it will go.',
-          `<b>It needs ${sim.shieldCost} moon dirt and you have ${Math.floor(sim.regolith)}.</b> Send the robot to dig at the <b>Robot Map</b> first. When you have enough, press <b>Build it</b>${isTouch ? '' : ' (or <b>B</b>)'}.`,
-          'Build it before the first storm, then hide in the shelter. You need both for 3 stars.',
+          'With the tool out, this card shows what you can build and how much moon dirt you have. A blue outline at the back of the Habitat shows where the shield will go.',
+          `When the bar is full, press <b>Build it</b>${isTouch ? '' : ' (or <b>B</b>)'}. Build it before the first storm, then hide in the Storm Shelter. You need both for 3 stars.`,
         ],
       },
     ],
@@ -202,7 +212,8 @@ export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
   let steps = [];               // the steps on screen now: the tour's, or one how-to's
   let kind = null;              // 'tour', or the id of the how-to that is showing
   let active = false;           // a card is on screen
-  const shown = new Set(seen);
+  const shown = new Set(seen);   // how-tos this save has had
+  const ran = new Set();          // how-tos this mission has had
   let i = -1;
   let alive = true;
   let callouts = [];            // the labels of the current step
@@ -452,11 +463,11 @@ export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
   function nextHowTo() {
     if (hud.open || sim.over) return;
     for (const how of HOWTOS) {
-      if (shown.has(how.id)) continue;
+      if (ran.has(how.id) || (shown.has(how.id) && !how.always)) continue;
       const known = how.known?.(sim, hud);
       if (!known && !how.when(sim, hud)) continue;
-      shown.add(how.id);
-      onSeen(how.id);
+      ran.add(how.id);
+      if (!how.always) { shown.add(how.id); onSeen(how.id); }
       if (!known) return run(how.steps(sim, hud), how.id);
     }
   }
