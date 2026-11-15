@@ -19,6 +19,7 @@ const GRAVITY = 1.62;          // Moon gravity, m/s2
 const WALK = 2.5, RUN = 5, JUMP = 2.6;
 const USE_RANGE = 2.4;         // how close you must be to use something with E
 const SUN_FULL = 3;
+const stillLights = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 await RAPIER.init();
 // The labels are drawn on canvases, so their typeface has to be loaded before the first one is drawn.
@@ -426,7 +427,9 @@ function labelSprite(text, icon, color = '#FFFFFF') {
 
 // --- The base outside ---
 const L = (dx, dz) => new THREE.Vector3(site.x + dx, groundAt(site.x + dx, site.z + dz), site.z + dz);
-function place(name, at, rotY = 0) {
+// solid: false for things that drive about (the robot), whose box would stay behind as an
+// invisible wall where it was parked.
+function place(name, at, rotY = 0, { solid = true } = {}) {
   const model = name === 'Solar' ? models.Solar.clone(true) : models[name];
   model.position.copy(at);
   model.rotation.y = rotY;
@@ -436,7 +439,7 @@ function place(name, at, rotY = 0) {
   });
   scene.add(model);
   model.updateMatrixWorld(true);
-  model.traverse(o => { if (o.name.startsWith('COL_') && o.isMesh) addBox(o); });
+  if (solid) model.traverse(o => { if (o.name.startsWith('COL_') && o.isMesh) addBox(o); });
   return model;
 }
 const panels = [-12, -4, 4].map((dx, i) => {
@@ -455,7 +458,7 @@ place('OxygenMaker', L(-16, 9), Math.PI / 2);
 place('Antenna', L(-18, -3));
 place('CargoLander', L(20, 18), -0.4);
 const dock = L(14, 6);
-const robot = place('Digger', dock.clone());
+const robot = place('Digger', dock.clone(), 0, { solid: false });
 const digSpot = L(34, -12);
 
 // The ice drill sits at the nearest ground NASA's map says never sees sunlight.
@@ -1069,6 +1072,17 @@ crew.add(crewModel);
 // The limbs move, so three.js can't tell from the rest pose when the mesh is off screen.
 crew.traverse(o => { o.castShadow = true; o.frustumCulled = false; });
 scene.add(crew);
+// Hiding the astronaut hides only its meshes. Hiding the whole group would also switch off the
+// helmet glow and chest light, and a change in the number of lights makes three.js rebuild every
+// material's shader, which freezes the game for a moment.
+const crewMeshes = [];
+crew.traverse(o => { if (o.isMesh) crewMeshes.push(o); });
+let crewShown = true;
+function showCrew(on) {
+  if (on === crewShown) return;
+  crewShown = on;
+  crewMeshes.forEach(m => { m.visible = on; });
+}
 
 // The skeleton's joints, and how each one sits at rest, for the body language added in tick().
 const BONES = ['Hips', 'Spine', 'ArmL', 'ArmR', 'ForearmL', 'ForearmR', 'ThighL', 'ThighR', 'ShinL', 'ShinR', 'FootL', 'FootR'];
@@ -1080,7 +1094,9 @@ const smoothed = Object.fromEntries(BONES.map(n => [n, bones[n].quaternion.clone
 const torch = new THREE.SpotLight(0xfff1d6, 60, 26, 0.55, 0.6, 1.3);
 torch.position.set(0, 1.18, 0.24);
 torch.target.position.set(0, 0.2, 7);
-torch.visible = false;
+// Always in the scene and switched by brightness, for the same reason as showCrew() above.
+torch.intensity = 0;
+let torchOn = false;
 const torchLamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3c4048, emissive: 0xfff1d6, emissiveIntensity: 0 }));
 torchLamp.position.set(0.11, 1.2, 0.2);
 // The helmet lamps give a faint glow after dark, just enough to see the astronaut and their feet.
@@ -1088,7 +1104,8 @@ const helmetGlow = new THREE.PointLight(0xfff1d6, 0, 4.5, 1.4);
 helmetGlow.position.set(0, 1.9, 0.5);
 crewModel.add(torch, torch.target, torchLamp, helmetGlow);
 function setTorch(on) {
-  torch.visible = on;
+  torchOn = on;
+  torch.intensity = on ? 60 : 0;
   torchLamp.material.emissiveIntensity = on ? 3 : 0;
 }
 
@@ -1277,7 +1294,7 @@ addEventListener('keydown', e => {
   if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   if (!e.repeat) {
     if (code === 'KeyE') useNearest();
-    if (code === 'KeyF') setTorch(!torch.visible);
+    if (code === 'KeyF') setTorch(!torchOn);
     if (code === 'KeyT') hooks?.toggleSpeed();
     if (code === 'KeyB') hooks?.build?.();
     const slot = /^Digit([1-4])$/.exec(e.code);
@@ -1286,7 +1303,6 @@ addEventListener('keydown', e => {
   keys.add(code);
 });
 addEventListener('keyup', e => keys.delete(KEYMAP[e.code] || e.code));
-addEventListener('blur', () => keys.clear());
 
 const DRAG_SPEED = 0.005; // radians the view turns per pixel of mouse drag
 let yaw = Math.PI / 2, pitch = 0.2, camDist = 7;
@@ -1324,16 +1340,26 @@ function fingerUp(e, tap) {
   if (tap && f && f.moved < 12 && fingers.size === 0 && state === 'play') click(e);
 }
 canvas.addEventListener('pointercancel', e => { if (e.pointerType === 'touch') fingerUp(e, false); });
+// Switching to another app or tab mid-press never sends the "let go", so forget every held key,
+// finger and button then. Otherwise the astronaut keeps walking, or taps stop working.
+addEventListener('blur', () => { keys.clear(); fingers.clear(); pinch = 0; down = null; touchPad?.letGo(); });
 
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture(e.pointerId);
   if (e.pointerType === 'touch') { fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 }); pinch = 0; return; }
   down = { x: e.clientX, y: e.clientY, moved: 0 };
-  // Hide the cursor and let the mouse travel without hitting the screen edge while dragging.
-  try { canvas.requestPointerLock()?.catch?.(() => {}); } catch {}
 });
+// Hide the cursor and let the mouse travel without hitting the screen edge, once a press turns
+// into a drag. Asking on every press would hide the cursor after a quick click (the lock can
+// arrive after the button is already up) and flash the browser's "Press Esc" banner each time.
+function lockForDrag() {
+  if (document.pointerLockElement || !down || down.locking) return;
+  down.locking = true;
+  try { canvas.requestPointerLock()?.catch?.(() => {}); } catch {}
+}
 // If the browser took the mouse back mid-drag (Esc), act like Esc was pressed so the pause menu opens.
 document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement && !down) { document.exitPointerLock(); return; } // the press already ended
   if (!document.pointerLockElement && down) {
     down = null;
     dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }));
@@ -1342,7 +1368,7 @@ document.addEventListener('pointerlockchange', () => {
 canvas.addEventListener('pointermove', e => {
   if (e.pointerType === 'touch') return fingerMove(e);
   if (canvas.hasPointerCapture(e.pointerId) || document.pointerLockElement === canvas) {
-    if (down) down.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
+    if (down) { down.moved += Math.abs(e.movementX) + Math.abs(e.movementY); if (down.moved > 6) lockForDrag(); }
     // Same turn per pixel sideways and up/down. Raise DRAG_SPEED to turn faster, lower it to turn slower.
     yaw -= e.movementX * DRAG_SPEED;
     pitch = THREE.MathUtils.clamp(pitch + e.movementY * DRAG_SPEED, -0.6, 1.3);
@@ -1411,7 +1437,7 @@ const touchPad = isTouch ? setupTouch({
   move: (x, y) => { stick.x = x; stick.y = y; },
   jump: () => { if (state === 'play' && !hooks?.busy()) jumpAsked = true; },
   use: () => { if (state === 'play' && !hooks?.busy()) useNearest(); },
-  light: () => { if (state === 'play' && !hooks?.busy()) setTorch(!torch.visible); },
+  light: () => { if (state === 'play' && !hooks?.busy()) setTorch(!torchOn); },
 }) : null;
 let camShown = 7; // how far the camera actually is: pulled in at once by walls, eased back out
 let camY = 0, camFloor = 0; // the height the camera follows (smoothed), and the ground height before a jump
@@ -1431,6 +1457,9 @@ const head = new THREE.Vector3(), camDir = new THREE.Vector3();
 function teleport(p) {
   crewBody.setTranslation(p, true);
   crewBody.setNextKinematicTranslation(p);
+  // Move the collider now too, so the next movement check starts from the new spot, not the old one.
+  world.propagateModifiedBodyPositionsToColliders();
+  walkTo = null; // and stop following a walk planned from where you were
   vy = velX = velZ = 0;
   camY = camFloor = p.y; // the camera jumps with a teleport instead of drifting there
 }
@@ -1607,11 +1636,11 @@ function tick(dt) {
   camShown = camWant < camShown ? camWant : camShown + (camWant - camShown) * ease(5);
   if (camShown < 0.7) {
     // Squeezed right up to the astronaut by a wall: look from the visor rather than from inside the suit.
-    crew.visible = false;
+    showCrew(false);
     camera.position.copy(head).addScaledVector(camDir, -0.1);
     camera.lookAt(camera.position.x - camDir.x, camera.position.y - camDir.y, camera.position.z - camDir.z);
   } else {
-    crew.visible = true;
+    showCrew(true);
     camera.position.copy(head).addScaledVector(camDir, camShown);
     camera.lookAt(head);
   }
@@ -1633,6 +1662,7 @@ function syncWorld(dt) {
   dirtShield.sync(sim.shielding, holding === 'builder' && sim.shieldCost !== undefined ? sim.shielding + 1 : 0, dt, crewIn);
   const light = sim.sunlight;
   sun.intensity = SUN_FULL * light;
+  sun.shadow.autoUpdate = light > 0.01; // no sunlight, no sun shadows to redraw: saves a whole pass each frame at night
   hemi.intensity = 0.07 + 0.63 * light;   // at night only starlight is left outside
   earth.visible = sim.earthUp;
   // Shelter glow: soft all the time, brighter and pulsing when a storm is coming or here.
@@ -1643,10 +1673,14 @@ function syncWorld(dt) {
   // Eco turns the cabin lamps down, and a flat battery makes them flicker.
   const lamps = LAMP * (sim.ls === 'eco' ? LAMP_ECO : 1);
   helmetGlow.intensity = 2.5 * (1 - light);
-  inLights.forEach(l => { l.intensity = lamps * (sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1); });
+  // The wobble is slow and gentle (a few times a second, not every frame), because fast flashing
+  // light can be uncomfortable or unsafe for some players. With reduced motion it holds still.
+  const t = performance.now() / 1000;
+  const wobble = phase => (stillLights ? 0 : Math.sin(t * 2.1 + phase) * Math.sin(t * 3.7 + phase * 1.7));
+  inLights.forEach(l => { l.intensity = lamps * (sim.share < 0.8 ? (0.5 + 0.12 * wobble(0)) * Math.max(0.4, sim.share) : 1); });
   panels.forEach((pn, i) => {
     const broken = !sim.panels[i];
-    pn.spark.intensity = broken ? 4 + 4 * Math.random() : 0;
+    pn.spark.intensity = broken ? 6 + 2 * wobble(i * 2.3) : 0;
     pn.label.visible = broken;
     pn.model.rotation.z = broken ? 0.12 : 0;
   });
@@ -1779,6 +1813,7 @@ function snapshot(name) {
   const shot = SHOTS[name]();
   // The world as it looks on a clear day, with nothing left over from the last mission.
   sun.intensity = SUN_FULL;
+  sun.shadow.autoUpdate = true;
   hemi.intensity = 0.7;
   earth.visible = true;
   inLights.forEach(l => { l.intensity = LAMP; });
@@ -1790,10 +1825,15 @@ function snapshot(name) {
   // Labels float over the game, not over a photo. They and the roof go back the way they were.
   const labels = [];
   scene.traverse(o => { if (o.isSprite && o.visible) { labels.push(o); o.visible = false; } });
-  const roofWas = roofMeshes.map(m => m.visible);
-  roofMeshes.forEach(m => { m.visible = !shot.inside; });
-  const crewWas = { at: crew.position.clone(), turn: crew.rotation.y, seen: crew.visible };
-  crew.visible = !!shot.crew;
+  // While you are inside, the roof is kept in the scene but drawn see-through (tick() turns off its
+  // colour and depth), so a photo of the outside has to switch those back on as well.
+  const roofWas = roofMeshes.map(m => [m.visible, m.material?.colorWrite, m.material?.depthWrite]);
+  roofMeshes.forEach(m => {
+    if (m.material) m.material.colorWrite = m.material.depthWrite = true;
+    m.visible = !shot.inside;
+  });
+  const crewWas = { at: crew.position.clone(), turn: crew.rotation.y, seen: crewShown };
+  showCrew(!!shot.crew);
   if (shot.crew) {
     const { at, face } = shot.crew;
     crew.position.set(at.x, at.y + CREW_HEIGHT / 2, at.z);
@@ -1818,10 +1858,13 @@ function snapshot(name) {
   dirtShield.set(0);
 
   labels.forEach(o => { o.visible = true; });
-  roofMeshes.forEach((m, i) => { m.visible = roofWas[i]; });
+  roofMeshes.forEach((m, i) => {
+    m.visible = roofWas[i][0];
+    if (m.material) { m.material.colorWrite = roofWas[i][1]; m.material.depthWrite = roofWas[i][2]; }
+  });
   crew.position.copy(crewWas.at);
   crew.rotation.y = crewWas.turn;
-  crew.visible = crewWas.seen;
+  showCrew(crewWas.seen);
   camera.fov = 60;
   renderer.setPixelRatio(ratio);
   fitWindow();

@@ -5,7 +5,7 @@ import { CONFIG as C, MISSIONS, MODES, missionById, pointsFor } from './config.j
 import { Sim, planRun, flareLabel, flareSize, starRules } from './sim.js';
 import { createHud, icon } from './hud.js';
 import { createTour } from './tour.js';
-import { getFlares, dataCard, SOURCES } from './nasa.js';
+import { getFlares, dataCard, SOURCES, PAST_FLARES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
 import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
 import { PAGES } from './scrapbook.js';
@@ -741,7 +741,7 @@ function spaceWeatherReport() {
   const top = list.reduce((a, b) => flareSize(b.classType).units > flareSize(a.classType).units ? b : a);
   const sizes = 'Flares are graded C, M or X, and X is the strongest.';
   return flares.live
-    ? `Space weather report, live from NASA's DONKI database: in the past 12 months the Sun fired off ${count('X')} X-class flares and ${count('M')} M-class flares. The biggest was the ${flareLabel(top)}. ${sizes} Your storms are sized from these real flares, and they change every time you play.`
+    ? `Space weather report, live from NASA's DONKI database: in the past ${flares.days >= 360 ? '12 months' : `${flares.days} days`} the Sun fired off ${count('X')} X-class flares and ${count('M')} M-class flares. The biggest was the ${flareLabel(top)}. ${sizes} Your storms are sized from these real flares, and they change every time you play.`
     : `Space weather report: the live NASA feed could not be reached, so your storms are sized from ${list.length} real past flares in NASA's DONKI records. ${sizes} They change every time you play.`;
 }
 
@@ -824,7 +824,8 @@ function launch(id = chosen) {
   newPages = [];
   let frames = 0;
   // A new plan every time: different real flares, and storms at slightly different times.
-  sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? []));
+  // If the live check hasn't answered yet, the storms come from NASA's archived flares instead.
+  sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? PAST_FLARES));
   sim.say(mission.brief, 'info');
   hud = createHud({ sim, site: game.site, unlocks: unlocksNow(), api: game, liveFlares: flares?.live ?? false, points: save.points });
   tour?.destroy();
@@ -861,6 +862,7 @@ function endMission() {
   tour = null;
   hud?.destroy();
   hud = null;
+  $('hud').inert = false;
   game.stop();
 }
 
@@ -872,10 +874,11 @@ function pause(tab = 'settings') {
   $('pause-mission').textContent = `${sim.mission.name}, ${sim.modeName} mode.`;
   $('pm-goal').textContent = goalText(sim.mission, sim.modeName);
   $('pm-brief').textContent = sim.mission.brief;
-  $('pm-flare').textContent = sim.storms.length ? 'Each solar storm in this mission is sized from a real flare in NASA\'s DONKI records.' : '';
+  $('pm-flare').textContent = sim.storms.some(s => s.flare) ? 'Each solar storm in this mission is sized from a real flare in NASA\'s DONKI records.' : '';
   $('abandon').hidden = true;
   $('pause').querySelector('.dialog > .row').hidden = false;
   pauseTab(tab);
+  $('hud').inert = true; // Tab stays inside the pause panel instead of reaching the HUD behind it
   show('pause');
 }
 
@@ -899,6 +902,7 @@ function pauseTab(id) {
 }
 
 function resume() {
+  $('hud').inert = false;
   game.resume();
   show(null);
 }
@@ -1038,3 +1042,8 @@ window.ui = { launch, scrapbook: openScrapbook, get sim() { return sim; }, get s
 
 renderStart();
 show('start');
+
+// The 3D world (three.js scene, Rapier physics, models and terrain) is a separate download that
+// starts now, so the start screen and its "Loading the Moon" show straight away instead of after
+// the whole game has arrived. main.js calls gameReady() when the Moon is ready.
+import('./main.js');

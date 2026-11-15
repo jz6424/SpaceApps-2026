@@ -80,7 +80,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     }
     const tag = isRead(page)
       ? `<span class="sb-tag read">${glyph('check', 14)} Read</span>`
-      : `<span class="sb-tag new">New +${CONFIG.science.pageRP}</span>`;
+      : `<span class="sb-tag new">New${allOpen() ? '' : ` +${CONFIG.science.pageRP}`}</span>`;
     return `<li><button class="sb-row" data-do="page" data-id="${page.id}">
       <span class="sb-sticker">${glyph(page.icon, 20)}</span>
       <span class="sb-row-name">${esc(page.name)}</span><span class="sb-dots"></span>
@@ -304,7 +304,9 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     shutNow = null;   // a page opened while the book was shutting keeps it open
     at = page ? page.id : null;
     paid = null;
-    if (page && isOpen(page) && !save.read.includes(at)) {
+    // With every mission opened (the teacher and judge switch) pages can be read but pay nothing,
+    // as the README and the site promise.
+    if (page && isOpen(page) && !allOpen() && !save.read.includes(at)) {
       save.read.push(at);
       save.points += CONFIG.science.pageRP;
       commit();

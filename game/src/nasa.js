@@ -56,7 +56,7 @@ export async function readSiteMaps() {
 //
 // Real flares from DONKI, each checked against the database on 2026-11-14. sep: DONKI links the
 // flare to a solar energetic particle event, which is the kind of storm the game is about.
-const PAST_FLARES = [
+export const PAST_FLARES = [
   { date: '2017-09-06', classType: 'X9.3', sep: true, note: 'It was the biggest flare of solar cycle 24.' },
   { date: '2024-10-03', classType: 'X9.0', sep: false, note: 'It was one of the biggest flares of solar cycle 25.' },
   { date: '2017-09-10', classType: 'X8.2', sep: true, note: 'Its particles reached the ground on Earth and lit up auroras on Mars.' },
@@ -92,7 +92,12 @@ async function fromCcmc(end) {
     const to = new Date(end.getTime() - k * 60 * DAY), from = new Date(to.getTime() - 59 * DAY);
     return getJson(`https://ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR?startDate=${iso(from)}&endDate=${iso(to)}`);
   }));
-  return parts.flatMap(p => p.status === 'fulfilled' && Array.isArray(p.value) ? p.value : []);
+  // Keep the unbroken run of answers back from today, so a count is never quietly missing a month.
+  const ok = parts.findIndex(p => p.status !== 'fulfilled' || !Array.isArray(p.value));
+  const got = ok < 0 ? parts : parts.slice(0, ok);
+  const list = got.flatMap(p => p.value);
+  list.days = got.length * 60;
+  return list;
 }
 
 // The same database through NASA's API portal, as a second try.
@@ -107,15 +112,16 @@ export async function getFlares() {
   for (const source of [fromCcmc, fromApiPortal]) {
     try {
       const seen = new Set();
-      const flares = (await source(end))
-        .filter(f => /^[MX]\d/.test(f.classType ?? '') && (f.peakTime || f.beginTime) && !seen.has(f.flrID) && seen.add(f.flrID))
+      const raw = await source(end);
+      const flares = raw
+        .filter(f => /^[MX]\d+(\.\d+)?$/.test(f.classType ?? '') &&(f.peakTime || f.beginTime) && !seen.has(f.flrID) && seen.add(f.flrID))
         .map(f => ({
           date: (f.peakTime || f.beginTime).slice(0, 10),
           classType: f.classType,
           sep: (f.linkedEvents ?? []).some(e => /-SEP-/.test(e.activityID ?? '')),
           id: f.flrID,
         }));
-      if (flares.length) return { live: true, flares };
+      if (flares.length) return { live: true, flares, days: raw.days ?? 365 };
     } catch {
       // Try the next source.
     }

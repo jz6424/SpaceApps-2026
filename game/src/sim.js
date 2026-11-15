@@ -87,7 +87,7 @@ export class Sim {
     this.ls = 'normal';
     this.comms = false;
     this.greenhouse = false;
-    this.robot = { task: 'idle', offline: 0, progress: 0, target: -1, resumeAfterStorm: null };
+    this.robot = { task: 'idle', offline: 0, progress: 0, target: -1, paidFor: -1 };
     this.panels = Array(C.solar.panels).fill(true);
     this.shielding = 0;
     this.where = 'inside';
@@ -157,9 +157,11 @@ export class Sim {
   }
   // What the solar panels make and what the base draws, per second, as things stand right now.
   get gen() { return this.panelsWorking * C.solar.perPanel * this.sunlight * this.siteSun * this.mode.solar; }
+  // Boost with no moon dirt left works (and is charged) like Normal.
+  get boostEmpty() { return this.ls === 'boost' && this.regolith <= 0; }
   get demand() {
     const P = C.power, ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
-    return (P.lifeSupport[this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
+    return (P.lifeSupport[this.boostEmpty ? 'normal' : this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
       + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
   }
   get batteryForecast() { // seconds the battery lasts at the current net drain, or Infinity
@@ -186,12 +188,17 @@ export class Sim {
     this.flags.robot = true;
     if (this.robot.offline > 0) return 'The robot is still being fixed.';
     if (task === 'repair') {
-      if (this.regolith < C.robot.repairRegolith) return `Not enough moon dirt. Repairs need ${C.robot.repairRegolith}.`;
       if (target < 0) target = this.panels.indexOf(false);
       if (target < 0) return 'No broken panels.';
-      this.regolith -= C.robot.repairRegolith;
+      // A repair is paid for once: pressing the button again, or carrying on after parking for a
+      // storm, picks up where the robot left off.
+      if (this.robot.paidFor !== target) {
+        if (this.regolith < C.robot.repairRegolith) return `Not enough moon dirt. Repairs need ${C.robot.repairRegolith}.`;
+        this.regolith -= C.robot.repairRegolith;
+        this.robot.paidFor = target;
+        this.robot.progress = 0;
+      }
       this.robot.target = target;
-      this.robot.progress = 0;
     }
     this.robot.task = task;
     return null;
@@ -211,6 +218,10 @@ export class Sim {
     if (this.regolith < C.evaRepairRegolith) return `You need ${C.evaRepairRegolith} moon dirt to patch it.`;
     this.regolith -= C.evaRepairRegolith;
     this.panels[i] = true;
+    if (this.robot.paidFor === i) { // the robot's moon dirt for this panel goes back in the store
+      this.regolith += C.robot.repairRegolith;
+      this.robot.paidFor = -1;
+    }
     if (this.robot.task === 'repair' && this.robot.target === i) this.robot.task = 'idle';
     this.say('Panel fixed. Power is flowing again.', 'good');
     return null;
@@ -381,6 +392,9 @@ export class Sim {
 
     // Power.
     const ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
+    // Boost needs moon dirt. Without it the machine runs (and is charged) like Normal: see demand.
+    if (this.boostEmpty && !this.flags.boostEmpty) { this.flags.boostEmpty = true; this.say('Out of moon dirt, so Boost is working like Normal.', 'warn'); }
+    if (!this.boostEmpty) this.flags.boostEmpty = false;
     const gen = this.gen, demand = this.demand, net = gen - demand;
     this.power = Math.min(C_.meters.powerMax, this.power + net * dt);
     if (this.power <= 0) {
@@ -454,6 +468,7 @@ export class Sim {
           this.say(`The robot fixed solar panel ${R.target + 1}.`, 'good');
           R.task = 'idle';
           R.target = -1;
+          R.paidFor = -1;
         }
       }
     }

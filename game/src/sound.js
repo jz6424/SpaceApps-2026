@@ -9,14 +9,20 @@ try { muted = localStorage.getItem(KEY) === 'off'; } catch { /* storage blocked:
 function wake() {
   try {
     ctx ??= new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended' && !document.hidden) ctx.resume().catch(() => {});
     if (!musicMuted) startMusic();
   } catch {
     ctx = null; // no audio on this device: the game plays silently
   }
 }
-addEventListener('pointerdown', wake, true);
-addEventListener('keydown', wake, true);
+// Phones and tablets only allow sound from the end of a tap (touchend, click), not its start.
+for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(type, wake, true);
+// Quiet while the game is in a background tab, back on when you return.
+document.addEventListener('visibilitychange', () => {
+  if (!ctx) return;
+  if (document.hidden) ctx.suspend().catch(() => {});
+  else ctx.resume().catch(() => {});
+});
 
 export const soundOn = () => !muted;
 export function setSound(on) {

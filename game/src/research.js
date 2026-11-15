@@ -134,7 +134,7 @@ export const BRANCHES = [
       },
       {
         id: 'IceDrill', icon: 'droplet', name: 'Ice drill', cost: 15, needs: 'DrumDigger',
-        science: 'The shadowed craters are colder than -200 C, so the icy ground there is frozen hard. NASA built a drill called TRIDENT that hammers while it turns to break through it.',
+        science: 'The shadowed craters are colder than -200 C, so the icy ground there is frozen hard. Engineers built NASA a drill called TRIDENT that hammers while it turns to break through it.',
         change: 'The robot brings back ice 25% faster.',
         effects: [{ path: 'robot.ice', times: 1.25 }],
       },

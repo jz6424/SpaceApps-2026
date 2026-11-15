@@ -491,6 +491,8 @@ export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
       clearCallouts();
       holder.remove();
       root.hidden = true;
+      // Leaving mid-tour (Abandon) must bring the station labels back for the next mission.
+      document.body.classList.remove('tour-labels');
     },
   };
 }

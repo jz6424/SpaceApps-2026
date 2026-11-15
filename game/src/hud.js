@@ -244,7 +244,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const R = sim.robot, lights = sim.food !== null || unlocks.includes('Greenhouse');
     const job = { dig: 'digging moon dirt', ice: 'hauling crater ice', repair: 'fixing a panel' }[R.task];
     return [
-      { name: 'Life Support', state: cap(sim.ls), on: true, use: P.lifeSupport[sim.ls], where: 'Life Support station', note: `${sim.ls} setting, always on` },
+      { name: 'Life Support', state: cap(sim.ls), on: true, use: P.lifeSupport[sim.boostEmpty ? 'normal' : sim.ls], where: 'Life Support station', note: `${sim.ls} setting, always on${sim.boostEmpty ? ' (no moon dirt, so it works like Normal)' : ''}` },
       { name: 'Heaters', state: sim.isNight ? 'on at night' : 'off until night', on: sim.isNight, use: P.heaters, where: 'automatic, there is no station for it', note: 'switch on at night' },
       { name: 'Antenna', state: sim.comms ? 'on' : 'off', on: sim.comms, use: P.comms, where: 'Comms station', note: 'on' },
       lights && { name: 'Grow lights', state: sim.greenhouse ? 'on' : 'off', on: sim.greenhouse, use: P.greenhouse, where: 'Galley', note: 'on' },
@@ -547,20 +547,31 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     },
   };
 
+  // The map's ground (sunlight plus shadowed ice) never changes, so it is worked out once and
+  // copied in; only the dots are redrawn.
+  let mapGround = null;
+  function groundMap(r0, c0, size) {
+    if (mapGround) return mapGround;
+    mapGround = document.createElement('canvas');
+    mapGround.width = mapGround.height = 200;
+    const ctx = mapGround.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(site.maps.sun.img, c0, r0, size, size, 0, 0, 200, 200);
+    const img = ctx.getImageData(0, 0, 200, 200);
+    for (let y = 0; y < 200; y++) for (let x = 0; x < 200; x++) {
+      const p = site.maps.psrAt(r0 + y * size / 200, c0 + x * size / 200);
+      if (p > 0.5) { const i = (y * 200 + x) * 4; img.data[i] = 46; img.data[i + 1] = 150; img.data[i + 2] = 245; }
+    }
+    ctx.putImageData(img, 0, 0);
+    return mapGround;
+  }
   function drawMap() {
     const cv = $('robot-map');
     if (!cv) return;
     const ctx = cv.getContext('2d');
-    const { maps } = site, half = 90; // pixels each way = 450 m
+    const half = 90; // pixels each way = 450 m
     const r0 = site.row - half, c0 = site.col - half, size = half * 2;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(maps.sun.img, c0, r0, size, size, 0, 0, 200, 200);
-    const img = ctx.getImageData(0, 0, 200, 200);
-    for (let y = 0; y < 200; y++) for (let x = 0; x < 200; x++) {
-      const p = maps.psrAt(r0 + y * size / 200, c0 + x * size / 200);
-      if (p > 0.5) { const i = (y * 200 + x) * 4; img.data[i] = 46; img.data[i + 1] = 150; img.data[i + 2] = 245; }
-    }
-    ctx.putImageData(img, 0, 0);
+    ctx.drawImage(groundMap(r0, c0, size), 0, 0);
     const toMap = (wx, wz) => [(wx - site.worldX) / 5 / size * 200 + 100, (wz - site.worldZ) / 5 / size * 200 + 100];
     const dot = ([x, y], fill, r) => { ctx.fillStyle = fill; ctx.strokeStyle = '#07173F'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(Math.max(4, Math.min(196, x)), Math.max(4, Math.min(196, y)), r, 0, 7); ctx.fill(); ctx.stroke(); };
     dot([100, 100], '#EAFE07', 7);
@@ -568,18 +579,39 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     dot(toMap(site.robot().x, site.robot().z), '#E43700', 5);
   }
 
+  // The panel refreshes every second. Opening it builds it; after that only the words and settings
+  // that changed are updated, so the buttons stay the same buttons: a slow press is never lost
+  // halfway, hover doesn't flicker and keyboard focus stays put.
+  let shownBody = '';
   function renderStation(force = false) {
     if (!open) return;
     const view = STATIONS[open]();
-    const focused = document.activeElement?.closest?.('#station [data-act]');
-    const key = focused ? `${focused.dataset.act}|${focused.dataset.arg}` : null;
-    if (force) $('station-title').innerHTML = `${icon(view.icon, 24)} ${view.title}`;
-    $('station-body').innerHTML = view.body;
-    view.after?.();
-    if (key) {
-      const [act, arg] = key.split('|');
-      $('station-body').querySelector(`[data-act="${act}"][data-arg="${arg}"]`)?.focus();
+    const body = $('station-body');
+    if (force) {
+      $('station-title').innerHTML = `${icon(view.icon, 24)} ${view.title}`;
+      body.innerHTML = view.body;
+    } else if (view.body !== shownBody) {
+      const next = document.createElement('div');
+      next.innerHTML = view.body;
+      morph(body, next);
     }
+    shownBody = view.body;
+    view.after?.();
+  }
+  function morph(now, next) {
+    const a = [...now.childNodes], b = [...next.childNodes];
+    for (let i = 0; i < b.length; i++) {
+      const old = a[i], neu = b[i];
+      if (!old) { now.appendChild(neu); continue; }
+      if (old.nodeType !== neu.nodeType || old.nodeName !== neu.nodeName) { now.replaceChild(neu, old); continue; }
+      if (old.nodeType === Node.TEXT_NODE) { if (old.data !== neu.data) old.data = neu.data; continue; }
+      if (old.nodeType !== Node.ELEMENT_NODE) continue;
+      for (const { name } of [...old.attributes]) if (!neu.hasAttribute(name)) old.removeAttribute(name);
+      for (const { name, value } of [...neu.attributes]) if (old.getAttribute(name) !== value) old.setAttribute(name, value);
+      if ('disabled' in old) old.disabled = neu.disabled;
+      if (old.nodeName !== 'CANVAS') morph(old, neu);
+    }
+    for (let i = a.length - 1; i >= b.length; i--) a[i].remove();
   }
 
   const ACTIONS = {
@@ -714,7 +746,9 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     renderSupplies();
     renderClock();
     renderRp();
-    $('hint').textContent = forTouch(hintText());
+    // The hint is read out by screen readers, so it is only written when the words change.
+    const hint = forTouch(hintText());
+    if ($('hint').textContent !== hint) $('hint').textContent = hint;
     $('prompt').hidden = !near || !!open;
     if (near) $('prompt').innerHTML = isTouch ? `Tap <b>Use</b> to ${near.label}` : `Press <kbd>E</kbd> to ${near.label}`;
     $('touch-use').classList.toggle('ready', !!near && !open); // the Use button lights up when there is something to use
