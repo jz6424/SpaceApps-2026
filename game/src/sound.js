@@ -235,6 +235,20 @@ export function sampleSound() {
   blip(at + 0.09, 1976, 0.7, 'sine', 0.12);
   blip(at + 0.09, 3951, 0.3, 'sine', 0.03);
 }
+// A mission won: one bright note for each star earned, climbing, then a soft chord under the last.
+// lead: seconds before the first note. gap: seconds between notes (both match the success screen).
+export function winSound(stars, gap = 0.5, lead = 0.5) {
+  if (!live()) return;
+  const at = ctx.currentTime + 0.02 + lead, notes = [659, 784, 1047];
+  for (let i = 0; i < stars; i++) {
+    blip(at + i * gap, notes[i], 0.8, 'sine', 0.13);
+    blip(at + i * gap, notes[i] * 2, 0.4, 'sine', 0.035);
+  }
+  const end = at + Math.max(0, stars - 1) * gap + 0.14;
+  [523, 659, 784].forEach(f => blip(end, f, 1.6, 'triangle', 0.04));
+  duckMusic(lead + stars * gap + 1.5);
+}
+
 // Building with moon dirt: a low rumble of sliding dirt, then two soft notes as it settles.
 export function buildSound() {
   if (!live()) return;

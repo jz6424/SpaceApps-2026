@@ -16,7 +16,7 @@ import { createMoonMenu } from './moon-menu.js';
 import './speak.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'debrief', 'how', 'credits'];
+const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'pause', 'success', 'debrief', 'how', 'credits'];
 
 let save = loadSave();
 let saveWorks = writeSave(save);
@@ -780,6 +780,16 @@ function goalText(mission, mode) {
     : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them.` : mission.goal;
 }
 
+// What each of a mission's three stars asks for in a mode, in full words.
+function starTexts(mission, mode) {
+  const S = starRules(mission, mode);
+  return [
+    'Finish the mission: reach sunrise with the goal met',
+    `Keep Life Support at ${S.two.lowestAir}% or more, with the battery empty for no more than ${S.two.maxBlackout} seconds`,
+    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, ${S.three.shielding ? 'build the regolith shield, ' : ''}and keep your radiation dose at ${S.three.maxDose} or less${S.three.shielding ? ' (that takes the shield and hiding in the Storm Shelter)' : ''}`,
+  ];
+}
+
 function renderBriefMode() {
   const mission = missionById(chosen);
   $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
@@ -787,12 +797,7 @@ function renderBriefMode() {
   $('mode-about').textContent = MODES[save.mode].about;
   // The three star tests, one under the other. A star is filled in only if that test has been
   // passed before in this mode, so a filled second star can sit between two empty ones.
-  const S = starRules(mission, save.mode), got = testsPassed(mission.id, save.mode);
-  const tests = [
-    'Finish the mission: reach sunrise with the goal met',
-    `Keep Life Support at ${S.two.lowestAir}% or more, with the battery empty for no more than ${S.two.maxBlackout} seconds`,
-    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, ${S.three.shielding ? 'build the regolith shield, ' : ''}and keep your radiation dose at ${S.three.maxDose} or less${S.three.shielding ? ' (that takes the shield and hiding in the Storm Shelter)' : ''}`,
-  ];
+  const got = testsPassed(mission.id, save.mode), tests = starTexts(mission, save.mode);
   $('star-title').textContent = `How to earn 3 stars in ${MODES[save.mode].label} mode`;
   $('star-list').innerHTML = tests.map((text, i) =>
     `<li class="${got[i] ? 'got' : ''}"><span class="star" aria-hidden="true">${got[i] ? '★' : '☆'}</span><span>${text}<span class="sr-only"> (${got[i] ? 'earned before' : 'not earned yet'})</span></span></li>`).join('');
@@ -980,7 +985,22 @@ function finish() {
     return el;
   }));
   $('debrief-again').dataset.id = mission.id;
-  show('debrief');
+  if (!o.won) return show('debrief');
+
+  // A won mission stops first on the success screen: the stars earned come in one at a time,
+  // each with its own note, and Continue goes on to the debrief.
+  $('success-mission').textContent = `${mission.name} · ${MODES[mode].label} mode`;
+  const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>';
+  $('success-stars').innerHTML = [0, 1, 2].map(i => `<span class="${i < stars ? 'got' : 'not'}" style="--i:${i}">${STAR}</span>`).join('');
+  $('success-stars').setAttribute('aria-label', `${stars} of 3 stars`);
+  $('success').style.setProperty('--n', stars);
+  $('success-line').textContent = `${['', 'You made it to sunrise.', 'Great work, astronaut!', 'A perfect mission!'][stars]}${stars > best ? (best ? ' That is your best yet.' : '') : ''}`;
+  $('success-count').textContent = `${stars} of 3 stars`;
+  $('success-next-star').hidden = stars >= 3;
+  if (stars < 3) $('success-next-star').textContent = `For star ${stars + 1}: ${starTexts(mission, mode)[stars].replace(/^./, c => c.toLowerCase())}.`;
+  $('success-points').textContent = `+${earned} research points`;
+  show('success');
+  sound.winSound(stars, calm ? 0 : 0.5, calm ? 0 : 0.5);
 }
 
 function renderCredits() {
@@ -1001,6 +1021,7 @@ const actions = {
   launch: playChosen,
   'moon-out': () => { if (selected) brief(selected); },   // back to the whole Moon: closes the open mission
   again: id => launch(id),
+  'success-next': () => show('debrief', 'fade'),
   restart: () => launch(sim.mission.id),
   research: openResearch,
   scrapbook: () => openScrapbook(),
@@ -1037,7 +1058,7 @@ addEventListener('keydown', e => {
   if (e.code !== 'Escape' || e.repeat) return;
   // Between missions Esc is the Back button of whatever menu is showing.
   if (!hud) {
-    const back = { research: 'open-missions', scrapbook: 'open-missions', how: 'home', credits: 'home', missions: selected ? 'moon-out' : 'home' }[showing()];
+    const back = { research: 'open-missions', scrapbook: 'open-missions', how: 'home', credits: 'home', success: 'success-next', missions: selected ? 'moon-out' : 'home' }[showing()];
     if (back && !diving) { e.preventDefault(); actions[back](); }
     return;
   }

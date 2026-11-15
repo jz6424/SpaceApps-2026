@@ -284,6 +284,21 @@
   </div>
 </div>
 
+<!-- A won mission stops here first: the stars earned, then Continue goes on to the debrief. -->
+<main id="success" class="screen" hidden>
+  <svg class="orbits" viewBox="0 0 620 620" aria-hidden="true"><g><circle cx="310" cy="310" r="80"/><circle cx="310" cy="310" r="155"/><circle cx="310" cy="310" r="230"/><circle cx="310" cy="310" r="300"/></g></svg>
+  <div class="success">
+    <p class="eyebrow" id="success-mission"></p>
+    <h2 id="success-title">Mission complete!</h2>
+    <div id="success-stars" role="img"></div>
+    <p id="success-count"></p>
+    <p id="success-line"></p>
+    <p id="success-next-star" class="fine" hidden></p>
+    <p id="success-points"></p>
+    <button class="btn primary" data-do="success-next">Continue</button>
+  </div>
+</main>
+
 <main id="debrief" class="screen" hidden>
   <div class="dialog wide">
     <p class="eyebrow">Debrief</p>
