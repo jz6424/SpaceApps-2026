@@ -125,7 +125,7 @@ function renderMissions() {
     renderBriefMode();
   }
   $('moon-caption').hidden = !!mission;
-  $('moon-info').hidden = !mission;
+  $('moon-info').hidden = $('brief-flare').hidden = !mission;
   $('moon-out').hidden = !mission;
   moonMenu?.setLocked(MISSIONS.filter(m => !isOpen(m)).map(m => m.id));
   moonMenu?.pick(selected);

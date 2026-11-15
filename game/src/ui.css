@@ -138,8 +138,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .seg:hover { color: var(--yellow); }
 .seg[aria-pressed="true"], .seg[aria-selected="true"] { --fill: rgba(234, 254, 7, .16); color: var(--yellow); }
 #mode-about { min-height: 3em; }
-/* Mission menu: a column of mission boxes beside the turning Moon. The picked box opens. */
-.mission-layout { display: grid; grid-template-columns: minmax(300px, 440px) minmax(0, 1fr); gap: 24px; align-items: start; }
+/* Mission menu: a column of mission boxes beside the turning Moon. The picked box opens.
+   The Moon takes the whole right side, top to bottom; the note about the base sits under the boxes. */
+.mission-layout { display: grid; grid-template-columns: minmax(300px, 440px) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 16px 24px; align-items: start; }
 #mission-list { display: grid; gap: 12px; }
 .mission { --fill: rgba(3, 8, 24, .38); padding: 0; transition: box-shadow .15s var(--ease); }
 .mission.locked { --fill: rgba(3, 8, 24, .2); }
@@ -160,20 +161,24 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .m-body { display: grid; gap: 12px; padding: 0 20px 20px; justify-items: start; }
 .m-body:empty { display: none; }
 #brief-panel { display: grid; gap: 16px; justify-items: start; width: 100%; }
-#moon-view { position: sticky; top: 16px; display: grid; gap: 12px; justify-items: center; }
-#moon { display: block; width: 100%; max-width: 640px; aspect-ratio: 1; max-height: max(320px, calc(100vh - 300px)); touch-action: none; cursor: grab; }
-#moon-caption { text-align: center; max-width: 30em; }
+#moon-view { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 16px; display: grid; gap: 12px; justify-items: center; }
+/* As big as the window allows: 171px is the space taken above it plus a margin below. */
+#moon { display: block; width: 100%; aspect-ratio: 1; max-height: max(320px, calc(100vh - 171px)); touch-action: none; cursor: grab; }
+#moon-notes { grid-column: 1; max-width: 34em; }
 /* Shown while zoomed in on a flag: goes back to the whole Moon. */
 #moon-out { position: absolute; left: 12px; top: 12px; z-index: 1; }
-#moon-info { display: grid; gap: 12px; width: 100%; }
+/* Facts about the picked landing site lie over the bottom of the picture, where the ground is. */
+#moon-info { position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; display: grid; gap: 12px; padding: 32px 12px 12px; background: linear-gradient(transparent, rgba(3, 8, 24, .82) 32px); pointer-events: none; }
 /* Play: the screen goes dark as the camera reaches the flag, then clears over the base. */
 #dive { position: fixed; inset: 0; z-index: 60; background: #000; opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 #dive.on { opacity: 1; pointer-events: auto; transition: opacity .9s cubic-bezier(.7, 0, .84, 0); }
 @media (prefers-reduced-motion: reduce) { #dive, #dive.on { transition: none; } }
 @media (max-width: 900px) {
   .mission-layout { grid-template-columns: 1fr; }
-  #moon-view { position: relative; top: auto; order: -1; }
-  #moon { max-width: 320px; }
+  .mission-layout { grid-template-rows: none; }
+  #moon-view { grid-column: auto; grid-row: auto; position: relative; top: auto; order: -1; }
+  #moon { max-width: 360px; max-height: none; }
+  #moon-info { position: static; padding: 0; background: none; width: 100%; }
 }
 .stars { font-weight: 600; }
 .stars span[aria-hidden] { color: var(--yellow); letter-spacing: .08em; }

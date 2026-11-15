@@ -12,7 +12,7 @@ const DEG = Math.PI / 180;
 const TILT = -66 * DEG;        // tips the south pole toward the camera, since that is where the base is
 const SPIN = 0.1;              // radians a second about its own axis while nothing is picked
 const SLOP = 6;                // pixels the pointer may wander and still count as a click
-const HOME = new THREE.Vector3(0, 0.05, 4.3);   // where the camera rests
+const HOME = new THREE.Vector3(0, 0.05, 3.95);  // where the camera rests
 const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // A point on the globe from latitude and longitude in degrees. y is up, so the south pole is -y.
@@ -75,11 +75,16 @@ function buildMoon() {
   moon.add(outline);
   // The axis the Moon turns on: a dashed line out of each pole. It is fixed to the Moon, so it
   // tips with it when the Moon is dragged.
-  const dash = new THREE.CylinderGeometry(0.009, 0.009, 0.07, 6), edge = new THREE.CylinderGeometry(0.017, 0.017, 0.086, 6), white = new THREE.MeshBasicMaterial({ color: 0xf2f6fc });
-  for (const end of [1, -1]) for (let y = 1.07; y < 1.5; y += 0.11) {
-    const piece = new THREE.Mesh(dash, white);
+  // It is faint, so it reads as a guide line and not as one of the flags. A thin dark rim keeps
+  // it from vanishing on the pale ground.
+  const dash = new THREE.CylinderGeometry(0.007, 0.007, 0.07, 6), edge = new THREE.CylinderGeometry(0.0115, 0.0115, 0.079, 6);
+  const white = new THREE.MeshBasicMaterial({ color: 0xf2f6fc, transparent: true, opacity: 0.5, depthWrite: false });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x07173f, side: THREE.BackSide, transparent: true, opacity: 0.22, depthWrite: false });
+  for (const end of [1, -1]) for (let y = 1.07; y < 1.4; y += 0.11) {
+    const piece = new THREE.Mesh(dash, white), rim = new THREE.Mesh(edge, dark);
     piece.position.y = end * y;
-    piece.add(new THREE.Mesh(edge, outline.material));   // the same dark outline as the Moon, so it shows on pale ground
+    rim.renderOrder = 1; piece.renderOrder = 2;
+    piece.add(rim);
     moon.add(piece);
   }
   return moon;
