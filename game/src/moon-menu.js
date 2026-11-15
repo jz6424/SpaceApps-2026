@@ -1,8 +1,15 @@
-// The Moon on the mission menu: a small low-poly globe in the same flat-colour style as the base,
-// with a flag for each mission. It always turns about its own axis, the line through its poles,
-// at one steady speed. A dashed line marks that axis. Dragging tips the whole Moon, axis and all,
-// to show another side. Picking a mission turns its flag to face you and moves the camera in.
-// Pressing Play dives the camera down to the flag before the mission starts.
+// The Moon on the mission menu: a low-poly globe in the same flat-colour style as the base, shaped
+// and coloured from NASA's maps of the real Moon, with a flag for each mission. It always turns
+// about its own axis, the line through its poles, at one steady speed. A dashed line marks that
+// axis. Dragging tips the whole Moon, axis and all, to show another side. Picking a mission turns
+// its flag to face you and moves the camera in. Pressing Play dives the camera down to the flag
+// before the mission starts.
+//
+// The maps are from NASA's CGI Moon Kit (Scientific Visualization Studio, svs.gsfc.nasa.gov/4720),
+// made from Lunar Reconnaissance Orbiter data. Both are whole-Moon maps with 0 degrees longitude
+// (the middle of the side that faces Earth) in the middle of the picture:
+//  * public/moon/lroc_color_poles_1k.jpg: how bright the ground is, from the LROC camera.
+//  * public/moon/ldem_3_8bit.jpg: how high the ground is, from the LOLA laser altimeter.
 //
 // The flags stand close together near the south pole, because every mission is flown from the same
 // base on Connecting Ridge. They are spread a little so each can be seen and clicked.
@@ -14,62 +21,106 @@ const SPIN = 0.1;              // radians a second about its own axis while noth
 const SLOP = 6;                // pixels the pointer may wander and still count as a click
 const HOME = new THREE.Vector3(0, 0.05, 4.7);   // where the camera rests: far enough back that no flag is cut off
 const REACH = 1.34;            // how far the flags and the axis line stick out, in Moon radii from the middle
+const DETAIL = 60;             // how finely the globe is cut up: fine enough for the real seas and big craters to show
+const RELIEF = 5;              // real heights are stretched this many times, or the Moon would look like a smooth ball
+const MOON_KM = 1737.4;        // the radius the height map is measured from
+const HEIGHT_KM = [-9.17, 10.79];   // the heights that black and white stand for in ldem_3_8bit.jpg (fitted against NASA's ldem_4.tif, which is in km)
+const MAP_W = 512, MAP_H = 256;     // the maps are shrunk to this, so one pixel is a bit smaller than one face
 const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// A point on the globe from latitude and longitude in degrees. y is up, so the south pole is -y.
+// A point on the globe from latitude and longitude in degrees, east positive. y is up, so the south
+// pole is -y. East is -z, so that seen from outside with north up, east is to the right as on the
+// real Moon (and not its mirror image).
 const onGlobe = (lat, lon, r = 1) => new THREE.Vector3(
-  r * Math.cos(lat * DEG) * Math.cos(lon * DEG), r * Math.sin(lat * DEG), r * Math.cos(lat * DEG) * Math.sin(lon * DEG));
+  r * Math.cos(lat * DEG) * Math.cos(lon * DEG), r * Math.sin(lat * DEG), -r * Math.cos(lat * DEG) * Math.sin(lon * DEG));
+
+// The blue crater beside the base. It is our own marker laid over the real ground, and not from the
+// maps: it stands in for the permanently shadowed craters where the ice is, which are too small to
+// see from this far away.
+const ICE = { at: onGlobe(-84, 205), size: 9 * DEG };
+// How much the blue crater moves the ground at `d` crater radii from its middle: a bowl with a raised rim.
+const iceBowl = d => (d < 1 ? -0.035 * ICE.size * 6 * (1 - d * d) : d < 1.3 ? 0.012 * ICE.size * 6 * (1 - (d - 1) / 0.3) : 0);
 
 // The same "random" numbers every time, so the Moon looks the same on every visit.
 function seeded(seed) {
   return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
 }
 
-function buildMoon() {
-  const rand = seeded(26);
-  // Craters: [direction, angular radius, how dark the floor is]. One big dark one sits beside the
-  // base, standing in for the shadowed craters where the ice is.
-  const craters = [{ at: onGlobe(-84, 205), size: 9 * DEG, dark: 0.55, ice: true }];
-  for (let i = 0; i < 46; i++) {
-    const at = new THREE.Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).normalize();
-    craters.push({ at, size: (3 + rand() * rand() * 13) * DEG, dark: 0.12 + rand() * 0.2 });
-  }
-  // Seas: the big dark patches, kept away from the pole so the flags stand on bright ground.
-  const seas = [];
-  for (let i = 0; i < 7; i++) seas.push({ at: onGlobe(-25 + rand() * 75, rand() * 360), size: (16 + rand() * 20) * DEG });
+// Reads NASA's two maps: { height } in km above the mean radius and { bright } from 0 to 1.
+async function loadMaps() {
+  const read = async (url, value) => {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const cv = document.createElement('canvas');
+    cv.width = MAP_W; cv.height = MAP_H;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, MAP_W, MAP_H);
+    const rgba = ctx.getImageData(0, 0, MAP_W, MAP_H).data, out = new Float32Array(MAP_W * MAP_H);
+    for (let i = 0; i < out.length; i++) out[i] = value(rgba[i * 4] / 255, rgba[i * 4 + 1] / 255, rgba[i * 4 + 2] / 255);
+    return out;
+  };
+  const [height, bright] = await Promise.all([
+    read('moon/ldem_3_8bit.jpg', r => HEIGHT_KM[0] + r * (HEIGHT_KM[1] - HEIGHT_KM[0])),
+    read('moon/lroc_color_poles_1k.jpg', (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b),
+  ]);
+  return { height, bright };
+}
 
-  const geo = new THREE.IcosahedronGeometry(1, 16);
+// The map's value in the direction `v` (a unit vector), blended from the four nearest pixels.
+// The map joins up with itself round the back of the Moon.
+function mapAt(map, v) {
+  const x = (Math.atan2(-v.z, v.x) / (2 * Math.PI) + 0.5) * MAP_W - 0.5;
+  const y = THREE.MathUtils.clamp((0.5 - Math.asin(THREE.MathUtils.clamp(v.y, -1, 1)) / Math.PI) * MAP_H - 0.5, 0, MAP_H - 1);
+  const x0 = Math.floor(x), y0 = Math.min(MAP_H - 2, Math.floor(y)), fx = x - x0, fy = y - y0;
+  const px = (col, row) => map[row * MAP_W + (col + MAP_W) % MAP_W];
+  return (px(x0, y0) * (1 - fx) + px(x0 + 1, y0) * fx) * (1 - fy) + (px(x0, y0 + 1) * (1 - fx) + px(x0 + 1, y0 + 1) * fx) * fy;
+}
+
+// How far the ground is from the middle of the globe in the direction `v`, in Moon radii.
+const groundAt = (maps, v) => 1 + (maps ? mapAt(maps.height, v) / MOON_KM * RELIEF : 0) + iceBowl(v.angleTo(ICE.at) / ICE.size);
+
+// Shapes and colours the globe. Without the maps (before they arrive, or if they can't be loaded)
+// it is a plain ball with the blue crater.
+function shapeMoon(geo, maps) {
+  const rand = seeded(26);
   const pos = geo.attributes.position, v = new THREE.Vector3();
-  // Push each corner in or out for the craters. Corners shared by several faces move the same
-  // way, so the surface stays closed.
+  // Push each corner in or out to the real height there, and dig the blue crater. Corners shared by several faces move the
+  // same way, so the surface stays closed.
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).normalize();
-    let lift = 0;
-    for (const c of craters) {
-      const d = v.angleTo(c.at) / c.size;
-      if (d < 1) lift -= 0.035 * c.size * 6 * (1 - d * d);                      // the bowl
-      else if (d < 1.3) lift += 0.012 * c.size * 6 * (1 - (d - 1) / 0.3);       // the raised rim
-    }
-    pos.setXYZ(i, v.x * (1 + lift), v.y * (1 + lift), v.z * (1 + lift));
+    v.multiplyScalar(groundAt(maps, v));
+    pos.setXYZ(i, v.x, v.y, v.z);
   }
-  // One flat colour per face, from where the middle of the face is.
-  const colors = new Float32Array(pos.count * 3), a = new THREE.Vector3(), b = new THREE.Vector3(), c3 = new THREE.Vector3();
-  const light = new THREE.Color(0xd9dee8), sea = new THREE.Color(0x9aa3b5), floor = new THREE.Color(0x7c8598), ice = new THREE.Color(0x4f79c9), col = new THREE.Color();
+  // One flat colour per face, from how bright the real ground is at the middle of the face. Only
+  // the brightness is taken from the map; the colours are the game's own blue-greys.
+  const colors = geo.attributes.color.array, a = new THREE.Vector3(), b = new THREE.Vector3(), c3 = new THREE.Vector3();
+  const light = new THREE.Color(0xd9dee8), sea = new THREE.Color(0x737d95), ray = new THREE.Color(0xf4f6fa), ice = new THREE.Color(0x4f79c9), col = new THREE.Color();
   for (let i = 0; i < pos.count; i += 3) {
     a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c3.fromBufferAttribute(pos, i + 2);
     v.copy(a).add(b).add(c3).normalize();
     col.copy(light);
-    if (seas.some(s => v.angleTo(s.at) < s.size)) col.copy(sea);
-    for (const c of craters) {
-      const d = v.angleTo(c.at) / c.size;
-      if (d < 0.8) col.lerp(c.ice ? ice : floor, c.ice ? 0.85 : c.dark * 2.2);
-      else if (d < 1.25 && d >= 1) col.lerp(light, 0.6).offsetHSL(0, 0, 0.03);
+    if (maps) {
+      const shade = mapAt(maps.bright, v);
+      col.copy(sea).lerp(light, THREE.MathUtils.smoothstep(shade, 0.36, 0.58));   // dark seas up to pale highlands
+      col.lerp(ray, THREE.MathUtils.smoothstep(shade, 0.68, 0.82));               // the fresh, bright craters and their rays
     }
-    col.offsetHSL(0, 0, (rand() - 0.5) * 0.035);   // a little variety from face to face
+    const d = v.angleTo(ICE.at) / ICE.size;
+    if (d < 0.8) col.lerp(ice, 0.85);
+    else if (d >= 1 && d < 1.25) col.lerp(light, 0.6).offsetHSL(0, 0, 0.03);   // its pale rim
+    col.offsetHSL(0, 0, (rand() - 0.5) * 0.02);   // a little variety from face to face
     for (let k = 0; k < 3; k++) colors.set([col.r, col.g, col.b], (i + k) * 3);
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  pos.needsUpdate = true;
+  geo.attributes.color.needsUpdate = true;
   geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+}
+
+function buildMoon() {
+  const geo = new THREE.IcosahedronGeometry(1, DETAIL);
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
+  shapeMoon(geo, null);
   const moon = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   // A dark shell just behind the surface draws the outline.
   const outline = new THREE.Mesh(new THREE.IcosahedronGeometry(1.035, 5), new THREE.MeshBasicMaterial({ color: 0x07173f, side: THREE.BackSide }));
@@ -112,7 +163,7 @@ function buildFlag(place, number) {
   const up = onGlobe(place.lat, place.lon).normalize();
   // Where this spot sits when it faces the camera: a little below the middle of the picture.
   const face = new THREE.Vector3(0, up.y, Math.sqrt(1 - up.y * up.y)).applyAxisAngle(new THREE.Vector3(1, 0, 0), TILT);
-  flag.position.copy(up).multiplyScalar(0.985);
+  flag.position.copy(up).multiplyScalar(0.985);   // moved onto the real ground once the maps arrive
   flag.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.2, 6), new THREE.MeshBasicMaterial({ color: 0xf2f6fc }));
   pole.position.y = 0.1;
@@ -157,6 +208,12 @@ export function createMoonMenu(canvas, missions, onPick) {
     moon.add(made.flag);
     return [m.id, made];
   }));
+  // When NASA's maps arrive the plain ball takes the real Moon's shape and colours, and each flag
+  // moves to stand on the ground there. If they can't be loaded the plain ball stays.
+  loadMaps().then(maps => {
+    shapeMoon(moon.geometry, maps);
+    for (const f of Object.values(flags)) f.flag.position.copy(f.up).multiplyScalar(groundAt(maps, f.up) - 0.015);
+  }).catch(() => {});
 
   let picked = null;        // mission id whose flag faces the camera
   let locked = new Set();   // missions that can't be played yet: their flags are grey

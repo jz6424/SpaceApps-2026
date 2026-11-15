@@ -77,6 +77,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 | Terrain you walk on | LRO LOLA 5 m elevation model, Connecting Ridge (PGDA product 78) -> `game/public/terrain/ridge_heights.f32` |
 | Base spot, solar output, comms gaps | LOLA sunlight and Earth-visibility maps (PGDA product 69) -> `sun.png`, `earth.png` |
 | Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
+| The Moon on the mission menu | [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/) from NASA's Scientific Visualization Studio: the LROC brightness map and the LOLA height map of the whole Moon -> `game/public/moon/` (NASA's files, unchanged). The globe's seas and craters are the real ones, with heights stretched 5 times so they show. The blue crater by the flags is our own marker for the icy craters |
 | Solar storms | NASA DONKI flares of the past 12 months, live from `ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR` (no key; 60 days per request, so six requests), then `api.nasa.gov/DONKI/FLR` as a second try, then a list of real past flares. The game says which one it used |
 | Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS, ISS Quest airlock and oxygen prebreathe |
 | Scrapbook photographs | NASA Image and Video Library (images.nasa.gov) and nasa.gov articles -> `game/public/scrapbook/real-*.jpg`. Each one is credited under the picture and in the in-game credits |
