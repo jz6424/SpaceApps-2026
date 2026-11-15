@@ -333,7 +333,7 @@ export class Sim {
     }
     if (!this.flags.night && this.t >= this.day) {
       this.flags.night = true;
-      this.say('The Sun has set. Heaters are on. Solar panels make nothing until sunrise.', 'warn');
+      this.say('The Sun has set. Solar panels make nothing until sunrise, so the battery is all you have. To save power: set Life Support to Eco, park the robot, and turn the antenna off when you don\'t need it. Outside, press F for your chest light.', 'warn');
     }
 
     this.updateStorms();
@@ -496,7 +496,19 @@ export class Sim {
     if (m.goalType === 'dose') return this.dose <= this.goalValue;
     if (m.goalType === 'food') return (this.food ?? 0) >= this.goalValue;
     if (m.goalType === 'battery') return this.power > 0;
+    if (m.goalType === 'samples') return this.samples.size >= this.goalValue;
     return true;
+  }
+
+  // The three star tests, each judged on its own, for the list on the briefing. The stars a run
+  // earns still build on each other (see finish), so this only says which tests were passed.
+  get starTests() {
+    const S = C.stars;
+    return [
+      this.goalMet(),
+      this.lowestAir >= S.two.lowestAir && this.blackout <= S.two.maxBlackout,
+      this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose,
+    ];
   }
 
   finish() {
@@ -505,6 +517,7 @@ export class Sim {
         dose: `You made it to sunrise, but your dose was ${Math.round(this.dose)} and the goal was ${this.goalValue} or less.`,
         food: `You made it to sunrise, but you had ${this.food} meals and the goal was ${this.goalValue}.`,
         battery: `You made it to sunrise, but the battery ran out ${Math.round(this.blackout)} s before the Sun came back.`,
+        samples: `You made it to sunrise, but you brought back ${this.samples.size} of the ${this.goalValue} rock samples.`,
       }[this.mission.goalType];
       return this.end(false, why, true);
     }
@@ -526,6 +539,7 @@ export class Sim {
     if (this.lowestAir < 25) tips.push('Life support got low. Normal or Boost keeps air topped up while the Sun gives you spare power.');
     if (this.dose > 40) tips.push('Your dose was high. Hide in the shelter during storms and pile moon dirt on it.');
     if (this.storms.some(s => s.warnedBy === 'sensor')) tips.push('A storm surprised you. With the antenna on, Mission Control warns you much earlier.');
+    if (this.mission.goalType === 'samples' && this.samples.size < this.goalValue) tips.push('The rock samples glow, so they are easy to spot. Go out through the Airlock early, while the Sun is up, and take two or three short walks.');
     if (this.mission.goalType === 'food' && (this.food ?? 0) < this.goalValue) tips.push('Keep the greenhouse lit and watered. The robot can haul crater ice.');
     if (!tips.length) tips.push('Great flying! Try a harder mode next.');
     return tips;

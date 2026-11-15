@@ -79,6 +79,7 @@ export const CONFIG = {
   science: {
     sampleRP: 2,      // each rock sample brought back
     uploadRP: 1,      // each data upload
+    pageRP: 2,        // reading a Scrapbook page for the first time
     uploadCooldown: 20,
   },
 
@@ -121,8 +122,8 @@ export const MISSIONS = [
     id: 'FirstNight',
     name: 'First Night',
     multiplier: 1,
-    goal: 'Survive the night and learn how everything works.',
-    brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. This first night is for learning: follow the red arrows, then keep the Habitat running until the Sun comes back.',
+    goal: 'Collect 5 glowing rock samples and survive the night.',
+    brief: 'You just landed at Connecting Ridge, near the Moon\'s south pole. Follow the red arrows to learn the base, go on moonwalks to pick up 5 glowing rock samples, and keep the Habitat running until the Sun comes back.',
     lesson: 'No sun means no solar power. Turning things down at night (like the Eco setting) makes the battery last until sunrise.',
     dataCards: ['sunlight', 'air'],
     day: 200, night: 200,
@@ -130,7 +131,8 @@ export const MISSIONS = [
     start: { power: 70, air: 85, regolith: 20 },
     storms: [{ at: 160, length: 25, strength: 'Mild' }],
     meteoroids: [],
-    goalType: 'survive',
+    goalType: 'samples',
+    goalValue: 5, // rock samples to bring back; there are 5 around the base
     tutorial: true,
   },
   {

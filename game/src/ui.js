@@ -1,17 +1,19 @@
-// Menus around the game: start, mission choice, Research Tree, briefing, pause, debrief and credits.
+// Menus around the game: start, mission choice, Research Tree, Scrapbook, briefing, pause, debrief and credits.
 // Also runs a mission: makes the Sim, hands it to the 3D world and the HUD, and ends it.
 import './ui.css';
-import { MISSIONS, MODES, missionById, pointsFor } from './config.js';
+import { CONFIG as C, MISSIONS, MODES, missionById, pointsFor } from './config.js';
 import { Sim, planRun, flareLabel, flareSize } from './sim.js';
 import { createHud, icon } from './hud.js';
 import { createTour } from './tour.js';
 import { getFlares, dataCard, SOURCES } from './nasa.js';
 import { emptySave, eraseSave, loadSave, writeSave } from './save.js';
 import { BRANCHES, UPGRADES_LIVE, nodeById, nodeState } from './research.js';
+import { PAGES } from './scrapbook.js';
+import { createScrapbook } from './scrapbook-view.js';
 import * as sound from './sound.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['start', 'missions', 'research', 'brief', 'pause', 'debrief', 'how', 'credits'];
+const SCREENS = ['start', 'missions', 'research', 'scrapbook', 'brief', 'pause', 'debrief', 'how', 'credits'];
 
 let save = loadSave();
 let saveWorks = writeSave(save);
@@ -29,6 +31,18 @@ const unlocksNow = () => allOpen() ? [...new Set([...save.unlocks, ...unlockIds]
 const flaresReady = getFlares().then(f => { flares = f; return f; });
 
 const commit = () => { saveWorks = writeSave(save); };
+
+// The Scrapbook: a page for each part of the base, collected by using that part in a mission.
+const scrapbook = createScrapbook({
+  getSave: () => save,
+  commit,
+  unlocks: () => unlocksNow(),
+  allOpen: () => allOpen(),
+  snapshot: name => game?.snapshot(name) ?? null,
+  cover: () => $('start-picture').getAttribute('src'),
+});
+let newPages = [];     // Scrapbook pages collected in the mission being played
+const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]);
 
 function show(name) {
   for (const key of SCREENS) $(key).hidden = key !== name;
@@ -72,6 +86,9 @@ function missionCard(mission, index) {
 
 function renderMissions() {
   $('points').textContent = save.points;
+  const unread = scrapbook.unread();
+  $('scrapbook-new').textContent = `${unread} new`;
+  $('scrapbook-new').hidden = !unread;
   $('mission-list').innerHTML = MISSIONS.map(missionCard).join('');
   $('save-note').textContent = saveWorks
     ? 'Your stars and points save by themselves in this browser. No account needed.'
@@ -349,6 +366,14 @@ function buy(id) {
   pick(id);
 }
 
+// --- Scrapbook ---
+// With no id it opens on the contents; with one, on that page.
+function openScrapbook(id) {
+  if (hud) endMission();
+  show('scrapbook');
+  scrapbook.open(id);
+}
+
 // --- Briefing ---
 // What the Sun has really been doing, from the flares the storms will be drawn from.
 function spaceWeatherReport() {
@@ -360,19 +385,36 @@ function spaceWeatherReport() {
     : `Space weather report: the live NASA feed could not be reached, so your storms are sized from ${list.length} real past flares in NASA's DONKI records. ${sizes} They change every time you play.`;
 }
 
+// Which of a mission's three star tests have been passed in a mode. Stars build on each other,
+// so an old save that only knows "2 stars" counts as the first two.
+function testsPassed(id, mode) {
+  const best = save.best[id]?.[mode] ?? 0, seen = save.tests[id]?.[mode] ?? [];
+  return [0, 1, 2].map(i => i < best || !!seen[i]);
+}
+
 // The difficulty buttons on the briefing, and the parts of the briefing that depend on them.
 function renderBriefMode() {
   const mission = missionById(chosen);
   $('mode-choice').innerHTML = Object.entries(MODES).map(([key, mode]) =>
     `<button class="seg" data-do="mode" data-id="${key}" aria-pressed="${key === save.mode}">${mode.label} · ${mode.level}</button>`).join('');
   $('mode-about').textContent = MODES[save.mode].about;
-  const best = save.best[mission.id]?.[save.mode] ?? 0;
-  $('mode-best').innerHTML = `Your best in ${MODES[save.mode].label} mode: ${starsHtml(best)}`;
   const probe = new Sim(mission, save.mode, game.site);
+  // The three star tests, one under the other. A star is filled in only if that test has been
+  // passed before in this mode, so a filled second star can sit between two empty ones.
+  const S = C.stars, got = testsPassed(mission.id, save.mode);
+  const tests = [
+    'Finish the mission: reach sunrise with the goal met',
+    `Keep Life Support at ${S.two.lowestAir}% or more, with the battery empty for no more than ${S.two.maxBlackout} seconds`,
+    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, and keep your radiation dose at ${S.three.maxDose} or less`,
+  ];
+  $('star-title').textContent = `How to earn 3 stars in ${MODES[save.mode].label} mode`;
+  $('star-list').innerHTML = tests.map((text, i) =>
+    `<li class="${got[i] ? 'got' : ''}"><span class="star" aria-hidden="true">${got[i] ? '★' : '☆'}</span><span>${text}<span class="sr-only"> (${got[i] ? 'earned before' : 'not earned yet'})</span></span></li>`).join('');
   $('brief-goal').textContent = mission.goalType === 'dose'
     ? `${mission.goal} Keep your dose at ${probe.goalValue} or less.`
     : mission.goalType === 'food' ? `${mission.goal} You need ${probe.goalValue} meals.`
-    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.` : mission.goal;
+    : mission.goalType === 'battery' ? `${mission.goal} If the battery is empty when the Sun comes up, the mission is not complete.`
+    : mission.goalType === 'samples' ? `${mission.goal} The rocks are outside, close to the base. Use the Airlock to go and get them.` : mission.goal;
 }
 
 async function brief(id) {
@@ -400,6 +442,8 @@ function launch(id = chosen) {
   const mission = missionById(id);
   chosen = id;
   if (hud) endMission();
+  newPages = [];
+  let frames = 0;
   // A new plan every time: different real flares, and storms at slightly different times.
   sim = new Sim(mission, save.mode, game.site, planRun(mission, flares?.flares ?? []));
   sim.say(mission.brief, 'info');
@@ -410,6 +454,14 @@ function launch(id = chosen) {
     frame(near) {
       hud.frame(near);
       tour?.frame();
+      // A few times a second: has the player just met something that has a Scrapbook page?
+      if (frames++ % 20 === 0) {
+        const fresh = scrapbook.collect(sim);
+        if (fresh.length) {
+          newPages.push(...fresh);
+          sim.say(`New Scrapbook page${fresh.length > 1 ? 's' : ''}: ${listOf(fresh.map(page => page.name))}. Read ${fresh.length > 1 ? 'them' : 'it'} after the mission.`, 'good');
+        }
+      }
       if (sim.over) finish();
     },
     openStation: id => hud.openStation(id),
@@ -463,6 +515,11 @@ function finish() {
   earned += sim.rp;
   save.points += earned;
   if (stars) (save.best[mission.id] ??= {})[mode] = Math.max(best, stars);
+  // Remember each star test passed in a full run to sunrise, even when the others were missed.
+  if (o.reachedSunrise) {
+    const passed = sim.starTests, before = testsPassed(mission.id, mode);
+    (save.tests[mission.id] ??= {})[mode] = before.map((had, i) => had || passed[i]);
+  }
   commit();
   const cards = mission.dataCards.map(kind => dataCard(kind, game.site));
   // Anyone who went through the airlock also gets the card about it.
@@ -479,6 +536,7 @@ function finish() {
     ['Radiation dose', `${Math.round(sim.dose)} of 100${mission.goalType === 'dose' ? ` (goal ${sim.goalValue})` : ''}`],
     ['Battery empty for', `${Math.round(sim.blackout)} s`],
     ...(sim.food !== null ? [['Meals at the end', `${sim.food} (goal ${sim.goalValue})`]] : []),
+    ...(mission.goalType === 'samples' ? [['Rock samples', `${sim.samples.size} of ${sim.goalValue}`]] : []),
     ['Research from samples and data', `${sim.rp}`],
     ...stormFacts,
   ];
@@ -488,6 +546,10 @@ function finish() {
   $('debrief-stars').innerHTML = starsHtml(stars);
   $('debrief-stats').innerHTML = facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('debrief-points').textContent = `You earned ${earned} research points. You now have ${save.points}.`;
+  $('debrief-pages').hidden = !newPages.length;
+  if (newPages.length) {
+    $('debrief-pages').innerHTML = `<b>New in your Scrapbook:</b> ${listOf(newPages.map(page => page.name))}. Read ${newPages.length > 1 ? 'each page' : 'the page'} for ${C.science.pageRP} more research points.`;
+  }
   $('debrief-lesson').textContent = mission.lesson;
   $('debrief-tips').innerHTML = sim.tips().map(t => `<li>${t}</li>`).join('');
   $('debrief-cards').replaceChildren(...cards.map(card => {
@@ -504,6 +566,7 @@ function finish() {
 function renderCredits() {
   $('sources').innerHTML = SOURCES.map(([what, who, url]) =>
     `<li><b>${what}:</b> ${who}. <a href="${url}" target="_blank" rel="noopener">${url.replace('https://', '')}</a></li>`).join('');
+  $('photo-credits').innerHTML = PAGES.map(page => `<li><b>${page.name}:</b> ${page.real.caption} Photo: ${page.real.credit}.</li>`).join('');
 }
 
 // --- Buttons ---
@@ -518,6 +581,9 @@ const actions = {
   again: id => launch(id),
   restart: () => launch(sim.mission.id),
   research: openResearch,
+  scrapbook: () => openScrapbook(),
+  page: id => openScrapbook(id),
+  level: id => scrapbook.setLevel(id),
   pick,
   buy,
   'pause-tab': pauseTab,
@@ -564,7 +630,7 @@ export function gameReady(api) {
 }
 
 // Debug helpers for scripted checks: window.ui.launch('FirstNight').
-window.ui = { launch, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; }, get cues() { return sound.cuesPlayed; } };
+window.ui = { launch, scrapbook: openScrapbook, get sim() { return sim; }, get save() { return save; }, finishNow: () => { sim.t = sim.total; }, get cues() { return sound.cuesPlayed; } };
 
 renderStart();
 show('start');

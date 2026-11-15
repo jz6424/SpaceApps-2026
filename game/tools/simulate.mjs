@@ -5,7 +5,7 @@
 // Table 1 uses each mission's own storm sizes and times. Table 2 plays many playthroughs the way
 // the game does: storms sized from real NASA DONKI flares (live if this computer can reach the
 // feed, otherwise the saved list) and shifted in time, to check no draw makes a mission unfair.
-import { MISSIONS, MODES } from '../src/config.js';
+import { CONFIG as C, MISSIONS, MODES } from '../src/config.js';
 import { Sim, planRun } from '../src/sim.js';
 import { getFlares } from '../src/nasa.js';
 
@@ -36,6 +36,15 @@ const PLAYERS = {
     }
     if (sim.isNight && sim.robot.task !== 'repair' && !(sim.food !== null && sim.water < 3 && sim.power > 50)) sim.robot.task = 'idle';
     if (sim.mission.goalType === 'dose' && sim.regolith >= 20 && sim.shielding < 2) sim.addShielding();
+    // Rock samples: a short moonwalk every 40 s, day or night (they glow), unless a storm is near.
+    // About 25 s outside per rock, and each trip out costs the airlock's share of air.
+    if (sim.mission.goalType === 'samples' && sim.samples.size < sim.goalValue && !storm && !warned) {
+      const phase = sim.t % 40, trip = Math.floor(sim.t / 40);
+      if (phase < 25) {
+        sim.where = 'outside';
+        if (sim.walk !== trip) { sim.walk = trip; sim.air = Math.max(0, sim.air - C.airlock.cycleAir); }
+      } else if (sim.walk === trip && sim.fetched !== trip) { sim.fetched = trip; sim.collectSample(`rock${sim.samples.size}`); }
+    }
   },
 };
 

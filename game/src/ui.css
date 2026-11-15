@@ -141,6 +141,14 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .stars { font-weight: 600; }
 .stars span[aria-hidden] { color: var(--yellow); letter-spacing: .08em; }
 .stars .off { color: rgba(255, 255, 255, .3); }
+/* The three star tests on the briefing, one under the other. An empty star is an outline. */
+#brief-stars { display: grid; gap: 8px; width: 100%; }
+#brief-stars h3 { font-size: 1.1rem; }
+.star-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.star-list li { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: start; color: var(--soft); }
+.star-list .star { font-size: 1.5rem; line-height: 1.5rem; text-align: center; color: rgba(255, 255, 255, .55); }
+.star-list .got { color: var(--text); }
+.star-list .got .star { color: var(--yellow); }
 .need { color: var(--soft); }
 .need svg { vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .footnotes { display: grid; gap: 0; }
@@ -533,6 +541,11 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
 #tour-callouts { position: fixed; inset: 0; pointer-events: none; }
 .tour-callout { position: fixed; box-sizing: border-box; display: grid; gap: 0; padding: 3px 9px; white-space: nowrap; width: max-content; background: rgba(7,23,63,.96); border: 2px solid #E43700; border-radius: 6px; font-size: 12px; line-height: 1.25; color: #fff; }
 .tour-callout b { color: var(--yellow); font: 700 13px var(--head); }
+/* One label for a group of things that sit together: a title, then a line for each. */
+.tour-callout.group { white-space: normal; width: 300px; gap: 4px; padding: 8px 12px; }
+.tour-callout.group b { font-size: 14px; }
+.tour-callout.group em { font-style: normal; font-weight: 700; color: #fff; }
+.tour-callout.group span { display: block; }
 .tour-callout .c-arrow { position: absolute; display: block; width: 22px; height: 28px; pointer-events: none; }
 .tour-callout .c-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
 .tour-ring-sm { position: fixed; border: 2px solid #E43700; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 0 10px rgba(228,55,0,.6); }

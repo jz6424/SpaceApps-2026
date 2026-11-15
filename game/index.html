@@ -40,9 +40,10 @@
     <button class="btn small primary" id="lock-skip" hidden>Skip</button>
   </section>
   <p id="prompt" class="panel" hidden></p>
-  <!-- Phones and tablets only (see touch.js): a joystick to walk, and Use and Jump buttons. -->
+  <!-- Phones and tablets only (see touch.js): a joystick to walk, and Light, Jump and Use buttons. -->
   <div id="touch-stick" aria-hidden="true"><div id="touch-knob"></div></div>
   <div id="touch-actions">
+    <button id="touch-light" class="touch-btn" aria-label="Chest light on and off">Light</button>
     <button id="touch-jump" class="touch-btn" aria-label="Jump">Jump</button>
     <button id="touch-use" class="touch-btn" aria-label="Use what you are next to">Use</button>
   </div>
@@ -101,6 +102,7 @@
     <div class="topbar">
       <button class="btn small" data-do="home">Back</button>
       <div class="row">
+        <button class="btn small" data-do="scrapbook">Scrapbook <span id="scrapbook-new" class="pip" hidden></span></button>
         <button class="btn small" data-do="research">Research Tree</button>
         <p class="score">Research points: <b id="points">0</b></p>
       </div>
@@ -132,6 +134,17 @@
   </div>
 </main>
 
+<!-- Scrapbook: a page about each part of the base, collected by playing -->
+<main id="scrapbook" class="screen" hidden>
+  <div class="inner">
+    <div class="topbar">
+      <button class="btn small" data-do="open-missions">Back to missions</button>
+      <p class="score">Research points: <b id="scrapbook-points">0</b></p>
+    </div>
+    <div id="scrapbook-book"></div>
+  </div>
+</main>
+
 <!-- Briefing before a mission -->
 <main id="brief" class="screen" hidden>
   <div class="dialog wide">
@@ -142,7 +155,10 @@
       <h3 id="mode-title">Choose your difficulty</h3>
       <div id="mode-choice" role="group" aria-labelledby="mode-title"></div>
       <p id="mode-about"></p>
-      <p id="mode-best" class="fine"></p>
+    </section>
+    <section id="brief-stars" aria-labelledby="star-title">
+      <h3 id="star-title"></h3>
+      <ul id="star-list" class="star-list"></ul>
     </section>
     <p class="goal"><b>Goal:</b> <span id="brief-goal"></span></p>
     <div id="brief-site" class="sitefacts"></div>
@@ -188,6 +204,7 @@
         <div><dt>Joystick</dt><dd>Walk. Push it all the way to run</dd></div>
         <div><dt>Use button</dt><dd>Use what you are next to</dd></div>
         <div><dt>Jump button</dt><dd>Jump</dd></div>
+        <div><dt>Light button</dt><dd>Chest light on and off</dd></div>
         <div><dt>Drag on the base</dt><dd>Look around</dd></div>
         <div><dt>Pinch</dt><dd>Zoom in and out</dd></div>
         <div><dt>Tap a label</dt><dd>Walk there and open it</dd></div>
@@ -203,7 +220,8 @@
         <div><dt><kbd>E</kbd></dt><dd>Use what you are next to</dd></div>
         <div><dt>Click a label</dt><dd>Walk there and open it</dd></div>
         <div><dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></dt><dd>Pick a tool from the hotbar</dd></div>
-        <div><dt><kbd>F</kbd></dt><dd>Speed up time</dd></div>
+        <div><dt><kbd>F</kbd></dt><dd>Chest light on and off</dd></div>
+        <div><dt><kbd>T</kbd></dt><dd>Speed up time</dd></div>
         <div><dt><kbd>Esc</kbd></dt><dd>Pause and settings</dd></div>
       </dl>
     </div>
@@ -223,6 +241,7 @@
     <p id="debrief-stars"></p>
     <dl id="debrief-stats" class="facts"></dl>
     <p id="debrief-points"></p>
+    <p id="debrief-pages" class="lesson" hidden></p>
     <p class="lesson"><b>What you just learned:</b> <span id="debrief-lesson"></span></p>
     <ul id="debrief-tips"></ul>
     <div id="debrief-cards" class="cards"></div>
@@ -236,6 +255,7 @@
     <div class="row">
       <button class="btn primary" data-do="open-missions">Next mission</button>
       <button class="btn" id="debrief-again" data-do="again">Play again</button>
+      <button class="btn" data-do="scrapbook">Scrapbook</button>
     </div>
   </div>
 </main>
@@ -249,9 +269,10 @@
       <li><b>Nothing is free.</b> The antenna, grow lights, robot and Boost all use power. Moon dirt can buy shielding, repairs or extra oxygen, but not all three.</li>
       <li><b>Storms:</b> keep the antenna on and Mission Control warns you early. Park the robot and hide in the Storm Shelter at the back. Every storm is sized from a real solar flare, and they change each time you play.</li>
       <li><b>Make it to sunrise</b> with life support left and your mission goal met. Earn stars and research points to unlock new missions.</li>
+      <li><b>Fill your Scrapbook.</b> The first time you use a station or a machine, its page is added to your Scrapbook. Read it after the mission to see how the real one works, and earn 2 more research points.</li>
     </ol>
-    <p class="fine key-only">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F to speed up time, Esc to pause. The gear button pauses the game and holds the settings and the list of controls. The arrow on the right edge slides your mission out of the way and back.</p>
-    <p class="fine touch-only">On a phone or tablet: use the joystick to walk (push it all the way to run), tap Use and Jump, drag to look around, pinch to zoom, and tap a label to walk there. The gear pauses the game and holds the settings.</p>
+    <p class="fine key-only">Keys: WASD or arrows to walk, Shift to run, Space to jump, drag to look, E to use, F for the chest light, T to speed up time, Esc to pause. The gear button pauses the game and holds the settings and the list of controls. The arrow on the right edge slides your mission out of the way and back.</p>
+    <p class="fine touch-only">On a phone or tablet: use the joystick to walk (push it all the way to run), tap Use, Jump and Light, drag to look around, pinch to zoom, and tap a label to walk there. The gear pauses the game and holds the settings.</p>
     <div class="row"><button class="btn primary" data-do="home">Got it</button></div>
   </div>
 </main>
@@ -262,6 +283,9 @@
     <h3>Real NASA data in this game</h3>
     <ul id="sources" class="sources"></ul>
     <p class="fine">Game rates (power, air, dose) are made simple and sped up so a lunar night fits in a few minutes. The data cards after each mission give the real numbers. Each solar storm is sized from a real solar flare: the flare's class sets how strong the storm is and how long it lasts. The flares come live from NASA DONKI (the past 12 months) when your browser can reach it, otherwise from a list of real past flares. The game always says which one you got. Not every real flare sends a particle storm toward the Moon; in the game each one does.</p>
+    <h3>Photographs in the Scrapbook</h3>
+    <p class="fine">Every real-life photograph in the Scrapbook is from NASA. NASA does not endorse this game.</p>
+    <ul id="photo-credits" class="sources"></ul>
     <h3>Made by</h3>
     <p>Team BaseRace for NASA Space Apps Challenge 2026: "Build a Junior Astronaut Mission Trainer". 3D models are our own designs, built in Blender and inspired by real NASA hardware like the Foundation Surface Habitat and VSAT solar towers.</p>
     <h3>Use of AI</h3>

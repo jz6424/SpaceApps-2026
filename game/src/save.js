@@ -2,11 +2,14 @@
 // keeps working from memory and the menu says when saving isn't possible.
 import { MISSIONS, MODES } from './config.js';
 import { NODES } from './research.js';
+import { PAGES, LEVELS } from './scrapbook.js';
 
 const KEY = 'moonbase.save.v2';
 
 export function emptySave() {
-  return { mode: 'Cadet', points: 0, unlocks: [], best: {}, openAll: false };
+  // found: Scrapbook pages met in a mission. read: pages opened (each pays research points once).
+  // reading: the Scrapbook reading level, 'easy' or 'deep'.
+  return { mode: 'Cadet', points: 0, unlocks: [], best: {}, tests: {}, openAll: false, found: [], read: [], reading: 'easy' };
 }
 
 // Anything hand-edited or left by an older build is dropped rather than trusted.
@@ -21,10 +24,18 @@ function clean(raw) {
     const known = NODES.map(node => node.id);
     save.unlocks = [...new Set(raw.unlocks.filter(id => known.includes(id)))];
   }
+  const pages = PAGES.map(page => page.id);
+  for (const list of ['found', 'read']) {
+    if (Array.isArray(raw[list])) save[list] = [...new Set(raw[list].filter(id => pages.includes(id)))];
+  }
+  if (typeof raw.reading === 'string' && Object.hasOwn(LEVELS, raw.reading)) save.reading = raw.reading;
   for (const mission of MISSIONS) {
     for (const mode of Object.keys(MODES)) {
       const stars = raw.best?.[mission.id]?.[mode];
       if ([1, 2, 3].includes(stars)) (save.best[mission.id] ??= {})[mode] = stars;
+      // tests: which of the three star tests have ever been passed, each on its own.
+      const tests = raw.tests?.[mission.id]?.[mode];
+      if (Array.isArray(tests) && tests.length === 3) (save.tests[mission.id] ??= {})[mode] = tests.map(Boolean);
     }
   }
   return save;

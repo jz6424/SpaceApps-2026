@@ -187,12 +187,15 @@ habitat.updateMatrixWorld(true);
 // The Habitat's white paint is close to pure white, which looks like it glows under any light. A
 // slightly greyer white keeps it reading as white while letting light and shade show on it.
 habitat.traverse(o => { if (o.isMesh && o.material?.name === 'M_White') o.material.color.multiplyScalar(0.84); });
-// The cabin lamps. In the cutaway view the roof is not drawn but still casts its shadow, so the
-// cabin is lit by these, not by the Sun pouring in through a missing roof.
-const LAMP = 8.5;
-const inLights = [-4.6, -1.4, 1.8].map(x => {
-  const l = new THREE.PointLight(0xfff4dd, LAMP, 0, 1.6);
-  l.position.set(x, 6.3, 0);
+// The cabin lamps, and one in the airlock. In the cutaway view the roof is not drawn but still
+// casts its shadow, so the cabin is lit by these, not by the Sun pouring in through a missing roof.
+// Their reach ends at the hull, so at night the inside of the base is bright and the ground
+// around it stays dark.
+const LAMP = 8.5;        // cabin light strength
+const LAMP_ECO = 0.3;    // Eco dims the lamps to this share
+const inLights = [-5.6, -2.2, 1.2, 5.1].map(x => {
+  const l = new THREE.PointLight(0xfff4dd, LAMP, 6.5, 1.2);
+  l.position.set(x, 5.2, 0);
   habitat.add(l);
   return l;
 });
@@ -431,7 +434,8 @@ iceLabel.position.copy(iceSpot).add(new THREE.Vector3(0, 3, 0));
 
 // Rock samples to collect on a moonwalk.
 const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a8f7f, emissive: 0xeafe07, emissiveIntensity: 0.25, roughness: 0.9 });
-const samples = [[24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
+// Five in all: two a short walk from the steps, three further out.
+const samples = [[12, 15], [17, -7], [24, 22], [-28, -30], [40, -32]].map(([dx, dz], i) => {
   const at = L(dx, dz);
   const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockMat);
   mesh.position.copy(at).add(new THREE.Vector3(0, 0.3, 0));
@@ -747,6 +751,22 @@ const bones = Object.fromEntries(BONES.map(n => [n, crewModel.getObjectByName(n)
 const rest = Object.fromEntries(BONES.map(n => [n, bones[n].quaternion.clone()]));
 const smoothed = Object.fromEntries(BONES.map(n => [n, bones[n].quaternion.clone()]));
 
+// A light on the chest of the suit, switched with F. It points where the astronaut faces.
+const torch = new THREE.SpotLight(0xfff1d6, 60, 26, 0.55, 0.6, 1.3);
+torch.position.set(0, 1.18, 0.24);
+torch.target.position.set(0, 0.2, 7);
+torch.visible = false;
+const torchLamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), new THREE.MeshStandardMaterial({ color: 0x3c4048, emissive: 0xfff1d6, emissiveIntensity: 0 }));
+torchLamp.position.set(0.11, 1.2, 0.2);
+// The helmet lamps give a faint glow after dark, just enough to see the astronaut and their feet.
+const helmetGlow = new THREE.PointLight(0xfff1d6, 0, 4.5, 1.4);
+helmetGlow.position.set(0, 1.9, 0.5);
+crewModel.add(torch, torch.target, torchLamp, helmetGlow);
+function setTorch(on) {
+  torch.visible = on;
+  torchLamp.material.emissiveIntensity = on ? 3 : 0;
+}
+
 // Idle, Walk and Run loop in place; tick() picks one from how the astronaut is moving. The run
 // plays slower than the walk: in the Moon's low gravity a run is a long, floating lope.
 const crewMixer = new THREE.AnimationMixer(crewModel);
@@ -932,7 +952,8 @@ addEventListener('keydown', e => {
   if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   if (!e.repeat) {
     if (code === 'KeyE') useNearest();
-    if (code === 'KeyF') hooks?.toggleSpeed();
+    if (code === 'KeyF') setTorch(!torch.visible);
+    if (code === 'KeyT') hooks?.toggleSpeed();
     const slot = /^Digit([1-4])$/.exec(e.code);
     if (slot) hooks?.hotbar?.(Number(slot[1]) - 1);
   }
@@ -1058,6 +1079,7 @@ const touchPad = isTouch ? setupTouch({
   move: (x, y) => { stick.x = x; stick.y = y; },
   jump: () => { if (state === 'play' && !hooks?.busy()) jumpAsked = true; },
   use: () => { if (state === 'play' && !hooks?.busy()) useNearest(); },
+  light: () => { if (state === 'play' && !hooks?.busy()) setTorch(!torch.visible); },
 }) : null;
 const LOCK_YAW = Math.PI / 2;   // the bearing of the fixed airlock view: "up the screen" is toward the cabin
 let lockSteer = false;         // true while the keys follow the airlock view instead of the chase camera
@@ -1267,14 +1289,17 @@ function syncWorld(dt) {
   if (!sim) return;
   const light = sim.sunlight;
   sun.intensity = SUN_FULL * light;
-  hemi.intensity = 0.25 + 0.45 * light;
+  hemi.intensity = 0.07 + 0.63 * light;   // at night only starlight is left outside
   earth.visible = sim.earthUp;
   // Shelter glow: soft all the time, brighter and pulsing when a storm is coming or here.
   const stormOn = sim.stormNow || (sim.nextStorm?.warnedBy && !sim.nextStorm.started);
   const pulse = stormOn ? 0.5 + 0.5 * Math.sin(performance.now() / 250) : 0;
   shelterZone.fill.material.opacity = 0.3 + 0.25 * pulse;
   shelterZone.edge.material.opacity = 0.7 + 0.3 * pulse;
-  inLights.forEach(l => { l.intensity = LAMP * (sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1); });
+  // Eco turns the cabin lamps down, and a flat battery makes them flicker.
+  const lamps = LAMP * (sim.ls === 'eco' ? LAMP_ECO : 1);
+  helmetGlow.intensity = 2.5 * (1 - light);
+  inLights.forEach(l => { l.intensity = lamps * (sim.share < 0.8 ? 0.3 + 0.4 * Math.random() * sim.share : 1); });
   panels.forEach((pn, i) => {
     const broken = !sim.panels[i];
     pn.spark.intensity = broken ? 4 + 4 * Math.random() : 0;
@@ -1361,6 +1386,100 @@ renderer.setAnimationLoop(t => {
   renderer.render(scene, camera);
 });
 
+// --- Scrapbook stills ---
+// One picture of each part of the base, taken from the live 3D world for the Scrapbook pages.
+// Each entry says what to frame and where the camera stands:
+//   box: what must fit in the picture.  from: the direction from it to the camera.
+//   tight: under 1 moves the camera closer.  inside: lift the roof off, as in the cabin view.
+//   crew: where the astronaut stands, and what they face (left out = out of the picture).
+const boxOf = (...things) => things.reduce((box, o) => box.union(new THREE.Box3().setFromObject(o)), new THREE.Box3());
+const boxAt = (mid, w, h) => new THREE.Box3().setFromCenterAndSize(mid, new THREE.Vector3(w, h, w));
+// An outdoor module, with the astronaut standing next to it to show its size.
+function moduleShot(model, from, tight = 0.92) {
+  const box = boxOf(model), mid = box.getCenter(new THREE.Vector3());
+  const view = new THREE.Vector3(from[0], 0, from[2]).normalize(), side = new THREE.Vector3(view.z, 0, -view.x);
+  const gap = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + 0.9;
+  const stand = mid.clone().addScaledVector(side, gap).addScaledVector(view, 0.8);
+  return { box: box.expandByPoint(stand), from, tight, crew: { at: stand, face: mid } };
+}
+// A station in the cabin: seen from above, from the far wall and the middle of the cabin, with
+// the astronaut at the controls.
+function stationShot(id, tight = 0.95) {
+  const s = stations[id], away = s.marker.position.z < site.z ? 1 : -1, inward = s.stand.x < site.x ? 1 : -1;
+  const mid = s.stand.clone().lerp(s.marker.position, 0.5).setY(deckY + 1);
+  return { box: boxAt(mid, 3.4, 2.2), from: [0.4 * inward, 1, 0.5 * away], tight, inside: true, crew: { at: s.stand, face: s.marker.position } };
+}
+const SHOTS = {
+  Habitat: () => ({ box: boxOf(habitat), from: [0.8, 0.3, 0.75], tight: 0.72, crew: { at: outsideSpot(), face: habitat.position } }),
+  HabitatBack: () => ({ box: boxOf(habitat), from: [-0.55, 0.3, 0.95], tight: 0.72 }),
+  Solar: () => moduleShot(panels[2].model, [1, 0.16, 0.7], 1.05),
+  Battery: () => moduleShot(models.Battery, [0.8, 0.35, 0.7]),
+  OxygenMaker: () => moduleShot(models.OxygenMaker, [0.9, 0.35, 0.5]),
+  Antenna: () => moduleShot(models.Antenna, [0.6, 0.25, 0.85]),
+  CargoLander: () => moduleShot(models.CargoLander, [0.85, 0.3, 0.6]),
+  IceDrill: () => moduleShot(models.IceDrill, [0.7, 0.25, 0.8]),
+  Digger: () => moduleShot(robot, [0.75, 0.4, 0.7], 1),
+  Crew: () => {
+    const at = L(2, 20).add(new THREE.Vector3(0, 0.1, 0)), face = at.clone().add(new THREE.Vector3(0.9, 0, 1));
+    return { box: boxAt(at.clone().add(new THREE.Vector3(0, 1, 0)), 2.6, 2.6), from: [0.75, 0.12, 1], tight: 0.9, crew: { at, face } };
+  },
+  Airlock: () => ({ box: boxAt(doors.outer.at.clone().add(new THREE.Vector3(0.6, 0.2, 1.2)), 5.5, 4.2), from: [0.9, 0.3, 0.75], tight: 0.9 }),
+  LifeSupport: () => stationShot('LifeSupport'),
+  Food: () => stationShot('Food'),
+  Shelter: () => stationShot('Shelter', 1.1),
+};
+function snapshot(name) {
+  if (state !== 'off' || !SHOTS[name]) return null;   // only between missions, when nothing else is using the view
+  const shot = SHOTS[name]();
+  // The world as it looks on a clear day, with nothing left over from the last mission.
+  sun.intensity = SUN_FULL;
+  hemi.intensity = 0.7;
+  earth.visible = true;
+  inLights.forEach(l => { l.intensity = LAMP; });
+  panels.forEach(pn => { pn.spark.intensity = 0; pn.model.rotation.z = 0; });
+  robot.position.copy(dock);
+  robot.rotation.y = 0;
+  syncAirlock(0, true);
+  // Labels float over the game, not over a photo. They and the roof go back the way they were.
+  const labels = [];
+  scene.traverse(o => { if (o.isSprite && o.visible) { labels.push(o); o.visible = false; } });
+  const roofWas = roofMeshes.map(m => m.visible);
+  roofMeshes.forEach(m => { m.visible = !shot.inside; });
+  const crewWas = { at: crew.position.clone(), turn: crew.rotation.y, seen: crew.visible };
+  crew.visible = !!shot.crew;
+  if (shot.crew) {
+    const { at, face } = shot.crew;
+    crew.position.set(at.x, at.y + CREW_HEIGHT / 2, at.z);
+    crew.rotation.y = Math.atan2(face.x - at.x, face.z - at.z);
+  }
+
+  const mid = shot.box.getCenter(new THREE.Vector3()), radius = shot.box.getSize(new THREE.Vector3()).length() / 2;
+  const fov = 36, ratio = renderer.getPixelRatio();
+  camera.fov = fov;
+  camera.aspect = 4 / 3;
+  camera.updateProjectionMatrix();
+  camera.position.copy(mid).addScaledVector(new THREE.Vector3(...shot.from).normalize(), radius / Math.sin(fov / 2 * Math.PI / 180) * (shot.tight ?? 1));
+  if (!shot.inside) camera.position.y = Math.max(camera.position.y, groundAt(camera.position.x, camera.position.z) + 1.2);
+  camera.lookAt(mid);
+  sun.target.position.copy(mid);
+  sun.position.copy(mid).addScaledVector(SUN_DIR, 400);
+  earth.position.copy(camera.position).addScaledVector(earthDir, 5000);
+  renderer.setPixelRatio(1);
+  renderer.setSize(960, 720, false);
+  renderer.render(scene, camera);
+  const still = renderer.domElement.toDataURL('image/jpeg', 0.82);
+
+  labels.forEach(o => { o.visible = true; });
+  roofMeshes.forEach((m, i) => { m.visible = roofWas[i]; });
+  crew.position.copy(crewWas.at);
+  crew.rotation.y = crewWas.turn;
+  crew.visible = crewWas.seen;
+  camera.fov = 60;
+  renderer.setPixelRatio(ratio);
+  fitWindow();
+  return still;
+}
+
 await document.fonts.ready;
 
 gameReady({
@@ -1370,6 +1489,7 @@ gameReady({
     sim = newSim;
     hooks = newHooks;
     speed = 1;
+    setTorch(false);
     fitWindow();
     teleport(startSpot());
     facing = crew.rotation.y;
@@ -1427,7 +1547,9 @@ gameReady({
     fitWindow();
     return still;
   },
+  // A still of one part of the base for a Scrapbook page: a key of SHOTS above.
+  snapshot,
 });
 
 // For scripted checks from the browser console.
-window.demo = { goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { snapshot, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };

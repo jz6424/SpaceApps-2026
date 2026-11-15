@@ -33,6 +33,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Stations in the Habitat:** Power, Life Support (Eco / Normal / Boost), Comms (antenna, forecast,
   science uploads, 1.3 s light delay), Galley and greenhouse, Robot Map (dig regolith, haul crater ice,
   fix panels), Storm Shelter (regolith shielding), Airlock (moonwalks).
+* **First Night:** bring back 5 glowing rock samples (two are a short walk from the steps) and reach
+  sunrise. After dark only the cabin is lit, and Eco dims it. **F** switches the chest light on the suit,
+  **T** speeds up time.
 * **Airlock:** two sliding doors that never open together. Going out: the inner door closes, you
   prebreathe pure oxygen (Cadets can skip it), pumps take the air out, then the outer door opens. Each
   trip out costs 1.5% Life Support (`airlock` in `src/config.js`). `npm run airlock` checks the rules.
@@ -45,14 +48,23 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
   (`planRun` in `src/sim.js`), so no two runs are the same.
 * **Win / lose:** reach sunrise with the mission goal met. Life support at 0 for 15 s, or the dose
   limit, ends the mission. Stars, research points, unlocks, then a debrief with NASA data cards.
-* **Missions:** First Night (tutorial; goal: charge left in the battery at sunrise), Solar Storm (needs
+* **Missions:** First Night (tutorial; goal: 5 rock samples and reach sunrise), Solar Storm (needs
   Regolith Shielding), Ice and Greens (needs Greenhouse). Modes: Cadet, Explorer, Commander.
 * **Research Tree:** spend research points between missions. Regolith Shielding and Greenhouse open
   missions 2 and 3. Thirteen upgrades (each with the real science and the exact change) are listed in
   `game/src/research.js` but not switched on yet; the steps to wire them into the rules are at the top
   of that file.
+* **Scrapbook:** a ring binder with a page for each big part of the base (14 pages: Habitat, Life
+  Support, solar panels, airlock, robot and so on; upgrades don't get their own page). A page is
+  added the first time you use that part in a mission, and two (Regolith shielding, Greenhouse)
+  come from the Research Tree; until then the contents shows it with a padlock and how to open it.
+  Each page has a picture taken live from the game, our Blender model, a real NASA photograph, the
+  science at two reading levels (Easy read for ages 7 to 9, Deep dive for 10 and up) and links to
+  NASA pages. Reading a page for the first time pays 2 research points (`science.pageRP` in
+  `src/config.js`). The words are in `src/scrapbook.js`; `npm run scrapbook` checks that every
+  NASA link still works and prints the reading grade of each write-up.
 * **For teachers and judges:** "Open every mission now" at the bottom of the mission menu, or add
-  `?all` to the game's address, opens every mission without earning points.
+  `?all` to the game's address, opens every mission and every Scrapbook page without earning points.
 
 ## Real NASA data
 
@@ -63,6 +75,7 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 | Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
 | Solar storms | NASA DONKI flares of the past 12 months, live from `ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR` (no key; 60 days per request, so six requests), then `api.nasa.gov/DONKI/FLR` as a second try, then a list of real past flares. The game says which one it used |
 | Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS, ISS Quest airlock and oxygen prebreathe |
+| Scrapbook photographs | NASA Image and Video Library (images.nasa.gov) and nasa.gov articles -> `game/public/scrapbook/real-*.jpg`. Each one is credited under the picture and in the in-game credits |
 
 Raw downloads and the scripts that cut them are in `nasa-data/` (big TIFFs, ~160 MB).
 
@@ -98,7 +111,7 @@ Then `python game/tools/make_heights.py` rewrites `game/public/terrain/ridge_hei
 | `game/tools/simulate.mjs` | `npm run balance`: plays every mission x mode with careful, careless and idle bots, then 300 playthroughs each with storms drawn from the real flare feed. |
 | `nasa-data/` | NASA LOLA rasters, cut-outs for Connecting Ridge and Nobile Rim, and the conversion scripts. |
 | `balancing/` | Original Roblox `BalanceConfig.lua` and `simulate.py` (the JS config was ported from these). |
-| `assets/blender/` | `modules.blend`, build scripts, glTF exports (copied into `game/public/models/`), previews. `build_astronaut.py` makes the rigged astronaut with Idle, Walk and Run loops (`Astronaut.glb`). |
+| `assets/blender/` | `modules.blend`, build scripts, glTF exports (copied into `game/public/models/`), previews. `build_astronaut.py` makes the rigged astronaut with Idle, Walk and Run loops (`Astronaut.glb`). `preview_scrapbook.py` renders the Scrapbook's model pictures (`game/public/scrapbook/model-*.jpg`). |
 | `docs/` | Design hub, mission planner, Space Apps brand style. |
 | `reference/` | The paused Roblox prototype, for reference only. |
 

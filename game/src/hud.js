@@ -187,6 +187,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   // --- Supplies, in the corner above the research points ---
   function renderSupplies() {
     const rows = [['box', 'Moon dirt', Math.floor(sim.regolith)]];
+    if (sim.mission.goalType === 'samples') rows.unshift(['star', 'Rock samples', `${sim.samples.size} <small>goal ${sim.goalValue}</small>`]);
     if (sim.food !== null) rows.push(['food', 'Meals', `${sim.food} <small>goal ${sim.goalValue}</small>`], ['droplet', 'Water', Math.floor(sim.water ?? 0)]);
     put('supplies', rows.map(([ico, label, value]) => `<div class="supply">${icon(ico, 18)}<span>${label}</span><b>${value}</b></div>`).join(''));
   }
@@ -263,6 +264,19 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   }
 
   // --- What to do next ---
+  const rocksLeft = () => (sim.mission.goalType === 'samples' ? Math.max(0, sim.goalValue - sim.samples.size) : 0);
+  // At night the battery is all there is. Say whether it will last, and exactly what to turn down.
+  function nightAdvice() {
+    const left = clock(sim.timeToSunrise);
+    if (sim.batteryForecast >= sim.timeToSunrise) return `Night: the battery will last until sunrise (${left} to go). Press T to speed up time (now ${speed}x).`;
+    const cuts = [];
+    if (sim.ls !== 'eco') cuts.push('set Life Support to Eco');
+    if (sim.robotWorking) cuts.push('park the robot at the Robot Map');
+    if (sim.greenhouse && sim.food === null) cuts.push('turn the grow lights off at Power');
+    if (sim.comms && !sim.nextStorm) cuts.push('turn the antenna off at Power');
+    const how = cuts.length ? `To save power: ${cuts.join(', ')}.` : 'Everything is already turned down, so keep an eye on Life Support.';
+    return `Night: the battery lasts about ${clock(sim.batteryForecast)} but sunrise is ${left} away. ${how}`;
+  }
   function hintText() {
     const f = sim.flags, next = sim.nextStorm, storm = sim.stormNow;
     if (storm && sim.where !== 'shelter') return 'Solar storm! Go to the Storm Shelter at the back of the Habitat.';
@@ -275,11 +289,13 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (sim.where === 'outside') {
       const broken = sim.panels.indexOf(false);
       if (broken >= 0) return `Walk to solar panel ${broken + 1} (the red light) and press E to fix it.`;
-      return 'Collect glowing rock samples for research points. Watch your suit air.';
+      const light = sim.sunlight === 0 ? ' It is dark: press F for your chest light.' : '';
+      if (rocksLeft() > 0) return `Pick up the glowing rocks with E: ${sim.samples.size} of ${sim.goalValue} so far. Watch your suit air.${light}`;
+      return `Collect glowing rock samples for research points. Watch your suit air.${light}`;
     }
     if (sim.power <= 0) return 'Battery empty! Open Power and switch something off, or set Life Support to Eco.';
     if (sim.air < 20) return 'Life support is low. Set it to Normal or Boost.';
-    if (sim.power > 0 && sim.sunlight === 0 && sim.batteryForecast < sim.timeToSunrise) return 'At this rate the battery runs out before sunrise. Open Power and switch something off, or set Life Support to Eco.';
+    if (sim.power > 0 && sim.sunlight === 0 && sim.batteryForecast < sim.timeToSunrise) return nightAdvice();
     if (sim.panels.includes(false)) return 'A solar panel is broken. Fix it outside (Airlock) or send the robot (Robot Map).';
     if (f.tourHint) return f.tourHint; // the guided tour in First Night
     if (sim.food !== null) {
@@ -290,7 +306,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       return 'You have enough moon dirt to add shielding at the Storm Shelter.';
     }
     if (sim.t < sim.day && sim.timeToSunset < 40 && sim.ls !== 'eco') return 'Night is coming. Set Life Support to Eco and turn off what you don\'t need.';
-    if (sim.t >= sim.day) return `Make the battery last until sunrise. Press F to speed up time (now ${speed}x).`;
+    if (rocksLeft() > 0) return `Rock samples: ${sim.samples.size} of ${sim.goalValue}. Use the Airlock to go outside and pick up the glowing rocks.${sim.t >= sim.day ? ' They glow in the dark.' : ''}`;
+    if (sim.t >= sim.day) return nightAdvice();
     return sim.mission.goal;
   }
 

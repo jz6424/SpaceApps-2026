@@ -1,35 +1,52 @@
-// The guided tour for First Night. It is short: a welcome, one step that labels the whole screen,
-// one step that labels every station, an optional airlock practice trip, and a send-off.
+// The guided tour for First Night. It is short: a welcome, two steps for the screen (bottom, then
+// top), two for the stations, a first moonwalk through the airlock, and a send-off.
 // Labels ("callouts") each sit next to the thing they describe, with a red arrow pointing at it.
+// Things that sit together and belong together share one label, so no step shows more than four.
 // Steps that only explain stop the game clock; steps that ask the player to do something let it run.
 
 import { forTouch } from './touch.js';
 
 const $ = id => document.getElementById(id);
 
-// Everything on the screen, labelled at once. side = which side of the thing the label sits on.
-const SCREEN = [
-  { target: '#meters [data-m="power"]', side: 'right', title: 'Power', text: 'Your battery. Sun fills it; machines drain it.' },
-  { target: '#meters [data-m="air"]', side: 'right', title: 'Life Support', text: 'Base air. You use it; the machine refills it.' },
-  { target: '#meters [data-m="dose"]', side: 'right', title: 'Radiation', text: 'Never goes down. Storms and walks raise it.' },
-  { target: '#supplies .supply', side: 'left', title: 'Moon dirt', text: 'Robot digs it. For repairs, Boost, shielding.' },
-  { target: '#rp-bar .rp-top', side: 'left', title: 'Research points', text: '+2 per rock, +1 per data upload.' },
-  { target: '#clock', side: 'below', title: 'Sun clock', text: 'Yellow day, blue night, red storms.' },
-  { target: '#feed', side: 'below', title: 'Messages', text: 'Base computer and Mission Control.' },
-  { target: '#mission-card', side: 'below', title: 'Mission', text: 'Your goal and your next step.' },
-  { target: '#mission-handle', side: 'left', title: 'Arrow', text: 'Slides the mission box away and back.' },
-  { target: '#settings', side: 'left', title: 'Settings', text: 'Pause, speed, sound, full screen, controls.' },
+// A label is { target, side, title, text } or, for a group, { target, side, title, lines }.
+// target is a CSS selector, a list of selectors (one frame round them all) or { station }.
+// side = which side of the thing the label sits on. lines = [name, what it is] pairs.
+const SCREEN_BOTTOM = [
+  {
+    target: '#meters', side: 'right', title: 'Your three meters',
+    lines: [
+      ['Power', 'Your battery. The Sun fills it, machines drain it.'],
+      ['Life Support', 'The air in the base. You use it, the machine refills it.'],
+      ['Radiation dose', 'It never goes down. Storms and moonwalks raise it.'],
+    ],
+  },
+  {
+    target: ['#supplies', '#rp-bar'], side: 'left', title: 'What you have collected',
+    lines: [
+      ['Rock samples', 'Tonight\'s goal: bring back 5 glowing rocks.'],
+      ['Moon dirt', 'The robot digs it. For repairs, Boost and shielding.'],
+      ['Research points', '+2 for each rock, +1 for each data upload.'],
+    ],
+  },
+];
+const SCREEN_TOP = [
+  { target: '#feed', side: 'below', title: 'Messages', text: 'From the base computer and Mission Control.' },
+  { target: '#clock', side: 'below', title: 'Sun clock', text: 'Yellow is day, blue is night, red is a storm.' },
+  { target: ['#mission-handle', '#mission-card'], side: 'below', title: 'Mission', text: 'Your goal and your next step. The arrow slides it away.' },
+  { target: '#settings', side: 'left', title: 'Settings', text: 'Pause, speed, sound and controls.' },
 ];
 
-// Every station, labelled at once, at its floating label in the base.
-const STATIONS = [
+// The stations, in two groups, each labelled at its floating label in the base.
+const STATIONS_RUN = [
   { target: { station: 'Power' }, title: 'Power', text: 'What charges and drains the battery.' },
   { target: { station: 'LifeSupport' }, title: 'Life Support', text: 'Pick Eco, Normal or Boost.' },
   { target: { station: 'Comms' }, title: 'Comms', text: 'Antenna on: Earth warns of storms.' },
-  { target: { station: 'Food' }, title: 'Galley', text: 'Food and greenhouse, for later.' },
-  { target: { station: 'MapTable' }, title: 'Robot Map', text: 'Robot digs here. Park it in storms.' },
-  { target: { station: 'Shelter' }, title: 'Storm Shelter', text: 'Hide here in storms (blue floor).' },
-  { target: { station: 'Airlock' }, title: 'Airlock', text: 'Doors to the Moon. Not in storms.' },
+];
+const STATIONS_WORK = [
+  { target: { station: 'MapTable' }, title: 'Robot Map', text: 'Send the robot to dig. Park it in storms.' },
+  { target: { station: 'Food' }, title: 'Galley', text: 'Food and the greenhouse, for later missions.' },
+  { target: { station: 'Shelter' }, title: 'Storm Shelter', text: 'Hide here in storms (the blue floor).' },
+  { target: { station: 'Airlock' }, title: 'Airlock', text: 'The way out to the Moon. Not in storms.' },
 ];
 
 function buildSteps() {
@@ -38,23 +55,31 @@ function buildSteps() {
     {
       title: 'Welcome to your first night', at: 'center', freeze: true,
       text: [
-        'You run a small Moon base on your own. <b>Survive the night until the Sun comes back</b> and learn the controls.',
+        'You run a small Moon base on your own. <b>Bring back 5 glowing rock samples and keep the base running until the Sun comes back.</b>',
         'Labels with red arrows will show what everything does. You can press <b>Skip tour</b> at any time.',
       ],
     },
     {
-      title: 'Your screen', at: 'center', freeze: true, callouts: SCREEN,
-      text: ['Each label points at part of the screen. Read them, then press <b>Next</b>.'],
+      title: 'The bottom of your screen', at: 'center', freeze: true, callouts: SCREEN_BOTTOM,
+      text: ['Your meters are on the left. What you have collected is on the right. Press <b>Next</b> when you have read them.'],
     },
     {
-      title: 'Your stations', at: 'left', freeze: true, callouts: STATIONS, hideWhenStationOpen: true,
-      text: ['Each station has a label in the base. <b>Click one</b> to open it (or press <b>E</b> when close). Press <b>Next</b> when you are done.'],
+      title: 'The top of your screen', at: 'center', freeze: true, callouts: SCREEN_TOP,
+      text: ['Messages, the Sun clock, your mission and the settings. Press <b>Next</b> when you have read them.'],
     },
-    // Optional practice trip through the airlock. Every step lets the player skip it.
     {
-      id: 'trip-offer', title: 'Optional: practice a moonwalk', at: 'center', freeze: true, alt: skipPractice, nextLabel: 'Let\'s try it',
+      title: 'Stations that run the base', at: 'left', freeze: true, callouts: STATIONS_RUN, hideWhenStationOpen: true,
+      text: ['These three keep the lights on and the air fresh. <b>Click a label</b> to open a station (or press <b>E</b> when close).'],
+    },
+    {
+      title: 'Stations for work and safety', at: 'left', freeze: true, callouts: STATIONS_WORK, hideWhenStationOpen: true,
+      text: ['The robot, your food, the storm shelter and the way outside. Press <b>Next</b> when you are done.'],
+    },
+    // The first moonwalk, through the airlock. Every step lets the player skip it.
+    {
+      id: 'trip-offer', title: 'Your first moonwalk', at: 'center', freeze: true, alt: skipPractice, nextLabel: 'Let\'s go',
       closeStation: true,
-      text: ['Try the airlock for real: go out, look around, and come back in. It takes about a minute. You can skip it.'],
+      text: ['The glowing rocks are outside. Let\'s go out through the airlock together and pick up the first one. It takes about a minute.'],
     },
     {
       id: 'trip-open', title: 'Open the Airlock', target: { station: 'Airlock' }, side: 'above', at: 'right', alt: skipPractice,
@@ -66,27 +91,26 @@ function buildSteps() {
       id: 'trip-go', title: 'Suit up', target: '#station-body [data-act="outside"]', side: 'left', at: 'right', alt: skipPractice,
       hint: 'Press "Suit up and go outside", then walk out when the outer door opens.',
       text: [
-        'Press <b>Suit up and go outside</b>. Watch the bar in the middle of the screen while the doors and air pump work.',
-        '<b>When the outer door is open, walk out onto the Moon</b> with WASD.',
+        'Press <b>Suit up and go outside</b>. Watch the bar in the corner of the screen while the doors and air pump work.',
+        '<b>When the hatch is open, walk out onto the Moon</b> with WASD.',
       ],
       until: sim => sim.where === 'outside', noNext: true,
     },
     {
       id: 'trip-outside', title: 'You are on the Moon', target: '#meters [data-m="suit"]', side: 'right', at: 'right',
-      hint: 'Look around, then walk back in through the hatch, press E and choose "Close up and come inside".',
+      hint: 'Pick up a glowing rock with E, then walk back in through the hatch, press E and choose "Close up and come inside".',
       text: [
-        'Your <b>suit air</b> counts down on the meter. Look around.',
+        'Walk to a <b>glowing rock</b> and press <b>E</b> to pick it up. Your <b>suit air</b> counts down on the meter.',
         '<b>To come back:</b> walk up the yellow steps and in through the open hatch. Between the two doors, press <b>E</b> and choose <b>Close up and come inside</b>.',
       ],
       until: sim => sim.where !== 'outside' && sim.airlockStatus === 'pressurized', noNext: true,
     },
     {
       id: 'ready', title: 'You are ready', at: 'center', closeStation: true, last: true,
-      hint: 'Make the battery last until sunrise. Press F to speed up time.',
       text: [
-        '<b>Survive until sunrise.</b>',
-        'Charge the battery before sunset, and turn the Antenna on at Comms.',
-        'A solar storm will pass before sunset: park the robot and go to the Storm Shelter. Press <b>F</b> to speed up time.',
+        '<b>Bring back 5 glowing rocks and survive until sunrise.</b> Go for the rocks while the Sun is up if you can.',
+        'A solar storm will pass before sunset: park the robot and go to the Storm Shelter.',
+        'When it gets dark, set Life Support to <b>Eco</b> so the battery lasts. <b>F</b> switches your chest light on, and <b>T</b> speeds up time.',
       ],
     },
   ];
@@ -117,8 +141,9 @@ export function createTour({ sim, game, hud }) {
     clearCallouts();
     callouts = list.map(c => {
       const el = document.createElement('div');
-      el.className = 'tour-callout';
-      el.innerHTML = `<b>${c.title}</b><span>${forTouch(c.text)}</span><i class="c-arrow">${ARROW}</i>`;
+      el.className = c.lines ? 'tour-callout group' : 'tour-callout';
+      const body = c.lines ? c.lines.map(([name, what]) => `<span><em>${name}</em> ${forTouch(what)}</span>`).join('') : `<span>${forTouch(c.text)}</span>`;
+      el.innerHTML = `<b>${c.title}</b>${body}<i class="c-arrow">${ARROW}</i>`;
       const box = document.createElement('div');
       box.className = 'tour-ring-sm';
       holder.append(box, el);
@@ -156,6 +181,13 @@ export function createTour({ sim, game, hud }) {
       const p = game.stationScreen(target.station);
       if (!p) return null;
       return { left: p.x - 58, top: p.y - 16, width: 116, height: 32 };
+    }
+    if (Array.isArray(target)) {
+      // Several things side by side share one frame.
+      const parts = target.map(rectOf).filter(Boolean);
+      if (!parts.length) return null;
+      const left = Math.min(...parts.map(q => q.left)), top = Math.min(...parts.map(q => q.top));
+      return { left, top, width: Math.max(...parts.map(q => q.left + q.width)) - left, height: Math.max(...parts.map(q => q.top + q.height)) - top };
     }
     const el = document.querySelector(target);
     if (!el || el.hidden) return null;
