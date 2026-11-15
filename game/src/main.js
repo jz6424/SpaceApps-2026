@@ -780,6 +780,8 @@ function goToStation(id) {
 
 // --- Loop ---
 let vy = 0, grounded = false;
+const LOCK_YAW = Math.PI / 2;   // the bearing of the fixed airlock view: "up the screen" is toward the cabin
+let lockSteer = false;         // true while the keys follow the airlock view instead of the chase camera
 // The astronaut eases into a walk and swings round to face the way they are going, instead of
 // snapping. Higher numbers are snappier, lower ones are floatier.
 const ACCEL = 7;       // how quickly the walking speed catches up with the keys
@@ -840,9 +842,14 @@ function tick(dt) {
   let fwd = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   let side = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   const speedWalk = keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN : WALK;
-  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  let mx = fx * fwd - fz * side, mz = fz * fwd + fx * side;
   let p = crewBody.translation();
+  // In the airlock the view is fixed, so the keys follow the screen: W toward the cabin door at
+  // the top, S toward the Moon door at the bottom. The switch waits until the keys are let go,
+  // so walking through a doorway never turns you round mid-step.
+  if (!fwd && !side) lockSteer = airlockZone(p).inAirlock;
+  const steer = lockSteer ? LOCK_YAW : yaw;
+  const fx = -Math.sin(steer), fz = -Math.cos(steer);
+  let mx = fx * fwd - fz * side, mz = fz * fwd + fx * side;
   if (fwd || side) walkTo = null;
   if (walkTo) {
     walkTo.since += dt;
@@ -913,10 +920,11 @@ function tick(dt) {
   camDir.set(Math.sin(yaw) * Math.cos(viewPitch), Math.sin(viewPitch), Math.cos(yaw) * Math.cos(viewPitch));
   if (inLock) {
     // Between the doors there is no room for a chase camera, so a wide one looks down from the
-    // ceiling, like the cutaway view in the cabin. It tilts so "forward" stays up the screen.
-    const dir = Math.sin(yaw) < 0 ? 1 : -1, mid = (INNER_X + OUTER_X) / 2;
-    camera.position.copy(hab(mid - 1.7 * dir, 0, DECK + 10.7));
-    head.copy(hab(mid + 0.5 * dir, 0, DECK));
+    // ceiling, like the cutaway view in the cabin. It never turns: the cabin door is always at the
+    // top of the screen and the Moon door at the bottom, whichever way you came in.
+    const mid = (INNER_X + OUTER_X) / 2;
+    camera.position.copy(hab(mid + 1.7, 0, DECK + 10.7));
+    head.copy(hab(mid - 0.5, 0, DECK));
   } else if (inHull) {
     camera.position.copy(head).addScaledVector(camDir, Math.max(camDist, 9));
   } else {
