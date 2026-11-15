@@ -103,6 +103,9 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .lede { font-size: 1.15rem; font-weight: 400; max-width: 34em; }
 #start-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 #start-status { font-weight: 600; }
+/* "Loading the Moon" with dots that count up; the dots keep a fixed width so the words don't shift. */
+.loading { margin: 0; line-height: 48px; font: 500 1.15rem/48px var(--head); letter-spacing: .02em; color: var(--soft); white-space: nowrap; }
+.loading .dots { display: inline-block; width: 1.6em; text-align: left; }
 #start-status:empty { display: none; }
 #start .row { gap: 8px 24px; }
 .fine { font-size: .9rem; color: var(--soft); }

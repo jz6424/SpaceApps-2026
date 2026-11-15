@@ -64,9 +64,20 @@ function starsHtml(count) {
 }
 
 // --- Start ---
+// While the Moon loads, the start screen shows just "Loading the Moon" with its dots counting
+// . .. ... and round again; the Play button takes its place once it has loaded.
+let loadingDots = 0;
 function renderStart() {
-  $('start-actions').innerHTML = `<button class="btn primary" data-do="open-missions" ${game ? '' : 'disabled'}>${game ? 'Play' : 'Loading the Moon…'}</button>`;
-  $('start-status').textContent = game ? '' : 'Loading real NASA terrain…';
+  clearInterval(loadingDots);
+  $('start-status').textContent = '';
+  if (game) {
+    $('start-actions').innerHTML = '<button class="btn primary" data-do="open-missions">Play</button>';
+    return;
+  }
+  $('start-actions').innerHTML = '<p class="loading" role="status">Loading the Moon<span class="dots" aria-hidden="true">.</span></p>';
+  const dots = $('start-actions').querySelector('.dots');
+  let n = 1;
+  loadingDots = setInterval(() => { n = n % 3 + 1; dots.textContent = '.'.repeat(n); }, 450);
 }
 
 // --- Mission menu ---
@@ -842,7 +853,7 @@ addEventListener('keydown', e => {
 addEventListener('resize', () => { if (!$('research').hidden) { placeMap(); drawStars(); } });
 
 addEventListener('unhandledrejection', () => {
-  if (!game) $('start-status').textContent = 'The Moon didn\'t load. Please refresh the page.';
+  if (!game) { clearInterval(loadingDots); $('start-actions').innerHTML = ''; $('start-status').textContent = 'The Moon didn\'t load. Please refresh the page.'; }
 });
 
 // Called by main.js once the world has loaded.
