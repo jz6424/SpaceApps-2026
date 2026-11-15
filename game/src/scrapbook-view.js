@@ -31,6 +31,7 @@ const GLYPHS = {
   lock: '<path d="M6 11h12v10H6z"/><path d="M8.5 11V7.5a3.5 3.5 0 0 1 7 0V11"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  back: '<path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/>',
   right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   out: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
 };
@@ -144,6 +145,9 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     </figure>`;
   }
 
+  // The way back to the contents, in the top left corner of every page.
+  const backHtml = `<button class="sb-back" data-do="scrapbook">${glyph('back', 20)} Contents</button>`;
+
   // Turning pages goes through the whole book, locked pages too.
   function navHtml(page) {
     const i = PAGES.indexOf(page), prev = PAGES[i - 1], next = PAGES[i + 1];
@@ -162,6 +166,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
     const chapter = CHAPTERS.find(c => c.id === page.chapter).name, still = stillFor(page);
     return `
     <article class="sb-spread is-locked" aria-labelledby="sb-title">
+      ${backHtml}
       <section class="sb-leaf sb-photos" aria-label="Pictures">
         ${still ? photoHtml('tilt-l', 'In the game', still, `A picture from the game. ${page.shotCaption}`, page.shotCaption) : ''}
         ${mysteryHtml('tilt-r', 'In real life', page.real.tall ? 'tall' : '')}
@@ -199,6 +204,7 @@ export function createScrapbook({ getSave, commit, unlocks, allOpen, snapshot, c
       : `<p class="sb-stamp">${glyph('check', 14)} Read</p>`;
     return `
     <article class="sb-spread" aria-labelledby="sb-title">
+      ${backHtml}
       <section class="sb-leaf sb-photos" aria-label="Pictures">
         ${still ? photoHtml('tilt-l', 'In the game', still, `A picture from the game. ${page.shotCaption}`, page.shotCaption) : ''}
         ${photoHtml('tilt-r', 'In real life', `scrapbook/${page.real.src}`, page.real.alt, page.real.caption, page.real.credit, page.real.tall ? 'tall' : '')}

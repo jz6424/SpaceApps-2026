@@ -35,11 +35,24 @@
 }
 
 #scrapbook .sb-spread :focus-visible, #scrapbook .sb-spread:focus-visible { outline: 3px solid var(--electric); outline-offset: 3px; }
-#scrapbook h2:focus { outline: none; }
+#scrapbook .sb-spread h2:focus, #scrapbook .sb-spread h2:focus-visible { outline: none; }   /* the title only takes focus so reading starts there */
 .sb-spread h2 { font-size: clamp(1.7rem, 3.4vw, 2.4rem); }
 .sb-spread h3 { font-size: 1.15rem; }
 .sb-label { font: 700 .85rem var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--electric); }
 .sb-link { font: inherit; font-weight: 700; color: var(--electric); background: none; border: 0; padding: 10px 0; margin: -10px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Back to the contents: a button in the top left corner of a page, with room made for it above
+   the pictures. */
+.sb-back {
+  position: absolute; z-index: 1; top: 16px; left: 20px; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; box-sizing: border-box; padding: 6px 16px 6px 10px; border: 2px solid var(--ink); border-radius: 8px;
+  background: #fff; color: var(--ink); cursor: pointer; font: 700 .9rem/1.2 var(--head); text-transform: uppercase; letter-spacing: .08em;
+  transition: background-color .15s var(--ease);
+}
+.sb-back:hover { background: #DCEBFD; }
+.sb-back .ico { vertical-align: 0; }
+.sb-back ~ .sb-photos { padding-top: 76px; }
+.sb-spread:is(.opening, .closing) .sb-back { visibility: hidden; }   /* its page is folded away, or folding */
 
 /* A picture taped to the page. The caption sits under the picture, never on it. */
 .sb-photo {
@@ -231,6 +244,9 @@ button.sb-row:hover { background: rgba(46, 150, 245, .16); }
   .sb-spread::before { display: none; }
   .sb-leaf, .sb-leaf:first-of-type, .sb-leaf:last-of-type { border-radius: 6px; padding: 24px 20px 28px; box-shadow: none; }
   .sb-text { order: -1; }   /* the write-up first, then its pictures */
+  .sb-back { top: 12px; left: 12px; }
+  .sb-back ~ .sb-photos { padding-top: 24px; }
+  .sb-back ~ .sb-text { padding-top: 72px; }
   #scrapbook .inner { padding: 16px 12px 32px; }
   .sb-tally { grid-template-columns: 1fr 1fr; }
   .sb-nav { grid-template-columns: 1fr; }
