@@ -212,8 +212,13 @@ const habitat = habGltf.scene;
 habitat.position.set(site.x, site.y, site.z);
 scene.add(habitat);
 const roofMeshes = [], colNodes = [], stationNodes = {};
+// Everything solid enough to stop a click: the Habitat's own meshes, and the doors, frames and
+// furniture built further down. A click only reaches a station or a door if nothing solid is in
+// front of it (see pick).
+const solids = [];
 habitat.traverse(o => {
   if (o.name.startsWith('COL_')) { colNodes.push(o); o.visible = false; return; }
+  if (o.isMesh && !o.parent.name.startsWith('COL_')) solids.push(o);
   if (o.name.startsWith('ROOF_')) { roofMeshes.push(o); if (o.isMesh) o.material = o.material.clone(); }
   const m = o.name.match(/^STATION_([A-Za-z]+)$/);
   if (m) stationNodes[m[1]] = o;
@@ -511,13 +516,17 @@ function block(x0, x1, y0, y1, z0, z1, mat) {
   mesh.position.copy(a).add(b).multiplyScalar(0.5);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
+  solids.push(mesh);
   return mesh;
 }
 
 const DOOR_HALF = 2.2;                    // half the doorway width: each door is two leaves this wide
 const INNER_X = 13.2, OUTER_X = 19.8;     // where the two doors stand: a wall inside the tube, the hatch on its end
 const INNER_TALL = 8.4, OUTER_TALL = 8.95;
-const HATCH_WIDE = 5.2, HATCH_SLIDE = 5.9; // the hatch is one slab that slides along the hull to open
+// The hatch is one slab that slides along the hull to open. It is wider and taller than the
+// doorway and stands just in front of the grey door frame, so shut it covers the opening with no
+// gap, and open it slides past the frame without cutting through it.
+const HATCH_WIDE = 6.2, HATCH_TALL = 9.0, HATCH_SLIDE = 5.9;
 const LOCK_LOOK = {                       // light colour and label for each state. Never colour alone.
   pressurized: { text: 'Pressurized', color: 0x2e96f5 },
   cycling: { text: 'Cycling...', color: 0xeafe07 },
@@ -546,6 +555,7 @@ for (const look of Object.values(LOCK_LOOK)) {
   mesh.position.set(site.x + (INNER_X + 0.3) * U, site.y, site.z);
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
+  solids.push(mesh);
   for (const s of [-1, 1]) {
     block(INNER_X + 0.26, INNER_X + 0.66, Math.min(s * DOOR_HALF, s * (DOOR_HALF + 0.4)), Math.max(s * DOOR_HALF, s * (DOOR_HALF + 0.4)), DECK - 0.05, DECK + INNER_TALL, PAINT.grey);
     solid(INNER_X - 0.2, INNER_X + 0.6, Math.min(s * DOOR_HALF, s * 4.4), Math.max(s * DOOR_HALF, s * 4.4), DECK, DECK + 10);
@@ -585,15 +595,17 @@ function makeHatch(which, x, tall, lamps) {
     disc.position.copy(hab(...at));
     disc.castShadow = true;
     scene.add(disc);
+    solids.push(disc);
     return disc;
   };
   [
-    block(x - 0.25, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.13, DECK + 8.5, PAINT.white), // just clear of the yellow tread
+    // The frame's front face is at x - 0.15; the slab starts just clear of it, and of the yellow tread.
+    block(x - 0.13, x + 0.25, -HATCH_WIDE / 2, HATCH_WIDE / 2, DECK + 0.13, DECK + HATCH_TALL, PAINT.white),
     round(1.1, 0.15, PAINT.glass, [x + 0.28, 0, DECK + 6]),
-    round(1.1, 0.15, PAINT.glass, [x - 0.28, 0, DECK + 6]),
+    round(1.1, 0.15, PAINT.glass, [x - 0.16, 0, DECK + 6]),
     round(0.65, 0.5, PAINT.red, [x + 0.45, 0, DECK + 3]),
     block(x + 0.6, x + 0.9, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
-    block(x - 0.55, x - 0.25, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
+    block(x - 0.5, x - 0.11, -1.2, 1.2, DECK + 2.8, DECK + 3.2, PAINT.red),
   ].forEach(mesh => { mesh.userData.door = which; pickables.push(mesh); leaf.attach(mesh); });
   return finishDoor(which, x, tall, lamps, [{ leaf, travel: HATCH_SLIDE }], HATCH_WIDE / 2, 0.25);
 }
@@ -1299,6 +1311,8 @@ let sim = null, hooks = null, speed = 1;
 const keys = new Set();
 const KEYMAP = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD' };
 addEventListener('keydown', e => {
+  // T changes the game speed even while a station panel is open: that is when you are waiting.
+  if (state === 'play' && hooks?.busy() && e.code === 'KeyT' && !e.repeat) return hooks.toggleSpeed();
   if (state !== 'play' || hooks?.busy()) return;
   if (e.target.closest?.('button')) { if (e.code === 'Space' || e.code === 'Enter') return; }
   const code = KEYMAP[e.code] || e.code;
@@ -1407,11 +1421,23 @@ addEventListener('resize', fitWindow);
 
 // Clicking a station (its label or the machine itself) walks you over and opens it.
 const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
-function pick(e) {
+// What is under the pointer: the first solid thing on its line of sight. Only if that is a station
+// or a door does the click count. (Before, walls were not looked at, so a click on the wall or the
+// frame beside the hatch went through it and worked the cabin door behind.)
+const drawn = o => {
+  for (let q = o; q; q = q.parent) if (!q.visible) return false;
+  const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+  if (mat?.colorWrite === false) return false;                               // the roof, while it is cut away
+  return !(mat?.transparent && !o.userData.station && !o.userData.door);    // window glass can be clicked through
+};
+let clickable = null;
+function pick(e, throughWalls = false) { // throughWalls: the old way, kept for scripted checks
+  clickable ??= [...new Set([...pickables, ...solids])];
   mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(mouse, camera);
-  const hit = raycaster.intersectObjects(pickables, false)[0];
-  return hit?.object.userData ?? null; // { station } or { door }
+  const hit = raycaster.intersectObjects(throughWalls ? pickables : clickable, false).find(h => drawn(h.object));
+  const what = hit?.object.userData;
+  return what?.station || what?.door ? what : null; // { station } or { door }
 }
 let hovered = null;
 function hover(e) {
@@ -1960,4 +1986,4 @@ gameReady({
 });
 
 // For scripted checks from the browser console.
-window.demo = { snapshot, dirtShield, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, get pitch() { return pitch; }, set pitch(v) { pitch = v; }, get camDist() { return camDist; }, set camDist(v) { camDist = v; }, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { snapshot, dirtShield, pickAt: (x, y, throughWalls) => pick({ clientX: x, clientY: y }, throughWalls), get yaw() { return yaw; }, set yaw(v) { yaw = v; }, get pitch() { return pitch; }, set pitch(v) { pitch = v; }, get camDist() { return camDist; }, set camDist(v) { camDist = v; }, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };

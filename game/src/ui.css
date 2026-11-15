@@ -495,6 +495,8 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .c-row .ico { vertical-align: -4px; }
 .c-row .dim { color: var(--soft); font-weight: 400; }
 .c-row .hot { color: #fff; background: var(--martian); padding: 0 8px; }
+.c-row .fast { color: var(--yellow); }
+.c-row .fast .ico { stroke: currentColor; }
 .track { position: relative; height: 8px; background: var(--yellow); }
 .track .night { position: absolute; top: 0; bottom: 0; right: 0; background: var(--electric); }
 .track .earth-gap { position: absolute; bottom: -4px; height: 2px; background: repeating-linear-gradient(90deg, #fff 0 4px, transparent 4px 8px); }

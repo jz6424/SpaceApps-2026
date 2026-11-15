@@ -306,7 +306,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const storm = sim.stormNow;
     put('clock', `
       <div class="c-row"><span>${when}</span><span class="${sim.earthUp ? '' : 'dim'}">${icon('globe', 18)} Earth ${sim.earthUp ? 'up' : 'set'}</span>
-      ${storm ? `<span class="hot">${icon('radiation', 18)} Storm! ${Math.ceil(storm.at + storm.length - sim.t)} s</span>` : ''}</div>
+      ${storm ? `<span class="hot">${icon('radiation', 18)} Storm! ${Math.ceil(storm.at + storm.length - sim.t)} s</span>` : ''}
+      ${speed > 1 ? `<span class="fast">${icon('ff', 18)} ${speed}x speed</span>` : ''}</div>
       <div class="track"><b class="night" style="left:${pDay}%"></b>${earth}${storms}<i style="left:${pNow}%"></i></div>`);
     $('storm-frame').hidden = !storm;
     $('storm-frame').classList.toggle('safe', sim.where === 'shelter');
@@ -662,8 +663,18 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     api.setSpeed(speed);
     $('speed').setAttribute('aria-pressed', speed > 1);
     $('speed').innerHTML = `${icon('ff', 18)} ${speed}x speed`;
+    renderClock(); // the Sun clock shows the speed while it is faster than normal
   }
-  const toggleSpeed = () => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]);
+  // With a storm on or on its way time stays at normal speed, and T says why instead of doing nothing.
+  const stormNear = () => !!(sim.stormNow || sim.nextStorm?.warnedBy);
+  let toldWhy = -Infinity;
+  function toggleSpeed() {
+    if (stormNear()) {
+      if (performance.now() - toldWhy > 6000) { toldWhy = performance.now(); sim.say('Time stays at normal speed until the solar storm has passed.', 'info'); }
+      return setSpeed(1);
+    }
+    setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]);
+  }
   const speedBtn = () => toggleSpeed();
   $('speed').addEventListener('click', speedBtn);
   setSpeed(1);
@@ -731,7 +742,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
 
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
-    if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) setSpeed(1);
+    if (speed > 1 && stormNear()) setSpeed(1);
     const now = performance.now();
     renderFeed(now);
     checkSuitAir(now);
