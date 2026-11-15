@@ -476,3 +476,12 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .volume input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--electric); }
 .volume input[type="range"]:focus-visible { outline: 2px solid var(--yellow); }
 @media (max-width: 520px) { .volume-row, .volume-row:not(:has(button)) { grid-template-columns: 1fr auto; } .volume-row input { grid-column: 1 / -1; order: 3; } }
+
+/* Tour labels: every one sits next to what it describes, with a red arrow pointing at it */
+#tour-callouts { position: fixed; inset: 0; pointer-events: none; }
+.tour-callout { position: fixed; box-sizing: border-box; display: grid; gap: 0; padding: 3px 9px; white-space: nowrap; width: max-content; background: rgba(7,23,63,.96); border: 2px solid #E43700; border-radius: 6px; font-size: 12px; line-height: 1.25; color: #fff; }
+.tour-callout b { color: #EAFE07; font: 900 13px "Fira Sans", system-ui, sans-serif; }
+.tour-callout .c-arrow { position: absolute; display: block; width: 22px; height: 28px; pointer-events: none; }
+.tour-callout .c-arrow svg { display: block; animation: tour-bob .7s ease-in-out infinite alternate; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+.tour-ring-sm { position: fixed; border: 2px solid #E43700; border-radius: 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.6), 0 0 10px rgba(228,55,0,.6); }
+.tour-callout[hidden], .tour-ring-sm[hidden] { display: none; }
