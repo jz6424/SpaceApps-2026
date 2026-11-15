@@ -1,12 +1,14 @@
 /* NASA Space Apps brand (docs/space-apps-style-spec.md): blues lead, Neon Yellow only on links,
    buttons and highlights, body text only on Deep Blue or Electric Blue. Matches game/src/ui.css.
-   Spacing sits on a 4px grid. The chrome stays quiet so the game view carries the page. */
+   Loosened for kids: sentence-case headline, rounder corners, and two drawn moments (the moonscape
+   in the hero and the stitched mission patches). Everything else stays quiet. Spacing is on a 4px grid. */
 :root {
   --deep: #07173F; --electric: #0042A6; --neon: #0960E1; --yonder: #2E96F5;
   --yellow: #EAFE07; --red: #E43700;
   --text: #fff; --soft: #C9D8F2;
   --line: rgba(201, 216, 242, .18);
   --raised: rgba(0, 66, 166, .24);
+  --ridge: #16295A;
   --head: "Fira Sans", system-ui, sans-serif;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --bar: 60px;
@@ -25,9 +27,9 @@ a { color: var(--yellow); text-underline-offset: 4px; }
 .skip { position: absolute; left: 12px; top: -80px; z-index: 30; background: var(--yellow); color: var(--deep); font-weight: 700; padding: 8px 16px; border-radius: 8px; }
 .skip:focus { top: 12px; }
 
-/* Brand type: Fira Sans Black and Bold for headings, H1 in caps with 5% tracking. */
+/* Brand type: Fira Sans Black and Bold for headings. The H1 is in sentence case so it reads like an invitation. */
 h1, h2, h3 { font-family: var(--head); margin: 0; line-height: 1.1; }
-h1 { font-weight: 900; text-transform: uppercase; letter-spacing: .05em; font-size: clamp(2.3rem, 7vw, 4.4rem); line-height: 1.02; }
+h1 { font-weight: 900; font-size: clamp(2.5rem, 6.4vw, 4.25rem); line-height: 1.04; text-wrap: balance; }
 h2 { font-weight: 900; font-size: clamp(1.6rem, 4vw, 2.4rem); }
 h3 { font-weight: 700; font-size: 1.25rem; }
 .fine { font-size: .9rem; color: var(--soft); }
@@ -43,6 +45,9 @@ h3 { font-weight: 700; font-size: 1.25rem; }
 .btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--deep); }
 .btn.primary:hover { background: #fff; border-color: #fff; }
 .btn.small { font-size: .95rem; padding: 0 16px; height: 40px; }
+.btn.big { font-size: 1.2rem; height: 56px; padding: 0 32px; }
+.quiet { color: var(--text); font-weight: 700; text-decoration: underline; text-decoration-color: var(--yonder); text-decoration-thickness: 2px; transition: text-decoration-color .15s var(--ease); }
+.quiet:hover { text-decoration-color: var(--yellow); }
 .link { font: inherit; color: var(--yellow); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
 
 /* Header */
@@ -54,17 +59,28 @@ h3 { font-weight: 700; font-size: 1.25rem; }
 .site-head nav a { color: var(--soft); text-decoration: none; font-size: .95rem; transition: color .15s var(--ease); }
 .site-head nav a:hover { color: var(--text); }
 
-/* Hero and the game stage */
-.hero { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%); padding: 64px 0; }
+/* Hero: the copy sits in open sky on the left, the scene stands on the ground to the right,
+   and the game stage below overlaps the ground so it looks parked on the Moon. */
+.hero { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--electric) 0%, var(--deep) 78%); padding: 72px 0 168px; }
 .hero .wrap { position: relative; }
-.orbits { position: absolute; right: -140px; top: -140px; width: 620px; opacity: .25; pointer-events: none; }
-.orbits g { fill: none; stroke: var(--yonder); stroke-width: 1.5; }
-.kicker { font-size: .95rem; color: var(--soft); margin-bottom: 12px; }
-.lede { font-size: 1.2rem; max-width: 36em; margin-top: 16px; }
-.facts { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; font-size: .95rem; color: var(--soft); margin: 12px 0 32px; }
+.scene { position: absolute; right: 0; bottom: 0; width: max(100%, 1440px); height: 460px; pointer-events: none; }
+.hero-copy { max-width: 560px; }
+.kicker { font-size: .95rem; color: var(--soft); margin-bottom: 16px; }
+.lede { font-size: 1.25rem; margin-top: 20px; }
+.hero-go { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 32px; }
+.facts { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 0; font-size: .95rem; color: var(--soft); margin: 24px 0 0; }
 .facts li + li { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--line); }
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy > * { animation: rise .45s var(--ease) backwards; }
+  .hero-copy > :nth-child(2) { animation-delay: 50ms; }
+  .hero-copy > :nth-child(3) { animation-delay: 100ms; }
+  .hero-copy > :nth-child(4) { animation-delay: 150ms; }
+  .hero-copy > :nth-child(5) { animation-delay: 200ms; }
+}
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 
-.stage { background: var(--deep); border: 1px solid var(--yonder); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.play-zone { position: relative; margin-top: -24px; padding-bottom: 80px; }
+.stage { background: var(--deep); border: 1px solid var(--yonder); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
 .stage:focus { outline: none; }
 .stage-bar { flex: none; height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); }
 .stage-name { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -100,34 +116,41 @@ html.no-scroll { overflow: hidden; }
 
 /* Sections */
 .band { padding: 80px 0; }
-.band + .band:not(.electric) { border-top: 1px solid var(--line); }
+.band:not(.electric) { border-top: 1px solid var(--line); }
+.electric + .band { border-top: 0; }
 .band h2 + p { margin-top: 16px; }
 .intro { font-size: 1.1rem; max-width: 40em; }
 .gap { margin-top: 80px; }
 .split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; align-items: start; margin-top: 32px; }
 
 /* The three meters, drawn the way the game's own panel draws them. */
-.meters { margin: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 4px 24px; }
+.meters { margin: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 16px; padding: 4px 24px; }
 .meter { padding: 20px 0; }
 .meter + .meter { border-top: 1px solid var(--line); }
 .meter dt { display: flex; align-items: center; gap: 8px; font: 700 1.1rem var(--head); }
 .meter dt .ico { color: var(--yonder); }
 .meter .val { margin-left: auto; font: 400 .8rem "Fira Code", monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
 .meter dd { margin: 0; color: var(--soft); font-size: .98rem; }
-.bar { display: block; height: 8px; border-radius: 4px; background: rgba(201, 216, 242, .16); margin: 12px 0; overflow: hidden; }
-.bar i { display: block; height: 100%; border-radius: 4px; background: var(--yonder); }
-.callout { padding: 16px 20px; border-left: 4px solid var(--yellow); background: var(--electric); border-radius: 0 8px 8px 0; }
+.bar { display: block; height: 12px; border-radius: 6px; background: rgba(201, 216, 242, .16); margin: 12px 0; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 6px; background: var(--yonder); }
+/* Shaped like a message from the base computer in the game: a card with a colour strip on its left. */
+.callout { padding: 20px 24px; border-left: 4px solid var(--yellow); background: var(--electric); border-radius: 4px 16px 16px 4px; }
+.callout b { display: block; font: 700 1.25rem/1.1 var(--head); margin-bottom: 8px; }
 
+/* Each mission gets its own patch, stitched round the edge like a real crew patch. */
 .missions { list-style: none; margin: 24px 0 16px; padding: 0; border-top: 1px solid var(--line); }
-.missions li { display: grid; grid-template-columns: 48px minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start; padding: 24px 0; border-bottom: 1px solid var(--line); }
-.missions .num { font: 900 2rem/1 var(--head); color: var(--yonder); font-variant-numeric: tabular-nums; }
-.missions h3 { margin-bottom: 8px; }
-.missions li > div p { color: var(--soft); }
+.missions li { display: grid; grid-template-columns: 96px minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; align-items: center; padding: 24px 0; border-bottom: 1px solid var(--line); }
+.patch { display: block; width: 96px; height: 96px; }
+.tag { font: 400 .8rem "Fira Code", monospace; color: var(--soft); margin-bottom: 4px; }
+.missions h3 { margin-bottom: 8px; font-size: 1.4rem; }
+.missions li > div p:not(.tag) { color: var(--soft); }
 .missions .goal b { display: block; font: 400 .8rem "Fira Code", monospace; color: var(--soft); margin-bottom: 4px; }
 
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 32px; }
+/* One big picture and two small ones, so the row has a rhythm. */
+.shots { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; margin-top: 32px; align-items: start; }
 .shots figure { margin: 0; }
-.shots img { width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.shots figure:first-child { grid-row: span 2; }
+.shots img { width: 100%; border: 1px solid var(--line); border-radius: 12px; }
 .shots figcaption { margin-top: 12px; font-size: .95rem; color: var(--soft); }
 
 .electric { background: var(--electric); }
@@ -139,15 +162,16 @@ html.no-scroll { overflow: hidden; }
 .sources a { white-space: nowrap; }
 
 .two-col { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; align-items: start; }
-.steps { margin: 24px 0 0; padding-left: 1.4em; display: grid; gap: 12px; }
-.steps li::marker { font: 700 1rem var(--head); color: var(--yonder); }
-.card { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 16px; align-content: start; }
+.steps { list-style: none; counter-reset: step; margin: 32px 0 0; padding: 0; display: grid; gap: 16px; }
+.steps li { counter-increment: step; position: relative; padding-left: 48px; min-height: 32px; }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: -2px; width: 32px; height: 32px; border-radius: 50%; background: var(--electric); font: 700 1rem/32px var(--head); text-align: center; font-variant-numeric: tabular-nums; }
+.card { background: var(--raised); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: grid; gap: 16px; align-content: start; }
 .keys dl { margin: 0; display: grid; gap: 8px; }
 .keys dl > div { display: grid; grid-template-columns: 136px 1fr; align-items: center; gap: 12px; }
 .keys dt { display: flex; gap: 4px; }
 .keys dd { margin: 0; }
 .keys .btn { justify-self: start; margin-top: 8px; }
-kbd { font: 400 .8rem "Fira Code", monospace; color: var(--text); background: var(--deep); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 8px; line-height: 24px; }
+kbd { font: 400 .8rem "Fira Code", monospace; color: var(--text); background: var(--deep); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 0 8px; line-height: 24px; }
 .about h3 { margin: 0 0 8px; }
 .about h3:not(:first-child) { margin-top: 24px; }
 .about p + p { margin-top: 16px; }
@@ -155,13 +179,24 @@ kbd { font: 400 .8rem "Fira Code", monospace; color: var(--text); background: va
 .site-foot { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: .9rem; color: var(--soft); }
 .site-foot .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
 
+/* Between phone and desktop the scene sits closer, so the copy column narrows to stay in open sky. */
+@media (max-width: 1100px) {
+  .hero-copy { max-width: 480px; }
+  .facts { display: grid; }
+  .facts li + li { margin-left: 0; padding-left: 0; border-left: 0; }
+}
 @media (max-width: 860px) {
   .site-head nav { display: none; }
   .site-head .wrap { justify-content: space-between; gap: 12px; }
   .two-col, .split { grid-template-columns: 1fr; gap: 32px; }
-  .missions li { grid-template-columns: 40px 1fr; gap: 12px 16px; }
+  .missions li { grid-template-columns: 72px 1fr; gap: 12px 16px; align-items: start; }
+  .patch { width: 72px; height: 72px; }
   .missions .goal { grid-column: 2; }
-  .hero { padding: 40px 0 48px; }
+  .shots { grid-template-columns: 1fr; }
+  .hero { padding: 40px 0 280px; }
+  .scene { width: max(100%, 878px); height: 280px; }
+  .hero-copy { max-width: none; }
+  .play-zone { margin-top: -16px; padding-bottom: 56px; }
   .band { padding: 56px 0; }
   .gap { margin-top: 56px; }
   .poster-bar .fine { margin-left: 0; flex-basis: 100%; }
@@ -176,6 +211,8 @@ kbd { font: 400 .8rem "Fira Code", monospace; color: var(--text); background: va
   .tool { padding: 0 8px; }
   .stage-body { height: clamp(440px, 72vh, 640px); }
   .poster-bar .btn { flex: 1 1 100%; }
+  .missions li { grid-template-columns: 56px 1fr; }
+  .patch { width: 56px; height: 56px; }
 }
 @media (max-width: 400px) {
   .brand .ico { display: none; }
