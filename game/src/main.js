@@ -357,19 +357,66 @@ function groundDetail() {
   return tex;
 }
 
-const terrainGeo = new THREE.PlaneGeometry(SPAN, SPAN, GRID - 1, GRID - 1).rotateX(-Math.PI / 2);
-const posAttr = terrainGeo.attributes.position;
-for (let i = 0; i < posAttr.count; i++) posAttr.setY(i, heights[i]);
-terrainGeo.computeVertexNormals();
 // Permanently shadowed ground (from NASA's PSR map) is a little darker, as it never sees the Sun,
 // with a faint cool tint to mark where the ice is. Kept subtle: the real ice is tiny grains mixed
 // into grey regolith, not blue (NASA's ShadowCam pictures of these craters show grey ground).
-const tint = new Float32Array(posAttr.count * 3);
-for (let i = 0; i < posAttr.count; i++) {
-  const r = Math.floor(i / GRID), c = i % GRID, ice = maps.psrAt(r, c), dim = 1 - 0.22 * ice;
-  tint.set([dim * (1 - 0.12 * ice), dim * (1 - 0.05 * ice), dim * (1 + 0.08 * ice)], i * 3);
+const tintAt = (r, c, out) => {
+  const ice = maps.psrAt(r, c), dim = 1 - 0.22 * ice;
+  out.push(dim * (1 - 0.12 * ice), dim * (1 - 0.05 * ice), dim * (1 + 0.08 * ice));
+};
+// The ground is drawn in 8 x 8 chunks of 320 m. Chunks next to the base use every 5 m height
+// sample, the ring beyond every second one, and the rest every fourth: about a quarter of the
+// triangles of one full-detail sheet, and chunks out of view are skipped. Walking and collisions
+// use the full NASA heights everywhere (the heightfield below), and the light on the ground uses
+// slopes from the full heights too, so the far ground looks the same. Each chunk hangs a short
+// skirt from its edges, so no crack shows where a finer chunk meets a coarser one.
+const CHUNK = 64; // height samples per chunk side
+function terrainChunks(material) {
+  const group = new THREE.Group();
+  const h = (r, c) => heights[Math.min(GRID - 1, Math.max(0, r)) * GRID + Math.min(GRID - 1, Math.max(0, c))];
+  const baseR = Math.round(toIndex(site.z) / CHUNK - 0.5), baseC = Math.round(toIndex(site.x) / CHUNK - 0.5);
+  const posts = (a, b, step) => { const out = []; for (let i = a; i < b; i += step) out.push(i); out.push(b); return out; };
+  for (let cr = 0; cr * CHUNK < GRID - 1; cr++) for (let cc = 0; cc * CHUNK < GRID - 1; cc++) {
+    const ring = Math.max(Math.abs(cr - baseR), Math.abs(cc - baseC)), step = ring <= 1 ? 1 : ring === 2 ? 2 : 4;
+    const rows = posts(cr * CHUNK, Math.min(GRID - 1, (cr + 1) * CHUNK), step);
+    const cols = posts(cc * CHUNK, Math.min(GRID - 1, (cc + 1) * CHUNK), step);
+    const pos = [], nrm = [], uv = [], col = [], idx = [];
+    const vert = (r, c, drop = 0) => {
+      const nx = -(h(r, c + 1) - h(r, c - 1)) / (2 * POST), nz = -(h(r + 1, c) - h(r - 1, c)) / (2 * POST), len = Math.hypot(nx, 1, nz);
+      pos.push(toWorld(c), h(r, c) - drop, toWorld(r));
+      nrm.push(nx / len, 1 / len, nz / len);
+      uv.push(c / (GRID - 1), 1 - r / (GRID - 1));
+      tintAt(r, c, col);
+      return pos.length / 3 - 1;
+    };
+    const top = rows.map(r => cols.map(c => vert(r, c)));
+    for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < cols.length - 1; j++) {
+      const a = top[i][j], b = top[i][j + 1], d = top[i + 1][j], e = top[i + 1][j + 1];
+      idx.push(a, d, b, b, d, e);
+    }
+    // Skirts: each edge copied 6 m lower and joined to the edge, facing both ways.
+    const edges = [rows.map((r, i) => [r, cols[0], top[i][0]]), rows.map((r, i) => [r, cols.at(-1), top[i].at(-1)]),
+      cols.map((c, j) => [rows[0], c, top[0][j]]), cols.map((c, j) => [rows.at(-1), c, top.at(-1)[j]])];
+    for (const edge of edges) {
+      const low = edge.map(([r, c]) => vert(r, c, 6));
+      for (let k = 0; k < edge.length - 1; k++) {
+        const a = edge[k][2], b = edge[k + 1][2], d = low[k], e = low[k + 1];
+        idx.push(a, d, b, b, d, e, a, b, d, b, e, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+  return group;
 }
-terrainGeo.setAttribute('color', new THREE.BufferAttribute(tint, 3));
 const terrainMat = new THREE.MeshStandardMaterial({ map: regolithTexture(), roughness: 1, vertexColors: true, normalMap: groundDetail(), normalScale: new THREE.Vector2(1.25, 1.25) });
 // The detail tile's alpha lightens and darkens the ground: once at its own size, and once much
 // larger and offset, so the 96 m repeat doesn't show as a pattern from far away.
@@ -379,8 +426,7 @@ terrainMat.onBeforeCompile = shader => {
     diffuseColor.rgb *= (0.75 + 0.5 * texture2D(normalMap, vNormalMapUv).a) * (0.88 + 0.24 * texture2D(normalMap, vNormalMapUv * 0.113 + 0.37).a);
     #endif`);
 };
-const terrain = new THREE.Mesh(terrainGeo, terrainMat);
-terrain.receiveShadow = true;
+const terrain = terrainChunks(terrainMat);
 scene.add(terrain);
 
 // Rapier wants the matrix column by column: each column is one x, going down z.
@@ -512,14 +558,15 @@ function stormHits(dt) {
   const storm = state === 'play' ? sim?.stormNow : null;
   const D = sim?.C.dose;
   const spot = sim?.doseSpot;
-  const rate = storm ? Math.min(4, 1.4 * D.storm[spot] * STRENGTH[storm.strength] * (spot === 'shelter' ? sim.shieldMult : 1)) : 0;
+  // With reduced motion they are rare (at most one every two seconds) and never streak.
+  const rate = storm ? Math.min(stillLights ? 0.5 : 4, (stillLights ? 0.18 : 1.4) * D.storm[spot] * STRENGTH[storm.strength] * (spot === 'shelter' ? sim.shieldMult : 1)) : 0;
   if (!rate && !hits.length) {
     if (hitsDrawn) { hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); hitsDrawn = false; }
     return;
   }
-  const dpr = Math.min(devicePixelRatio || 1, 2), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  const dpr = renderer.getPixelRatio(), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr); // as sharp as the 3D view, no sharper
   if (hitLayer.width !== w || hitLayer.height !== h) { hitLayer.width = w; hitLayer.height = h; }
-  if (rate && !sim.flags.hitsTold) {
+  if (hits.length && !sim.flags.hitsTold) { // said once the first flash is on screen
     sim.flags.hitsTold = true;
     sim.say('See those flashes? Astronauts really do see tiny flashes of light when space radiation passes through their eyes. Apollo crews reported them. In the game they come faster than in real life, so you can see the storm: the more flashes, the more radiation. The shelter and its moon-dirt shield cut them down.', 'info');
   }
@@ -546,8 +593,8 @@ function stormHits(dt) {
       g.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
       continue;
     }
-    g.shadowColor = 'rgba(170, 215, 255, 1)'; // a blue-white glow round each flash
-    g.shadowBlur = 10 * dpr;
+    g.shadowColor = 'rgba(170, 215, 255, 1)'; // a blue-white glow round each flash (not on slow computers)
+    g.shadowBlur = low ? 0 : 10 * dpr;
     g.strokeStyle = g.fillStyle = `rgba(245, 250, 255, ${(0.95 * fade).toFixed(3)})`;
     if (p.kind === 'streak') {
       g.lineWidth = 2.2 * dpr;
@@ -750,9 +797,9 @@ function wear(model) {
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWearPos = position; vWearNormal = normal;');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n#define WEAR_FOIL ${foil}\n${WEAR_NOISE}`)
-        .replace('#include <map_fragment>', `#include <map_fragment>\n${WEAR_CHUNK}`);
+        .replace('#include <map_fragment>', `#include <map_fragment>\n${low ? '' : WEAR_CHUNK}`); // simple graphics: no wear detail
     };
-    m.customProgramCacheKey = () => `wear${foil}`;
+    m.customProgramCacheKey = () => `wear${foil}${low ? 'off' : ''}`;
     m.needsUpdate = true;
   });
 }
@@ -1315,7 +1362,7 @@ float dirtHull(float x) {
     return own;
   }
 
-  const grain = terrain.material.map.clone();
+  const grain = terrainMat.map.clone();
   grain.repeat.set(1, 1);
   grain.needsUpdate = true;
   const group = new THREE.Group();
@@ -2434,7 +2481,7 @@ gameReady({
   goToStation,
   pause() { state = 'paused'; keys.clear(); touchPad?.letGo(); walkTo = null; },
   resume() { state = 'play'; },
-  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); hold(null); hits.length = 0; hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); }, // nothing left in hand for the Scrapbook pictures
+  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); hold(null); digPatch.visible = false; dug = 0; hits.length = 0; hitLayer.getContext('2d').clearRect(0, 0, hitLayer.width, hitLayer.height); }, // nothing left in hand for the Scrapbook pictures
   // A still of the base for the start screen. Reading the canvas right after drawing keeps it filled.
   picture() {
     const spot = outsideSpot();

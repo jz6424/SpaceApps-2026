@@ -172,11 +172,12 @@ export const SOURCES = [
   ['Terrain', 'LRO LOLA 5 m elevation model of Connecting Ridge (Site01), NASA Goddard Planetary Geodesy Data Archive (PGDA)', 'https://pgda.gsfc.nasa.gov/products/78'],
   ['Sunlight, Earth view, permanent shadow', 'LRO LOLA south pole illumination maps, NASA PGDA', 'https://pgda.gsfc.nasa.gov/products/69'],
   ['The Moon on the mission menu', 'CGI Moon Kit: whole-Moon brightness map (LROC camera) and height map (LOLA laser altimeter), NASA\'s Scientific Visualization Studio', 'https://svs.gsfc.nasa.gov/4720/'],
-  ['The Earth in the sky', 'Whole-Earth map with clouds, "Equirectangular Projected Earth", NASA\'s Scientific Visualization Studio', 'https://svs.gsfc.nasa.gov/3615/'],
+  ['The Earth in the sky', 'Whole-Earth map with clouds, "Equirectangular Projected Earth", NASA\'s Scientific Visualization Studio, redrawn by us in simple cartoon colours', 'https://svs.gsfc.nasa.gov/3615/'],
   ['Solar flares and storm sizes', 'NASA DONKI space weather database, Community Coordinated Modeling Center (CCMC)', 'https://ccmc.gsfc.nasa.gov/tools/DONKI/'],
   ['Radiation limit', 'NASA-STD-3001 Volume 1, crew health standard', 'https://www.nasa.gov/ochmo/human-spaceflight-standards/'],
   ['Life support numbers', 'Ewert and Stromgren (2019), NASA Technical Reports Server 20190027563', 'https://ntrs.nasa.gov/citations/20190027563'],
   ['Airlock and prebreathe', 'Quest airlock on the International Space Station and oxygen prebreathe, NASA Human Research Program', 'https://humanresearchroadmap.nasa.gov/evidence/reports/DCS.pdf'],
   ['Ice in craters', 'NASA LCROSS mission results (2009)', 'https://www.nasa.gov/mission/lcross/'],
+  ['Light flashes in a storm', 'Astronauts see tiny flashes of light when space radiation passes through their eyes: Apollo light flash investigations (1975), NASA Technical Reports Server', 'https://ntrs.nasa.gov/citations/19760005597'],
   ['Base site', 'Connecting Ridge was one of NASA\'s 13 Artemis III candidate landing regions in 2022. NASA\'s 2024 shortlist of nine does not include it', 'https://www.nasa.gov/news-release/nasa-identifies-candidate-regions-for-landing-next-americans-on-Moon/'],
 ];

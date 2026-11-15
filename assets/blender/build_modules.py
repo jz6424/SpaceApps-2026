@@ -377,7 +377,7 @@ def CargoLander():
     xa = x1 - low * run / top
     for k in range(3):
         a, b = xa + k * (x1 - xa) / 3, xa + (k + 1) * (x1 - xa) / 3
-        col("Ramp%d" % (k + 1), a, b, -.95, .95, 0, top * (x1 - a) / run)
+        col("Ramp%d" % (k + 1), a, b, -.95, .95, 0, max(.2, top * (x1 - b) / run))   # top at the step's low end: under the plank
     for a, n in ((45, "NE"), (135, "NW"), (225, "SW"), (315, "SE")):
         c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
         col("Pad" + n, c * 5.2 - .8, c * 5.2 + .8, s * 5.2 - .8, s * 5.2 + .8, 0, .45)

@@ -180,10 +180,18 @@ function showNudge() {
   const first = recommended(), ready = canResearch().sort((a, b) => (b.id === first) - (a.id === first)); // the recommended pick first
   nudgeAfterMission = false;
   if (!ready.length) return;
-  $('rp-nudge-text').textContent = `You have ${save.points} research point${save.points === 1 ? '' : 's'}, enough for ${ready.length === 1 ? ready[0].name : `${ready.length} things, like ${ready[0].name}`}.`;
+  nudgeFrom = document.activeElement;
   $('rp-nudge').hidden = false;
+  $('rp-nudge-text').textContent = `You have ${save.points} research point${save.points === 1 ? '' : 's'}, enough for ${ready.length === 1 ? ready[0].name : `${ready.length} things, like ${ready[0].name}`}.`;
+  $('rp-nudge').querySelector('[data-do="rp-nudge-open"]').focus({ preventScroll: true }); // keyboard and screen reader land on it
 }
-const hideNudge = () => { $('rp-nudge').hidden = true; };
+// Closing it puts keyboard focus back where it was (or on the Research Tree button).
+let nudgeFrom = null;
+function hideNudge() {
+  if ($('rp-nudge').hidden) return;
+  $('rp-nudge').hidden = true;
+  if (showing() === 'missions') ((nudgeFrom?.isConnected && nudgeFrom !== document.body) ? nudgeFrom : $('missions').querySelector('[data-do="research"]'))?.focus({ preventScroll: true });
+}
 
 function renderMissions() {
   $('points').textContent = save.points;

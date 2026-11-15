@@ -33,19 +33,23 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Stations in the Habitat:** Power, Life Support (Eco / Normal / Boost), Comms (antenna, forecast,
   science uploads, 1.3 s light delay), Galley and greenhouse, Robot Map (dig regolith, haul crater ice,
   fix panels), Storm Shelter (regolith shielding), Airlock (moonwalks).
-* **First Night:** bring back 5 glowing rock samples (two are a short walk from the steps) and reach
-  sunrise. After dark only the cabin is lit, and Eco dims it. **F** switches the chest light on the suit,
+* **First Night:** bring back 5 glowing rock samples and reach sunrise. There are 10 around the base,
+  in new spots every game: 5 ordinary ones 14 to 40 m out and 5 rare blue ones further out, worth more. After dark only the cabin is lit, and Eco dims it. **F** switches the chest light on the suit,
   **T** speeds up time.
-* **Airlock:** two sliding doors that never open together. Going out: the inner door closes, you
-  prebreathe pure oxygen (a few seconds here, hours in real life), pumps take the air out, then the outer door opens. Each
-  trip out costs 1.5% Life Support (`airlock` in `src/config.js`). `npm run airlock` checks the rules.
+* **Airlock:** an inner door and an outer plug hatch that never open together. Going out: the inner door
+  closes, you prebreathe pure oxygen (a few seconds here, hours in real life), pumps take the air out,
+  then the hatch opens; it shuts by itself behind you. Each trip out costs 1.5% Life Support (`airlock`
+  in `src/config.js`). Going out is blocked during a solar storm, but coming back in never is, and the
+  airlock counts as outside for radiation. `npm run airlock` checks the rules.
 * **No free choices:** everything that helps costs power, moon dirt, suit air or radiation dose.
 * **Events:** sunset and a lunar night, solar storms, micrometeoroid hits on solar panels, Earth
   setting below the horizon (no comms).
 * **Storms from real flares:** each storm is sized from a real flare in NASA DONKI. The flare's class
   (M1 to M4.9 mild, M5 to M9.9 moderate, X strong) sets the storm's strength, and a bigger flare makes
   it last longer. Every playthrough draws different flares and shifts the storm and space-rock times
-  (`planRun` in `src/sim.js`), so no two runs are the same.
+  (`planRun` in `src/sim.js`), so no two runs are the same. During a storm the view shows small
+  light flashes, like the ones Apollo astronauts saw when radiation passed through their eyes: more of
+  them the bigger your dose, and faster than in real life so you can see it.
 * **Win / lose:** reach sunrise with the mission goal met. Life support at 0 for 15 s, or the dose
   limit, ends the mission. Stars, research points, unlocks, then a debrief with NASA data cards.
 * **Missions:** First Night (tutorial; goal: 5 rock samples and reach sunrise), Solar Storm (needs
@@ -53,7 +57,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 * **Research Tree:** spend research points between missions. Regolith Shielding and Greenhouse open
   missions 2 and 3. Thirteen upgrades (each with the real science and the exact change, listed in
   `game/src/research.js`) change the numbers the next missions run on: warmer blankets, a dish
-  antenna, a bigger suit tank and so on.
+  antenna, a bigger suit tank and so on. Circles you can't afford yet say why in red; the first pick
+  (Regolith Shielding) pulses until you research something. After a mission, a popup and a red dot on
+  the Research Tree button say when you have points to spend.
 * **Scrapbook:** a ring binder with a page for each big part of the base (14 pages: Habitat, Life
   Support, solar panels, airlock, robot and so on; upgrades don't get their own page). A page is
   added the first time you use that part in a mission, and two (Regolith shielding, Greenhouse)
@@ -76,8 +82,9 @@ Add `?low` to the address for simple graphics on slow computers (the game also s
 |---|---|
 | Terrain you walk on | LRO LOLA 5 m elevation model, Connecting Ridge (PGDA product 78) -> `game/public/terrain/ridge_heights.u16` |
 | Base spot, solar output, comms gaps | LOLA sunlight and Earth-visibility maps (PGDA product 69) -> `sun.png`, `earth.png` |
-| Crater ice, blue ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
+| Crater ice, faintly tinted ground, ice drill spot | LOLA permanent shadow map -> `psr.png` |
 | The Moon on the mission menu | [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/) from NASA's Scientific Visualization Studio: the LROC brightness map and the LOLA height map of the whole Moon -> `game/public/moon/` (NASA's files, unchanged). The globe's seas and craters are the real ones, with heights stretched 5 times so they show. The blue crater by the flags is our own marker for the icy craters |
+| The Earth in the sky | [SVS 3615](https://svs.gsfc.nasa.gov/3615/) whole-Earth map with clouds, redrawn in cartoon colours in the game -> `game/public/earth/earth.jpg` |
 | Solar storms | NASA DONKI flares of the past 12 months, live from `ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR` (no key; 60 days per request, so six requests), then `api.nasa.gov/DONKI/FLR` as a second try, then a list of real past flares. The game says which one it used |
 | Data cards | NASA-STD-3001 dose limit, Ewert & Stromgren 2019 life support, LCROSS, ISS Quest airlock and oxygen prebreathe |
 | Scrapbook photographs | NASA Image and Video Library (images.nasa.gov) and nasa.gov articles -> `game/public/scrapbook/real-*.jpg`. Each one is credited under the picture and in the in-game credits |

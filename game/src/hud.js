@@ -506,8 +506,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
         title: 'Robot Map', icon: 'map',
         body: `<div class="maprow"><canvas id="robot-map" width="200" height="200" aria-label="Map of the base from NASA data: the base, the ice crater, and the robot"></canvas>
         <div><p class="big">Robot: ${status}</p>
-        <ul class="legend"><li><b class="dot base"></b> Your base</li><li><b class="dot ice"></b> Shadowed ice (${site.iceDistance} m away)</li><li><b class="dot bot"></b> Robot</li></ul>
-        <p class="fine">Map: NASA LOLA sunlight (bright = sunny) and permanent shadow (blue).</p></div></div>
+        <ul class="legend"><li><b class="dot base"></b> Your base</li><li><b class="dot ice"></b> Shadowed ground that may hold ice (${site.iceDistance} m away)</li><li><b class="dot bot"></b> Robot</li></ul>
+        <p class="fine">Map: NASA LOLA sunlight (bright = sunny) and permanent shadow (blue), where ice can survive.</p></div></div>
         <div class="opts">
           ${btn('robot', 'Park at base', { arg: 'idle', on: R.task === 'idle', note: 'Uses no power. Safe in storms.' })}
           ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for building, repairs and Boost.` })}
@@ -537,7 +537,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares }) {
       const cost = `Each trip out costs ${C.airlock.cycleAir}% Life Support.`;
       const view = {
         pressurized: `<p class="big">Go on a moonwalk?</p>
-          <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside.</p>
+          <p>Outside you can fix solar panels by hand and collect rock samples. Your suit holds ${C.suit.seconds} s of air, and your radiation dose rises about 3 times faster than inside. Standing in the airlock counts as outside too: its thin walls don't block much radiation.</p>
           <div class="opts">${btn('outside', 'Suit up and go outside', { disabled: !!sim.stormNow, note: sim.stormNow ? 'Not during a solar storm' : `Suit air: ${Math.floor(sim.suit)} s. ${cost}` })}</div>`,
         vacuum: `<p class="big">Ready to come in?</p>
           <p>The outer door closes, the air comes back, then the inner door opens.</p>
