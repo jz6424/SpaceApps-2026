@@ -2,7 +2,7 @@
 import { CONFIG as C, MISSIONS } from './config.js';
 import { flareLabel } from './sim.js';
 import { isTouch, forTouch } from './touch.js';
-import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound } from './sound.js';
+import { airlockSound, hologramSound, messageCue, soundOn, setSound, warningSound, lowPowerSound, stormSound, sampleSound, dataSentSound, buildSound } from './sound.js';
 
 const $ = id => document.getElementById(id);
 
@@ -28,8 +28,10 @@ export const ICONS = {
   wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>',
   scoop: '<path d="M4 20 13 11"/><path d="m11 7 6 6 3.5-2.5c1.2-3.2-.8-6.8-4.5-7.5z"/>',
   // Hotbar tools, drawn in the instrument style (square ends, see .slot-icon in ui.css).
-  driver: '<path d="m13 6 5-2 2 2-2 5-2 1-4-4z"/><path d="M13.5 10.5 4.5 19.5"/><path d="m6 15 3 3M8 13l3 3"/><path d="m17.5 6.5-1.5 1.5"/>',
+  shovel: '<path d="M16.5 3.5 20.5 7.5"/><path d="M18.5 5.5 10.5 13.5"/><path d="m8 11 5 5-3.5 4.5H4.5L3.5 19.5v-5z"/>',
   sampler: '<path d="M9 3h6v3l1.5 1.5V19a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V7.5L9 6z"/><path d="M9 6h6"/><path d="M7.5 11h3.5M7.5 14h2.5M7.5 17h3.5"/><path d="M14 12.5v4"/>',
+  up: '<path d="m5 15 7-7 7 7"/>',
+  down: '<path d="m5 9 7 7 7-7"/>',
   left: '<path d="m15 5-7 7 7 7"/>',
   right: '<path d="m9 5 7 7-7 7"/>',
   target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>',
@@ -56,7 +58,12 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   // The meters, clock and so on are redrawn five times a second. Most of those times nothing has
   // changed, so the page is only touched when the drawing is different from what is showing.
   const showing = new Map();
-  const put = (id, html) => { if (showing.get(id) !== html) { showing.set(id, html); $(id).innerHTML = html; } };
+  const put = (id, html) => {
+    if (showing.get(id) === html) return false;
+    showing.set(id, html);
+    $(id).innerHTML = html;
+    return true;
+  };
 
   // Fixed parts of the HUD.
   $('hud-title').textContent = sim.mission.name;
@@ -87,31 +94,31 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   };
   $('fullscreen').addEventListener('click', fsBtn);
 
-  // --- Hotbar: four slots at the bottom of the screen ---
-  // Keys 1 to 4 (or a click) put a tool in the astronaut's right hand; the same key again puts it
-  // away. Fixing a panel or picking up a rock takes out the right tool by itself. For now the tools
-  // are for show: nothing in the rules depends on which one is out.
+  // --- Hotbar: the tools you have, at the bottom of the screen ---
+  // A number key (or a click) puts a tool in the astronaut's right hand; the same key again puts
+  // it away. Only tools you own are shown: the Sample kit from the start, and the Building tool
+  // once Regolith Shielding is researched. Picking up a rock takes the Sample kit out by itself.
   const SLOTS = [
-    { id: 'wrench', name: 'Repair tool', icon: 'driver' },
     { id: 'scoop', name: 'Sample kit', icon: 'sampler' },
-    null,
-    null,
-  ];
+    unlocks.includes('Shielding') && { id: 'builder', name: 'Building tool', icon: 'shovel' },
+  ].filter(Boolean);
   let held = -1;
+  const holding = () => SLOTS[held]?.id ?? null;
   function renderHotbar() {
-    $('hotbar').innerHTML = SLOTS.map((slot, i) => `<button class="slot${i === held ? ' on' : ''}${slot ? '' : ' empty'}" data-slot="${i}" ${slot ? '' : 'disabled'}
-        aria-pressed="${i === held}" aria-label="Slot ${i + 1}: ${slot ? slot.name : 'empty'}" title="${slot ? slot.name : 'Empty'}">
-        <span class="slot-key">${i + 1}</span>${slot ? `<span class="slot-icon">${icon(slot.icon, 28)}</span>` : '<span class="slot-empty"></span>'}<i class="slot-bar"></i></button>`).join('');
+    $('hotbar').innerHTML = SLOTS.map((slot, i) => `<button class="slot${i === held ? ' on' : ''}" data-slot="${i}" data-tool="${slot.id}"
+        aria-pressed="${i === held}" aria-label="Slot ${i + 1}: ${slot.name}" title="${slot.name}">
+        <span class="slot-key">${i + 1}</span><span class="slot-icon">${icon(slot.icon, 28)}</span><i class="slot-bar"></i></button>`).join('');
     $('hotbar-name').textContent = held >= 0 ? SLOTS[held].name : '';
+    renderBuild();
   }
   function selectSlot(i) {
     if (!SLOTS[i]) return;
     held = held === i ? -1 : i;
-    api.hold(held >= 0 ? SLOTS[held].id : null);
+    api.hold(holding());
     renderHotbar();
   }
   function holdTool(id) {
-    const i = SLOTS.findIndex(slot => slot?.id === id);
+    const i = SLOTS.findIndex(slot => slot.id === id);
     if (i < 0 || i === held) return;
     held = i;
     api.hold(id);
@@ -124,6 +131,48 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     document.activeElement?.blur?.(); // so Space keeps meaning "jump", not "press this button again"
   };
   $('hotbar').addEventListener('click', slotBtn);
+
+  // --- The Building tool: with it in your hand, a card over the hotbar offers what can be built ---
+  // For now that is one thing, the regolith shield over the Storm Shelter, in two levels. It is
+  // paid for in moon dirt, which the robot has to dig first. The card's parts stay in the page
+  // and only their words change, so a click on Build is never lost to a redraw.
+  const pct = v => `${Math.round(v * 100)}%`;
+  function renderBuild() {
+    const on = holding() === 'builder';
+    $('build-card').hidden = !on;
+    if (!on) return;
+    const level = sim.shielding, cost = sim.shieldCost, have = Math.floor(sim.regolith), done = cost === undefined;
+    const levels = C.dose.shielding.length - 1, now = C.dose.shielding[level], next = C.dose.shielding[level + 1];
+    const title = done ? 'Regolith shield: finished' : `Regolith shield: level ${level + 1} of ${levels}`;
+    const text = done
+      ? `The Storm Shelter is buried in moon dirt. A storm in there gives you ${pct(now)} of the dose it did.`
+      : `${level ? 'Bury the Storm Shelter in moon dirt, right over the top' : 'Bank moon dirt up the sides of the Storm Shelter'}. Storm dose in the shelter goes from ${pct(now)} to ${pct(next)}.`;
+    const short = !done && have < cost;
+    const digging = sim.robotWorking && sim.robot.task === 'dig';
+    const wait = Math.ceil((cost - sim.regolith) / (C.robot.dig * sim.share || 1));
+    const need = done ? 'Nothing more to build here.'
+      : `Needs ${cost} moon dirt. You have ${have}.${!short ? '' : digging ? ` The robot is digging: about ${wait} s to go.` : ' Send the robot to dig at the Robot Map.'}`;
+    const go = short ? 'Not enough moon dirt yet' : isTouch ? 'Build it' : 'Build it <kbd>B</kbd>';
+    if (showing.get('build-title') !== title) { showing.set('build-title', title); $('build-title').innerHTML = `${icon('shovel', 20)} ${title}`; }
+    for (const [id, value] of [['build-text', text], ['build-need', need]]) {
+      if (showing.get(id) !== value) { showing.set(id, value); $(id).textContent = value; }
+    }
+    if (showing.get('build-go') !== go) { showing.set('build-go', go); $('build-go').innerHTML = go; }
+    $('build-go').hidden = done;
+    $('build-go').disabled = short;
+    $('build-bar').hidden = done;
+    $('build-bar').setAttribute('aria-valuenow', Math.min(have, cost ?? have));
+    $('build-bar').setAttribute('aria-valuemax', cost ?? have);
+    $('build-bar').firstElementChild.style.width = `${done ? 100 : Math.min(100, sim.regolith / cost * 100)}%`;
+  }
+  function build() {
+    if (holding() !== 'builder' || open) return;
+    const no = sim.addShielding();
+    if (no) notice(no); else buildSound();
+    renderBuild();
+  }
+  const buildBtn = () => { build(); document.activeElement?.blur?.(); };
+  $('build-go').addEventListener('click', buildBtn);
   renderHotbar();
 
   // --- Research points bar: fills toward the cheapest item you have not unlocked yet ---
@@ -160,10 +209,10 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   $('feed').innerHTML = '';
 
   // --- Meters ---
-  function meter(name, ico, label, value, max, text, state, extra = '', note = '') {
+  function meter(name, ico, label, value, max, text, state, extra = '', note = '', more = '') {
     const pct = Math.max(0, Math.min(100, value / max * 100));
     return `<div class="meter ${state}" data-m="${name}">
-      <div class="m-top">${icon(ico, 20)}<span class="m-label">${label}</span><span class="m-val">${text}</span></div>
+      <div class="m-top">${icon(ico, 20)}<span class="m-label">${label}${more}</span><span class="m-val">${text}</span></div>
       <div class="bar" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${Math.round(value)}"><i style="width:${pct}%"></i>${extra}</div>
       ${state !== 'ok' ? `<div class="m-state">${icon('alert', 14)} ${state === 'bad' ? 'Danger' : 'Low'}</div>` : ''}
       ${note ? `<div class="m-note">${note}</div>` : ''}
@@ -177,12 +226,62 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     const storm = sim.stormNow;
     const dState = sim.dose >= 80 || (storm && sim.where !== 'shelter') ? 'bad' : sim.dose >= 50 ? 'warn' : 'ok';
     const goalMark = sim.mission.goalType === 'dose' ? `<b class="goal-mark" style="left:${sim.goalValue}%" title="Goal"></b>` : '';
-    let html = meter('power', 'bolt', 'Power', sim.power, 100, `${Math.round(sim.power)}% · ${trend(net)}`, pState)
+    // The little arrow on Power says the bar opens a list (see "Where your power goes" below).
+    let html = meter('power', 'bolt', 'Power', sim.power, 100, `${Math.round(sim.power)}% · ${trend(net)}`, pState, '', '', `<span class="m-more">${icon(usesOpen !== isTouch ? 'down' : 'up', 14)}</span>`)
       + meter('air', 'wind', 'Life Support', sim.air, 100, `${Math.round(sim.air)}%`, aState)
       + meter('dose', 'radiation', 'Radiation dose', sim.dose, 100, `${Math.round(sim.dose)} / 100`, dState, goalMark, sim.mission.goalType === 'dose' ? `Goal: finish at ${sim.goalValue} or less (the white mark)` : '');
     if (sim.where === 'outside') html += meter('suit', 'wind', 'Suit air', sim.suit, C.suit.seconds, `${Math.ceil(sim.suit)} s`, sim.suit < 20 ? 'bad' : sim.suit < 40 ? 'warn' : 'ok');
-    put('meters', html);
+    // The button over the Power bar is as tall as the bar's own block, which grows with a Low sign.
+    if (put('meter-rows', html)) $('power-btn').style.height = `${$('meter-rows').firstElementChild.offsetHeight}px`;
   }
+
+  // --- Where your power goes: click the Power bar and a list opens above it ---
+  // Every machine that can draw power is on the list, with how much it takes each second. The ones
+  // that are off stay on it, dimmed, so you can see what else there is to switch.
+  let usesOpen = false;
+  const cap = word => word[0].toUpperCase() + word.slice(1);
+  function powerUses() {
+    const R = sim.robot, lights = sim.food !== null || unlocks.includes('Greenhouse');
+    const job = { dig: 'digging moon dirt', ice: 'hauling crater ice', repair: 'fixing a panel' }[R.task];
+    return [
+      { name: 'Life Support', state: cap(sim.ls), on: true, use: P.lifeSupport[sim.ls], where: 'Life Support station', note: `${sim.ls} setting, always on` },
+      { name: 'Heaters', state: sim.isNight ? 'on at night' : 'off until night', on: sim.isNight, use: P.heaters, where: 'automatic, there is no station for it', note: 'switch on at night' },
+      { name: 'Antenna', state: sim.comms ? 'on' : 'off', on: sim.comms, use: P.comms, where: 'Comms station', note: 'on' },
+      lights && { name: 'Grow lights', state: sim.greenhouse ? 'on' : 'off', on: sim.greenhouse, use: P.greenhouse, where: 'Galley', note: 'on' },
+      { name: 'Robot', state: sim.robotWorking ? job : 'parked', on: sim.robotWorking, use: P.robot, where: 'Robot Map station', note: 'working outside' },
+    ].filter(Boolean);
+  }
+  function renderUses() {
+    if (!usesOpen) return;
+    const uses = powerUses(), most = Math.max(...Object.values(P.lifeSupport), P.heaters);
+    const net = sim.gen - sim.demand, fc = sim.batteryForecast;
+    put('pu-body', `
+      <ul class="pu">${uses.map(u => `<li class="${u.on ? 'on' : 'off'}">
+        <span class="pu-name">${u.name} <small>${u.state}</small></span>
+        <span class="pu-bar" aria-hidden="true"><i style="width:${u.on ? Math.round(u.use / most * 100) : 0}%"></i></span>
+        <b>${u.on ? fixed(u.use) : '0'}</b></li>`).join('')}</ul>
+      <dl class="pu-sum">
+        <dt>All together</dt><dd>${per(sim.demand, 'power')}</dd>
+        <dt>Solar panels make</dt><dd>${per(sim.gen, 'power')}</dd>
+        <dt>Battery</dt><dd>${sim.power <= 0 ? 'empty: everything runs slowly' : net >= 0 ? 'charging' : `draining, lasts about ${clock(fc)}`}</dd>
+      </dl>
+      <p class="fine">The numbers are power used each second. To save power, switch things off or down at their stations.</p>`);
+  }
+  function showUses(on) {
+    usesOpen = on;
+    $('power-uses').hidden = !on;
+    $('power-btn').setAttribute('aria-expanded', on);
+    $('power-btn').title = on ? 'Hide the list' : 'See what is using power';
+    showing.delete('pu-body');
+    renderMeters();
+    renderUses();
+  }
+  const usesBtn = () => { showUses(!usesOpen); document.activeElement?.blur?.(); };
+  const usesClose = () => showUses(false);
+  $('power-btn').addEventListener('click', usesBtn);
+  $('pu-close').addEventListener('click', usesClose);
+  $('pu-title').innerHTML = `${icon('bolt', 20)} Where your power goes`;
+  $('pu-close').innerHTML = icon('x', 18);
 
   // --- Supplies, in the corner above the research points ---
   function renderSupplies() {
@@ -302,8 +401,14 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       if (!sim.greenhouse) return 'Open the Galley and turn on the grow lights.';
       if ((sim.water ?? 0) < 3 && sim.robot.task !== 'ice') return 'The plants need water. Send the robot for crater ice.';
     }
-    if (sim.mission.goalType === 'dose' && sim.shielding < 2 && sim.regolith >= C.dose.shieldingCost[sim.shielding] && unlocks.includes('Shielding')) {
-      return 'You have enough moon dirt to add shielding at the Storm Shelter.';
+    // The dirt shield, in the mission that is about it: dig, then build, one level at a time.
+    if (sim.mission.goalType === 'dose' && sim.shieldCost !== undefined && SLOTS.some(slot => slot.id === 'builder')) {
+      const level = sim.shielding + 1, cost = sim.shieldCost;
+      if (sim.regolith >= cost) {
+        if (holding() === 'builder') return `You have the moon dirt for level ${level} of the regolith shield. ${isTouch ? 'Tap Build it.' : 'Press Build it (or B).'}`;
+        return `You have enough moon dirt. ${isTouch ? 'Tap the Building tool' : 'Press 2 for the Building tool'} and build level ${level} of the regolith shield.`;
+      }
+      if (sim.robot.task !== 'dig' && sim.robot.offline <= 0 && (sim.t < sim.day || !sim.shielding)) return `The regolith shield needs ${cost} moon dirt and you have ${Math.floor(sim.regolith)}. Send the robot to dig at the Robot Map.`;
     }
     if (sim.t < sim.day && sim.timeToSunset < 40 && sim.ls !== 'eco') return 'Night is coming. Set Life Support to Eco and turn off what you don\'t need.';
     if (rocksLeft() > 0) return `Rock samples: ${sim.samples.size} of ${sim.goalValue}. Use the Airlock to go outside and pick up the glowing rocks.${sim.t >= sim.day ? ' They glow in the dark.' : ''}`;
@@ -345,13 +450,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
           ${sim.food !== null || unlocks.includes('Greenhouse') ? btn('greenhouse', 'Grow lights', { arg: sim.greenhouse ? 'off' : 'on', on: sim.greenhouse, note: `Uses ${per(P.greenhouse, 'power')}. Grows food, adds a little air.` }) : ''}
         </div>
         <h4>What is using power right now</h4>
-        <ul class="uses">${[
-          { name: 'Life Support', use: P.lifeSupport[sim.ls], where: 'Life Support station', note: `${sim.ls} setting, always on` },
-          sim.isNight && { name: 'Heaters', use: P.heaters, where: 'automatic, there is no station for it', note: 'switch on at night' },
-          sim.comms && { name: 'Antenna', use: P.comms, where: 'Comms station', note: 'on' },
-          sim.greenhouse && { name: 'Grow lights', use: P.greenhouse, where: 'Galley', note: 'on' },
-          sim.robotWorking && { name: 'Robot', use: P.robot, where: 'Robot Map station', note: 'working outside' },
-        ].filter(Boolean).map(u => `<li><b>${u.name}</b> <span class="u-val">${per(u.use, 'power')}</span><span class="u-where">${u.note}. Find it at: ${u.where}.</span></li>`).join('')}</ul>`,
+        <ul class="uses">${powerUses().filter(u => u.on).map(u => `<li><b>${u.name}</b> <span class="u-val">${per(u.use, 'power')}</span><span class="u-where">${u.note}. Find it at: ${u.where}.</span></li>`).join('')}</ul>`,
       };
     },
     LifeSupport: () => ({
@@ -405,7 +504,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
         <p class="fine">Map: NASA LOLA sunlight (bright = sunny) and permanent shadow (blue).</p></div></div>
         <div class="opts">
           ${btn('robot', 'Park at base', { arg: 'idle', on: R.task === 'idle', note: 'Uses no power. Safe in storms.' })}
-          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for shielding, repairs and Boost.` })}
+          ${btn('robot', 'Dig moon dirt', { arg: 'dig', on: R.task === 'dig', note: `Uses ${per(P.robot, 'power')}. Digs ${per(C.robot.dig, 'moon dirt')} for building, repairs and Boost.` })}
           ${sim.water !== null ? btn('robot', 'Haul crater ice', { arg: 'ice', on: R.task === 'ice', note: `Uses ${per(P.robot, 'power')}. Brings ${per(C.robot.ice, 'water')} for the plants.` }) : ''}
           ${btn('robot', `Fix panel ${broken >= 0 ? broken + 1 : ''}`, { arg: 'repair', on: R.task === 'repair', disabled: broken < 0 && R.task !== 'repair', note: `Costs ${C.robot.repairRegolith} moon dirt, takes ${C.robot.repairSeconds} s. No moonwalk needed.` })}
         </div>
@@ -414,17 +513,17 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       };
     },
     Shelter: () => {
-      const has = unlocks.includes('Shielding');
-      const cost = C.dose.shieldingCost[sim.shielding];
-      const k = sim.shieldMult;
+      const has = SLOTS.some(slot => slot.id === 'builder');
+      const cost = sim.shieldCost, k = sim.shieldMult;
+      const shield = !has ? 'Research Regolith Shielding to get a Building tool. With it you can cover the shelter in moon dirt.'
+        : cost === undefined ? 'The regolith shield is finished: the shelter is buried in moon dirt.'
+        : `Regolith shield: level ${sim.shielding} of 2. Close this panel and ${isTouch ? 'tap the Building tool' : 'press 2 for the Building tool'} to build the next level (${cost} moon dirt).`;
       return {
         title: 'Storm Shelter', icon: 'shield',
         body: `<p class="big">${sim.stormNow ? 'Storm now! Stay here.' : 'Hide here during solar storms'}</p>
         <p>The shelter is the back of the Habitat, behind the water tanks and supplies. Extra dose per second in a strong storm:</p>
-        <dl class="facts"><dt>Outside</dt><dd>${fixed(C.dose.storm.outside)}</dd><dt>Rest of Habitat</dt><dd>${fixed(C.dose.storm.inside * k)}</dd><dt>Here in the shelter</dt><dd>${fixed(C.dose.storm.shelter * k)}</dd></dl>
-        ${has ? `<div class="opts">${btn('shield', `Pile on moon dirt (level ${sim.shielding + 1})`, { disabled: cost === undefined || sim.regolith < cost, note: cost === undefined ? 'Fully shielded.' : `Costs ${cost} moon dirt (you have ${Math.floor(sim.regolith)}). Cuts storm dose inside.` })}</div>`
-          : '<p class="fine">Unlock Regolith Shielding with research points to pile moon dirt on the Habitat.</p>'}
-        <p class="fine">Shielding level: ${sim.shielding} of 2.</p>`,
+        <dl class="facts"><dt>Outside</dt><dd>${fixed(C.dose.storm.outside)}</dd><dt>Rest of Habitat</dt><dd>${fixed(C.dose.storm.inside)}</dd><dt>Here in the shelter</dt><dd>${fixed(C.dose.storm.shelter * k)}</dd></dl>
+        <p class="fine">${shield}</p>`,
       };
     },
     Airlock: () => {
@@ -490,7 +589,6 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     forecast: () => notice(sim.askForecast()),
     upload: () => notice(sim.sendData()),
     robot: arg => notice(sim.setRobot(arg)),
-    shield: () => notice(sim.addShielding()),
     outside: () => { const no = sim.airlockStart('out'); if (no) notice(no); else close(); },
     inside: () => { const no = sim.airlockStart('in'); if (no) notice(no); else close(); },
   };
@@ -523,16 +621,18 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     document.activeElement?.blur?.();
   }
 
-  function toggleSpeed() {
-    speed = speed === 1 ? 3 : 1;
+  // Game speed: T (or the button in Settings) steps through 1x, 2x and 3x, then back to 1x.
+  const SPEEDS = [1, 2, 3];
+  function setSpeed(to) {
+    speed = to;
     api.setSpeed(speed);
     $('speed').setAttribute('aria-pressed', speed > 1);
     $('speed').innerHTML = `${icon('ff', 18)} ${speed}x speed`;
   }
+  const toggleSpeed = () => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]);
   const speedBtn = () => toggleSpeed();
   $('speed').addEventListener('click', speedBtn);
-  $('speed').innerHTML = `${icon('ff', 18)} 1x speed`;
-  $('speed').setAttribute('aria-pressed', 'false');
+  setSpeed(1);
   // --- Airlock progress: one bar per step, with the reason for the step ---
   const LOCK_STEPS = {
     'close inner': ['Airlock', 'Closing the inner door', ''],
@@ -600,7 +700,7 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
 
   function frame(near) {
     // A storm forces normal speed, so nobody fast-forwards into danger.
-    if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) toggleSpeed();
+    if (speed > 1 && (sim.stormNow || sim.nextStorm?.warnedBy)) setSpeed(1);
     const now = performance.now();
     renderFeed(now);
     checkSuitAir(now);
@@ -609,6 +709,8 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
     if (now - lastRender < 200) return;
     lastRender = now;
     renderMeters();
+    renderUses();
+    renderBuild();
     renderSupplies();
     renderClock();
     renderRp();
@@ -620,8 +722,12 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
   }
 
   return {
-    frame, openStation, close, toggleSpeed, selectSlot, holdTool,
+    frame, openStation, close, toggleSpeed, setSpeed, selectSlot, holdTool, build, showUses,
     notice,
+    get speed() { return speed; },
+    get holding() { return holding(); },
+    get usesOpen() { return usesOpen; },
+    hasTool: id => SLOTS.some(slot => slot.id === id),
     busy: () => !!open,
     get open() { return open; },
     destroy() {
@@ -634,6 +740,11 @@ export function createHud({ sim, site, unlocks, api, liveFlares, points = 0 }) {
       $('fullscreen').removeEventListener('click', fsBtn);
       $('mission-handle').removeEventListener('click', missionBtn);
       $('hotbar').removeEventListener('click', slotBtn);
+      $('build-go').removeEventListener('click', buildBtn);
+      $('build-card').hidden = true;
+      $('power-btn').removeEventListener('click', usesBtn);
+      $('pu-close').removeEventListener('click', usesClose);
+      $('power-uses').hidden = true;
       $('sound').removeEventListener('click', soundBtn);
       list.removeEventListener('scroll', fadeTop);
       list.removeEventListener('pointerenter', enterFeed);

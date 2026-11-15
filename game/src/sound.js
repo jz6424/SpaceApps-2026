@@ -229,6 +229,15 @@ export function sampleSound() {
   blip(at + 0.09, 1976, 0.7, 'sine', 0.12);
   blip(at + 0.09, 3951, 0.3, 'sine', 0.03);
 }
+// Building with moon dirt: a low rumble of sliding dirt, then two soft notes as it settles.
+export function buildSound() {
+  if (!live()) return;
+  const at = ctx.currentTime + 0.02;
+  rush(at, 1.4, 0.3, 'lowpass', 320);
+  sweep(at, 90, 55, 1.2, 'sine', 0.12);
+  blip(at + 1.25, 196, 0.5, 'sine', 0.12);
+  blip(at + 1.4, 262, 0.7, 'sine', 0.1);
+}
 export function dataSentSound() {
   if (!live()) return;
   const at = ctx.currentTime + 0.02;

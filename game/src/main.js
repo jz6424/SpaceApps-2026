@@ -770,6 +770,295 @@ function useDoorNow(which) {
   hooks?.notice(sim.airlockDoor(which));
 }
 
+// --- The regolith shield: moon dirt piled over the Storm Shelter end of the Habitat ---
+// Two models, one for each level you can build with the Building tool:
+//   level 1  a berm: dirt banked up the sides and round the back, to just under the windows,
+//            with a flat top and a wall of filled regolith bags holding its foot
+//   level 2  the same berm with a mound on it that buries the whole shelter end, so that only
+//            the roof pack and the dish show, and a second row of bags round the mound's foot
+// Each is a skin of dirt worked out the way a real pile forms: the dirt has to cover the hull by a
+// set depth, and from there it runs down at the steepest slope a pile will hold. The skin is
+// drawn only where it is outside the hull, so none of it shows in the cabin.
+// All of it is in the Habitat's own metres: x toward the door, y up from the pad, z to the south.
+const dirtShield = (() => {
+  const AXIS = 13.5 * U;                                    // height of the hull's centre line
+  const PROFILE = [[-23, 3.8], [-22.2, 7], [-20.6, 9.6], [-18.4, 11]].map(([x, r]) => [x * U, r * U]); // the hull's rounded back end
+  const FRONT = -9.6 * U;                                   // the dirt comes this far forward: the end of the shelter
+  const COVER = 0.35, SLOPE = 1.43, STEEP = 1.6;            // dirt over the hull (m); how steeply the berm and the mound stand
+  const BANK = 10.5 * U, SHELF = 1.6;                       // how high level 1 is banked, and how far its flat top reaches out from the hull
+  const SPLIT = 19.6 * U - 0.02;                            // where the roof is cut away when you are inside
+  const CELL = 0.25, X0 = -12.75, X1 = 0.75, Z1 = 8.5;
+  const cols = Math.round((X1 - X0) / CELL) + 1, rows = Math.round(2 * Z1 / CELL) + 1;
+  const hullRadius = x => {
+    if (x < PROFILE[0][0]) return 0;
+    for (let i = 1; i < PROFILE.length; i++) {
+      const [x0, r0] = PROFILE[i - 1], [x1, r1] = PROFILE[i];
+      if (x <= x1) return r0 + (r1 - r0) * (x - x0) / (x1 - x0);
+    }
+    return PROFILE.at(-1)[1];
+  };
+  // Lumps: smooth noise from a fixed table, so the pile is the same every time.
+  const lump = (() => {
+    const N = 64, table = new Float32Array(N * N);
+    let seed = 12345;
+    for (let i = 0; i < table.length; i++) { seed = (seed * 1664525 + 1013904223) >>> 0; table[i] = seed / 4294967296; }
+    const at = (c, r) => table[((r % N + N) % N) * N + ((c % N + N) % N)];
+    return (x, z) => {
+      const c = Math.floor(x), r = Math.floor(z), fx = x - c, fz = z - r, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+      return THREE.MathUtils.lerp(THREE.MathUtils.lerp(at(c, r), at(c + 1, r), sx), THREE.MathUtils.lerp(at(c, r + 1), at(c + 1, r + 1), sx), sz) - 0.5;
+    };
+  })();
+
+  // How high the pile stands at every point of the grid. Beyond its foot the number keeps
+  // falling below zero, so the skin meets the ground in a clean line.
+  function pile(level) {
+    // The dirt lying on the hull itself, as [x, z, height]: `out` further out than the hull, no higher than `cap`.
+    const lying = (out, cap) => {
+      const seeds = [];
+      for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+        const x = X0 + c * CELL, z = -Z1 + r * CELL;
+        if (x > FRONT || x < PROFILE[0][0] - out) continue;
+        const reach = hullRadius(Math.max(x, PROFILE[0][0])) + out;
+        if (Math.abs(z) > reach) continue;
+        seeds.push([x, z, Math.min(AXIS + Math.sqrt(reach * reach - z * z), cap)]);
+      }
+      return seeds;
+    };
+    const berm = lying(SHELF, BANK), mound = level > 1 ? lying(COVER, Infinity) : [];
+    const high = new Float32Array(cols * rows);
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+      const x = X0 + c * CELL, z = -Z1 + r * CELL;
+      let h = -Infinity;
+      for (const [sx, sz, top] of berm) h = Math.max(h, top - SLOPE * Math.hypot(x - sx, z - sz));
+      for (const [sx, sz, top] of mound) h = Math.max(h, top - STEEP * Math.hypot(x - sx, z - sz));
+      const rough = THREE.MathUtils.smoothstep(h, 0.1, 1.2);
+      high[r * cols + c] = h + rough * (0.3 * lump(x * 0.5 + level * 7, z * 0.5) + 0.12 * lump(x * 1.7, z * 1.7 + level * 3)) - 0.03;
+    }
+    return high;
+  }
+
+  // Dirt is drawn only outside the hull, grows out of the ground when it is built, and is cut off
+  // flat at the roof line while you are inside (like the roof), so you can still see into the cabin.
+  const uniforms = [];
+  function dirtSkin(material) {
+    const own = { dirtGrow: { value: 1 }, dirtCut: { value: 1000 } };
+    uniforms.push(own);
+    material.onBeforeCompile = shader => {
+      Object.assign(shader.uniforms, own);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float dirtGrow, dirtCut;\nvarying vec3 dirtAt;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.y = min(transformed.y * dirtGrow, dirtCut);\ndirtAt = transformed;');
+      const steps = PROFILE.slice(1).map(([x1, r1], i) => {
+        const [x0, r0] = PROFILE[i];
+        return `if (x <= ${x1.toFixed(4)}) return ${r0.toFixed(4)} + ${(r1 - r0).toFixed(4)} * (x - (${x0.toFixed(4)})) / ${(x1 - x0).toFixed(4)};`;
+      }).join('\n  ');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+varying vec3 dirtAt;
+float dirtHull(float x) {
+  if (x < ${PROFILE[0][0].toFixed(4)}) return 0.0;
+  ${steps}
+  return ${PROFILE.at(-1)[1].toFixed(4)};
+}`)
+        .replace('void main() {', `void main() {
+  float dirtR = dirtHull(dirtAt.x) - 0.06;
+  vec2 dirtFrom = vec2(dirtAt.z, dirtAt.y - ${AXIS.toFixed(4)});
+  if (dirtR > 0.0 && dot(dirtFrom, dirtFrom) < dirtR * dirtR) discard;`);
+    };
+    return own;
+  }
+
+  const grain = terrain.material.map.clone();
+  grain.repeat.set(1, 1);
+  grain.needsUpdate = true;
+  const group = new THREE.Group();
+  group.position.set(site.x, site.y, site.z);
+  scene.add(group);
+  const bagMat = new THREE.MeshStandardMaterial({ color: 0xd2ccbc, roughness: 0.95 });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6f6d6b, roughness: 1, flatShading: true });
+
+  function build(level) {
+    const high = pile(level), at = (c, r) => high[r * cols + c];
+    const points = [], uvs = [], shades = [], index = [], slot = new Int32Array(cols * rows).fill(-1);
+    const corner = (c, r) => {
+      const k = r * cols + c;
+      if (slot[k] < 0) {
+        const x = X0 + c * CELL, z = -Z1 + r * CELL, shade = 0.86 + 0.3 * lump(x * 0.8, z * 0.8) + 0.18 * lump(x * 3.1, z * 3.1);
+        slot[k] = points.length / 3;
+        points.push(x, high[k], z);
+        uvs.push(x / 3, z / 3);
+        shades.push(shade, shade, shade * 0.98);
+      }
+      return slot[k];
+    };
+    for (let c = 0; c < cols - 1; c++) for (let r = 0; r < rows - 1; r++) {
+      if (Math.max(at(c, r), at(c + 1, r), at(c, r + 1), at(c + 1, r + 1)) <= 0) continue; // bare ground
+      const a = corner(c, r), b = corner(c + 1, r), d = corner(c, r + 1), e = corner(c + 1, r + 1);
+      index.push(a, d, b, b, d, e);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(shades, 3));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    const dirt = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: grain, roughness: 1, vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+    dirt.castShadow = dirt.receiveShadow = true;
+    const skin = dirtSkin(dirt.material);
+
+    const heightAt = (x, z) => {
+      const c = THREE.MathUtils.clamp((x - X0) / CELL, 0, cols - 1.001), r = THREE.MathUtils.clamp((z + Z1) / CELL, 0, rows - 1.001);
+      const c0 = Math.floor(c), r0 = Math.floor(r), fc = c - c0, fr = r - r0;
+      return THREE.MathUtils.lerp(THREE.MathUtils.lerp(at(c0, r0), at(c0 + 1, r0), fc), THREE.MathUtils.lerp(at(c0, r0 + 1), at(c0 + 1, r0 + 1), fc), fr);
+    };
+    // The line round the pile where the dirt is `tall` high: walked from far out toward the middle.
+    const mid = { x: (PROFILE.at(-1)[0] + FRONT) / 2, z: 0 };
+    const ringAt = tall => {
+      const ring = [];
+      for (let turn = 0; turn < 360; turn += 0.5) {
+        const dx = Math.cos(turn * Math.PI / 180), dz = Math.sin(turn * Math.PI / 180);
+        for (let far = 13; far > 0; far -= 0.04) {
+          const x = mid.x + dx * far, z = mid.z + dz * far;
+          if (x < X0 || x > X1 || Math.abs(z) > Z1 || heightAt(x, z) < tall) continue;
+          // Not under the Habitat, where the dirt runs out against the hull.
+          if (!(x > PROFILE[0][0] && Math.abs(z) < hullRadius(x) + 0.35)) ring.push({ x, z });
+          break;
+        }
+      }
+      return ring;
+    };
+    // Regolith bags: a wall three bags high holds the foot of the berm, and on level 2 two more
+    // rows hold the foot of the mound. Each row sits on the joints of the one below.
+    const BAG = { long: 0.84, tall: 0.3, deep: 0.5 };
+    const rowsOfBags = [0, 1, 2].map(k => ({ tall: 0.04 + k * 0.27, shift: k % 2 }));
+    if (level > 1) rowsOfBags.push({ tall: BANK + 0.12, shift: 0 }, { tall: BANK + 0.39, shift: 1 });
+    const spots = [];
+    for (const row of rowsOfBags) {
+      const ring = ringAt(row.tall);
+      let run = row.shift * BAG.long / 2;
+      ring.forEach((p, i) => {
+        const q = ring[(i + 1) % ring.length], step = Math.hypot(q.x - p.x, q.z - p.z);
+        if (step > 0.6) { run = 0; return; }    // a gap in the line (the hull is in the way)
+        run += step;
+        if (run < BAG.long * 0.94) return;
+        run = 0;
+        spots.push({ x: p.x, y: Math.max(0, row.tall) + BAG.tall * 0.42, z: p.z, turn: Math.atan2(q.x - p.x, q.z - p.z) });
+      });
+    }
+    const foot = ringAt(0.04);
+    const bagGeo = new THREE.SphereGeometry(0.5, 10, 6).scale(BAG.deep, BAG.tall, BAG.long);
+    const bags = new THREE.InstancedMesh(bagGeo, bagMat, spots.length);
+    const place = new THREE.Object3D();
+    spots.forEach((p, i) => {
+      place.position.set(p.x, p.y, p.z);
+      place.rotation.set(0, p.turn + 0.2 * lump(p.x * 9, p.z * 9), 0);
+      place.scale.setScalar(0.94 + 0.16 * (lump(p.x * 4, p.z * 4) + 0.5));
+      place.updateMatrix();
+      bags.setMatrixAt(i, place.matrix);
+    });
+    bags.castShadow = bags.receiveShadow = true;
+    const STONES = 18;
+    const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.34, 0), stoneMat, STONES);
+    for (let i = 0; i < STONES; i++) {
+      const p = foot[Math.floor((i + 0.5) / STONES * foot.length)], tow = Math.hypot(mid.x - p.x, mid.z - p.z) || 1, up = 1 + 1.6 * (lump(i * 3.7, level * 5) + 0.5);
+      const x = p.x + (mid.x - p.x) / tow * up, z = p.z + (mid.z - p.z) / tow * up;
+      place.position.set(x, heightAt(x, z) + 0.05, z);
+      place.rotation.set(i * 1.3, i * 2.1, i * 0.7);
+      place.scale.set(0.7 + lump(i * 1.9, 3) * 0.8, 0.5 + lump(i * 2.3, 9) * 0.4, 0.7 + lump(i * 3.1, 5) * 0.7);
+      place.updateMatrix();
+      stones.setMatrixAt(i, place.matrix);
+    }
+    stones.castShadow = stones.receiveShadow = true;
+    const extras = new THREE.Group();
+    extras.add(bags, stones);
+
+    // The build plan: the same shape in see-through blue, shown while the Building tool is out.
+    const planMat = new THREE.MeshBasicMaterial({ color: 0x2e96f5, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.4, depthWrite: false, wireframe: true });
+    const plan = new THREE.Group();
+    plan.add(new THREE.Mesh(geo, planMat), new THREE.Mesh(geo, lineMat));
+    dirtSkin(planMat); dirtSkin(lineMat);
+    plan.renderOrder = 4;
+
+    const model = new THREE.Group();
+    model.add(dirt, extras);
+    model.visible = plan.visible = false;
+    group.add(model, plan);
+
+    // What stops you walking through it: a block down each side and one round the back, set in a
+    // little from the foot. The hull's own walls take over where the dirt meets them.
+    const bound = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+    const half = hullRadius(0) + 0.1, inset = 0.9, tall = 1.6;
+    const blocks = [
+      [bound.min.x + inset, PROFILE[0][0] - 0.2, -(bound.max.z - inset), bound.max.z - inset],
+      [PROFILE[0][0] - 0.2, FRONT + 1.2, half, bound.max.z - inset],
+      [PROFILE[0][0] - 0.2, FRONT + 1.2, -(bound.max.z - inset), -half],
+    ].map(([x0, x1, z0, z1]) => {
+      const collider = world.createCollider(RAPIER.ColliderDesc.cuboid((x1 - x0) / 2, tall, (z1 - z0) / 2).setTranslation(site.x + (x0 + x1) / 2, site.y + tall, site.z + (z0 + z1) / 2));
+      collider.setEnabled(false);
+      return { collider, x0: site.x + x0, x1: site.x + x1, z0: site.z + z0, z1: site.z + z1 };
+    });
+    return { model, dirt, extras, plan, planMat, lineMat, skin, blocks, foot, grow: 0, since: 0 };
+  }
+  const levels = [null, build(1), build(2)];
+
+  let built = 0;       // the level standing now
+  const RISE = 1.8;    // seconds for a new level to grow out of the ground (real time, whatever the frame rate)
+  function solid() {
+    levels.forEach((lv, n) => lv?.blocks.forEach(b => b.collider.setEnabled(n === built)));
+    // Anyone standing where the dirt has just gone is stepped back to the foot of it.
+    const p = crewBody.translation();
+    for (const b of levels[built]?.blocks ?? []) {
+      const m = CREW_RADIUS + 0.1;
+      if (isInside(p) || p.x < b.x0 - m || p.x > b.x1 + m || p.z < b.z0 - m || p.z > b.z1 + m) continue;
+      const out = [[b.x0 - m - p.x, 0], [b.x1 + m - p.x, 0], [0, b.z0 - m - p.z], [0, b.z1 + m - p.z]]
+        .filter(([dx, dz]) => !isInside({ x: p.x + dx, y: p.y, z: p.z + dz }))
+        .sort((u, v) => Math.hypot(...u) - Math.hypot(...v))[0];
+      if (out) teleport({ x: p.x + out[0], y: site.y + CREW_HEIGHT / 2 + 0.1, z: p.z + out[1] });
+    }
+  }
+  return {
+    // level: what the rules say is built. plan: the level to outline in blue (0 for none).
+    // inside: the astronaut is in the Habitat, so the top is cut away with the roof.
+    sync(level, plan, dt, inside) {
+      if (level !== built) {
+        const grew = level > built;
+        built = level;
+        levels.forEach((lv, n) => { if (lv) { lv.grow = n < level || (n === level && !grew) ? 1 : 0; lv.since = performance.now(); } });
+        solid();
+        if (grew && levels[level]) for (let i = 0; i < 8; i++) {
+          const p = levels[level].foot[Math.floor((i + Math.random()) / 8 * levels[level].foot.length)];
+          kickDust({ x: site.x + p.x, y: site.y, z: site.z + p.z }, 1.2);
+        }
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 420);
+      levels.forEach((lv, n) => {
+        if (!lv) return;
+        if (n === built && lv.grow < 1) lv.grow = Math.min(1, (performance.now() - lv.since) / 1000 / RISE);
+        // The level below stays until the new one has grown past it.
+        const eased = 1 - (1 - lv.grow) ** 3;
+        lv.model.visible = n === built || (n === built - 1 && levels[built].grow < 1);
+        lv.extras.visible = n === built;
+        lv.extras.scale.set(1, Math.max(0.001, eased), 1); // the bags and rocks come up with the dirt
+        lv.dirt.castShadow = lv.grow > 0.5;
+        lv.skin.dirtGrow.value = Math.max(0.001, eased);
+        lv.plan.visible = n === plan;
+        lv.planMat.opacity = 0.12 + 0.12 * pulse;
+        lv.lineMat.opacity = 0.2 + 0.25 * pulse;
+      });
+      for (const own of uniforms) own.dirtCut.value = inside ? SPLIT : 1000;
+    },
+    // Straight to a level with nothing moving, for a new mission and for the Scrapbook's stills.
+    set(level) {
+      built = level;
+      levels.forEach((lv, n) => { if (lv) lv.grow = n <= level ? 1 : 0; });
+      levels.forEach((lv, n) => lv?.blocks.forEach(b => b.collider.setEnabled(n === built)));
+      this.sync(level, 0, 0, false);
+    },
+    get level() { return built; },
+  };
+})();
+
 // --- Astronaut ---
 // `crew` sits at the middle of the physics capsule. The model (assets/blender/build_astronaut.py)
 // has its pivot at the feet and faces +Z, so it hangs half a body height below.
@@ -822,11 +1111,11 @@ function setMove(name) {
 const TOOLS = {};
 {
   const part = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; return m; };
-  const wrench = new THREE.Group();   // a handle with an open jaw
-  wrench.add(part(0.04, 0.26, 0.04, PAINT.grey, 0, 0.1, 0), part(0.13, 0.05, 0.045, PAINT.gold, 0, 0.25, 0), part(0.04, 0.07, 0.045, PAINT.gold, -0.045, 0.3, 0), part(0.04, 0.07, 0.045, PAINT.gold, 0.045, 0.3, 0));
   const scoop = new THREE.Group();    // a handle with a small open box on the end
   scoop.add(part(0.035, 0.3, 0.035, PAINT.grey, 0, 0.12, 0), part(0.14, 0.02, 0.12, PAINT.blue, 0, 0.28, 0.02), part(0.14, 0.07, 0.02, PAINT.blue, 0, 0.31, -0.04), part(0.02, 0.07, 0.12, PAINT.blue, -0.07, 0.31, 0.02), part(0.02, 0.07, 0.12, PAINT.blue, 0.07, 0.31, 0.02));
-  for (const [id, tool] of Object.entries({ wrench, scoop })) {
+  const builder = new THREE.Group();  // a short shovel: a handle, a collar and a flat gold blade
+  builder.add(part(0.035, 0.36, 0.035, PAINT.grey, 0, 0.14, 0), part(0.055, 0.05, 0.055, PAINT.dark, 0, 0.32, 0), part(0.16, 0.16, 0.02, PAINT.gold, 0, 0.42, 0.01), part(0.11, 0.05, 0.02, PAINT.gold, 0, 0.525, 0.01));
+  for (const [id, tool] of Object.entries({ scoop, builder })) {
     tool.position.set(0, -0.27, 0.04);       // in the fist, at the end of the forearm
     tool.rotation.x = Math.PI / 2;           // pointing forward, out of the hand
     tool.visible = false;
@@ -990,6 +1279,7 @@ addEventListener('keydown', e => {
     if (code === 'KeyE') useNearest();
     if (code === 'KeyF') setTorch(!torch.visible);
     if (code === 'KeyT') hooks?.toggleSpeed();
+    if (code === 'KeyB') hooks?.build?.();
     const slot = /^Digit([1-4])$/.exec(e.code);
     if (slot) hooks?.hotbar?.(Number(slot[1]) - 1);
   }
@@ -1182,7 +1472,7 @@ function useNearest() {
   const it = nearestUsable();
   if (!it || !sim) return;
   if (it.kind === 'station') openStation(it.id);
-  if (it.kind === 'panel') { hooks?.useTool?.('wrench'); hooks?.notice(sim.repairPanelByHand(it.i)); }
+  if (it.kind === 'panel') hooks?.notice(sim.repairPanelByHand(it.i));
   if (it.kind === 'sample') { hooks?.useTool?.('scoop'); sim.collectSample(it.id); }
   if (it.kind === 'door') useDoor(it.id);
 }
@@ -1283,7 +1573,7 @@ function tick(dt) {
   crewMixer.update(dt);
   bodyLanguage(dt, pace, !isInside(now));
 
-  const inside = isInside(now);
+  const inside = crewIn = isInside(now);
   const inLock = airlockZone(now).inAirlock;
   // Cutaway: inside, the roof fades away and the camera looks down from above.
   // Not drawn, but still there for the Sun: the roof keeps shading the cabin.
@@ -1336,8 +1626,11 @@ function tick(dt) {
 
 // Things in the world that follow the game rules: daylight, broken panels, the robot.
 let robotPhase = 0;
+let crewIn = false; // the astronaut is in the Habitat (worked out in tick)
 function syncWorld(dt) {
   if (!sim) return;
+  // The regolith shield as built so far, and its blue build plan while the Building tool is out.
+  dirtShield.sync(sim.shielding, holding === 'builder' && sim.shieldCost !== undefined ? sim.shielding + 1 : 0, dt, crewIn);
   const light = sim.sunlight;
   sun.intensity = SUN_FULL * light;
   hemi.intensity = 0.07 + 0.63 * light;   // at night only starlight is left outside
@@ -1464,7 +1757,7 @@ function stationShot(id, tight = 0.95) {
 }
 const SHOTS = {
   Habitat: () => ({ box: boxOf(habitat), from: [0.8, 0.3, 0.75], tight: 0.72, crew: { at: outsideSpot(), face: habitat.position } }),
-  HabitatBack: () => ({ box: boxOf(habitat), from: [-0.55, 0.3, 0.95], tight: 0.72 }),
+  HabitatBack: () => ({ box: boxOf(habitat), from: [-0.55, 0.3, 0.95], tight: 0.95, dirt: 2 }), // with the regolith shield built
   Solar: () => moduleShot(panels[2].model, [1, 0.16, 0.7], 1.05),
   Battery: () => moduleShot(models.Battery, [0.8, 0.35, 0.7]),
   OxygenMaker: () => moduleShot(models.OxygenMaker, [0.9, 0.35, 0.5]),
@@ -1493,6 +1786,7 @@ function snapshot(name) {
   robot.position.copy(dock);
   robot.rotation.y = 0;
   syncAirlock(0, true);
+  dirtShield.set(shot.dirt ?? 0);
   // Labels float over the game, not over a photo. They and the roof go back the way they were.
   const labels = [];
   scene.traverse(o => { if (o.isSprite && o.visible) { labels.push(o); o.visible = false; } });
@@ -1521,6 +1815,7 @@ function snapshot(name) {
   renderer.setSize(960, 720, false);
   renderer.render(scene, camera);
   const still = renderer.domElement.toDataURL('image/jpeg', 0.82);
+  dirtShield.set(0);
 
   labels.forEach(o => { o.visible = true; });
   roofMeshes.forEach((m, i) => { m.visible = roofWas[i]; });
@@ -1554,11 +1849,12 @@ gameReady({
     walkTo = null;
     hold(null);
     syncAirlock(0, true);
+    dirtShield.set(0);
     frozen = false;
     state = 'play';
   },
   setSpeed(s) { speed = s; },
-  hold, // which tool is in the astronaut's hand: 'wrench', 'scoop' or null
+  hold, // which tool is in the astronaut's hand: 'scoop', 'builder' or null
   freeze(on) { frozen = on; },
   // Where a station's floating label is on the screen (null if it is behind the camera).
   stationScreen(id) {
@@ -1581,7 +1877,7 @@ gameReady({
   goToStation,
   pause() { state = 'paused'; keys.clear(); touchPad?.letGo(); walkTo = null; },
   resume() { state = 'play'; },
-  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; },
+  stop() { state = 'off'; keys.clear(); sim = null; hooks = null; dirtShield.set(0); },
   // A still of the base for the start screen. Reading the canvas right after drawing keeps it filled.
   picture() {
     const spot = outsideSpot();
@@ -1605,4 +1901,4 @@ gameReady({
 });
 
 // For scripted checks from the browser console.
-window.demo = { snapshot, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };
+window.demo = { snapshot, dirtShield, get yaw() { return yaw; }, set yaw(v) { yaw = v; }, get pitch() { return pitch; }, set pitch(v) { pitch = v; }, get camDist() { return camDist; }, set camDist(v) { camDist = v; }, samples, torch, setTorch, inLights, goTo: id => goToStation(id), findPath, navGrid, NAV, get walking() { return walkTo; }, doors, useDoor, airlockZone, hab, standSpot, keys, scene, tick, world, teleport, site, crewBody, insideSpot, outsideSpot, stations, isInside, whereIs, get sim() { return sim; }, iceSpot, iceDistance, siteData, camera, renderer };

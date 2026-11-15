@@ -79,6 +79,65 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 @keyframes screen-fade { to { opacity: 0; } }
 @keyframes screen-sink { to { transform: translateY(100%); } }
 @keyframes screen-soften { from { -webkit-mask-position: 0 calc(0px - var(--soft)); mask-position: 0 calc(0px - var(--soft)); } }
+/* Title screen <-> mission menu: three moves to choose from (ui.js picks one; see MOVES there).
+   While any of them plays the title screen can't grow a scroll bar, which would shift it. */
+#start { scrollbar-gutter: stable; }
+#start:is(.leaving, .arriving) { overflow-y: hidden; }
+
+/* 1. Scope. The ring round the title's picture opens out: the mission menu shows through a round
+   hole where the picture was, and the hole and the ring grow together until the menu fills the
+   screen. ui.js measures the ring (--scope-x, -y, -r0), how far it must open (-r1) and how many
+   times bigger that is (-grow). The way back closes it again. */
+.screen.arriving.move-scope { z-index: 6; animation: scope-open .85s cubic-bezier(.6, 0, .3, 1) both, screen-fade .22s ease reverse both; }
+.screen.leaving.move-scope .scope-ring { animation: scope-ring .85s cubic-bezier(.6, 0, .3, 1) both; }
+.screen.leaving.move-scope-back { animation: scope-open .7s cubic-bezier(.6, 0, .3, 1) reverse both, screen-fade .2s ease .5s both; }
+.screen.arriving.move-scope-back .scope-ring { animation: scope-ring .7s cubic-bezier(.6, 0, .3, 1) reverse both; }
+@keyframes scope-open {
+  from { clip-path: circle(var(--scope-r0) at var(--scope-x) var(--scope-y)); }
+  to { clip-path: circle(var(--scope-r1) at var(--scope-x) var(--scope-y)); }
+}
+@keyframes scope-ring { to { transform: scale(var(--scope-grow)); } }
+
+/* 2. Doors. Two airlock doors slide in from the sides and meet in the middle, the screens swap
+   behind them, and the doors slide open again. */
+#doors { position: fixed; inset: 0; z-index: 58; pointer-events: none; visibility: hidden; overflow: hidden; }
+#doors.run { visibility: visible; pointer-events: auto; }
+#doors i {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 50%; box-sizing: border-box; transform: translateX(-102%);
+  background: linear-gradient(90deg, #06143A, #0B2260 70%, #0E2A75);
+  border-right: 3px solid var(--yonder); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+#doors i:last-child { left: 50%; transform: translateX(102%) scaleX(-1); }
+/* A raised panel on each door, and a striped edge where the two meet. */
+#doors i::before { content: ""; position: absolute; inset: 9% 16% 9% 12%; border: 2px solid rgba(255, 255, 255, .14); border-radius: 10px; background: rgba(255, 255, 255, .03); }
+#doors i::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 18px; background: repeating-linear-gradient(-45deg, var(--yonder) 0 12px, #07173F 12px 24px); opacity: .85; }
+#doors.run i { animation: door-left 1s both; }
+#doors.run i:last-child { animation-name: door-right; }
+@keyframes door-left {
+  0% { transform: translateX(-102%); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  36%, 58% { transform: none; animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
+  100% { transform: translateX(-102%); }
+}
+@keyframes door-right {
+  0% { transform: translateX(102%) scaleX(-1); animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  36%, 58% { transform: scaleX(-1); animation-timing-function: cubic-bezier(.5, 0, .2, 1); }
+  100% { transform: translateX(102%) scaleX(-1); }
+}
+/* The old screen goes while the doors are shut. */
+.screen.leaving.move-doors { animation: screen-vanish 1s linear both; }
+@keyframes screen-vanish { 0%, 46% { visibility: visible; } 47%, 100% { visibility: hidden; } }
+
+/* 3. Fly. The title rushes toward you and fades, as if flown past; behind it the Moon comes in
+   from far away (moon-menu.js) and the menu's words slide into place. The way back is a plain
+   fade with the title settling. */
+.screen.leaving.move-fly { animation: screen-fade .5s ease-in both; }
+.screen.leaving.move-fly .inner { animation: fly-past .5s ease-in both; }
+.screen.arriving.move-fly :is(.topbar, h2, #mission-list, #moon-notes) { animation: fly-settle .5s var(--ease) .3s backwards; }
+.screen.leaving.move-fly-back { animation: screen-fade .4s ease both; }
+.screen.arriving.move-fly-back .inner { animation: fly-past .45s ease-out reverse both; }
+@keyframes fly-past { to { transform: scale(1.6); } }
+@keyframes fly-settle { from { opacity: 0; transform: translateX(-32px); } }
+
 /* The Research Tree's title bar and buttons fade in once the sky has slowed, and out as it leaves. */
 #research.arriving.move-up :is(.rt-top, .rt-zoom) { animation: screen-fade .5s ease .55s reverse backwards; }
 #research.leaving.move-down :is(.rt-top, .rt-zoom, #research-panel) { animation: screen-fade .3s ease both; }
@@ -412,6 +471,37 @@ kbd { font: 400 14px var(--mono); color: var(--text); border: 1px solid rgba(255
 .m-state { font: 500 14px var(--head); text-transform: uppercase; letter-spacing: .1em; color: var(--yellow); display: flex; align-items: center; gap: 4px; }
 .m-state .ico { vertical-align: 0; }
 .meter.bad .m-state { color: #fff; background: var(--martian); padding: 0 8px; justify-self: start; }
+/* The Power bar is also a button: a see-through one lies over it, and the list it opens sits
+   above the meters (below them on phones, where the meters are at the top of the screen). */
+#meter-rows { display: contents; }
+.m-more { display: inline-flex; margin-left: 4px; vertical-align: -2px; color: var(--yellow); }
+.m-more .ico { stroke: currentColor; }
+#power-btn { position: absolute; left: -8px; right: -8px; top: -6px; height: 44px; box-sizing: content-box; padding: 6px 0; margin: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
+#power-btn:hover, #power-btn[aria-expanded="true"] { border-color: rgba(234, 254, 7, .55); background: rgba(234, 254, 7, .06); }
+#power-uses { position: absolute; left: 0; bottom: calc(100% + 16px); width: 100%; display: grid; gap: 8px; --fill: rgba(3, 8, 24, .78); text-shadow: none; }
+#power-uses[hidden] { display: none; }
+.touch #power-uses { bottom: auto; top: calc(100% + 12px); width: min(300px, calc(100vw - 24px)); z-index: 6; max-height: calc(100dvh - 150px); overflow-y: auto; }
+@media (max-height: 480px) { .touch #build-text { display: none; } }
+/* On a phone the open list lies over the panels below the meters, so it must be on top of them. */
+.touch #meters:has(#power-uses:not([hidden])) { z-index: 8; }
+.touch #power-uses { --fill: rgba(3, 8, 24, .94); }
+.pu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pu-head h3 { margin: 0; font: 500 16px var(--head); text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 8px; }
+.pu-head h3 .ico { stroke: var(--yellow); vertical-align: 0; flex: none; }
+#pu-close { flex: none; min-height: 36px; width: 36px; padding: 0; display: grid; place-items: center; }
+#pu-body { display: grid; gap: 8px; }
+.pu { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pu li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; font-size: 14px; }
+.pu-name small { color: var(--soft); font-size: 14px; margin-left: 4px; }
+.pu-name { grid-area: 1 / 1; }
+.pu b { grid-area: 1 / 2; font: 500 14px var(--mono); font-variant-numeric: tabular-nums; }
+.pu-bar { grid-area: 2 / 1 / 3 / -1; position: relative; height: 4px; background: rgba(255, 255, 255, .16); }
+.pu-bar i { position: absolute; inset: 0 auto 0 0; background: var(--yellow); }
+.pu li.off { opacity: .55; }
+.pu-sum { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; border-top: 1px solid rgba(255, 255, 255, .2); padding-top: 8px; }
+.pu-sum dt { color: var(--soft); }
+.pu-sum dd { margin: 0; text-align: right; }
+#power-uses .fine { margin: 0; }
 
 #corner { position: fixed; right: 16px; bottom: 16px; width: 296px; display: flex; flex-direction: column; gap: 12px; }
 #corner .panel { position: static; }
@@ -556,6 +646,17 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
 .slot.empty { --edge: rgba(255, 255, 255, .14); cursor: default; }
 .slot.empty::before { background: rgba(3, 8, 24, .24); }
 .slot-empty { width: 12px; height: 12px; opacity: .3; background: linear-gradient(#fff, #fff) center / 100% 1px no-repeat, linear-gradient(#fff, #fff) center / 1px 100% no-repeat; }
+/* The Building tool's card: what can be built, what it costs and a Build button. It sits on the
+   hotbar, so it shows and hides with it. */
+#build-card { position: static; width: min(340px, calc(100vw - 24px)); display: grid; gap: 6px; margin-bottom: 4px; --fill: rgba(3, 8, 24, .72); border: 1px solid rgba(46, 150, 245, .7); -webkit-backdrop-filter: none; backdrop-filter: none; }
+#build-card[hidden] { display: none; }
+#build-card h3 { margin: 0; font: 500 16px var(--head); text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 8px; }
+#build-card h3 .ico { stroke: var(--yonder); vertical-align: 0; stroke-linecap: square; stroke-linejoin: miter; }
+#build-card p { margin: 0; font-size: 15px; }
+#build-card .bar i { background: var(--yonder); }
+#build-go { justify-self: start; }
+#build-go:disabled { --pf: #39435a; color: var(--soft); }
+#build-go kbd { margin-left: 6px; }
 #prompt { -webkit-backdrop-filter: none; backdrop-filter: none; --fill: rgba(3, 8, 24, .5); left: 50%; bottom: 116px; transform: translateX(-50%); font-weight: 600; margin: 0; }
 
 /* A solar storm: a red edge round the screen that throbs three times when the storm starts, then holds. */
@@ -643,6 +744,7 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
   html:not(.touch) #corner > * { flex: 1 1 160px; }
   html:not(.touch) .rp-next { display: none; }
   html:not(.touch) #meters { order: 6; gap: 8px; }
+  html:not(.touch) #hud > #meters { position: relative; left: auto; bottom: auto; }
   html:not(.touch) #station { left: 8px; right: 8px; top: auto; bottom: 8px; transform: none; width: auto; max-height: 72vh; }
 }
 @media (max-width: 760px) {
@@ -702,7 +804,7 @@ button.co-name:hover { background: rgba(3, 8, 24, .78); }
 .touch #meters, .touch #clock, .touch #corner, .touch #feed, .touch #hotbar-wrap {
   position: static; transform: none; width: auto; min-width: 0; max-width: none; pointer-events: auto;
 }
-.touch #meters { grid-area: meters; align-self: start; gap: 8px; }
+.touch #meters { grid-area: meters; align-self: start; gap: 8px; position: relative; left: auto; bottom: auto; }
 .touch #clock { grid-area: clock; align-self: start; justify-self: center; width: min(360px, 100%); }
 .touch #corner { grid-area: corner; align-self: start; margin-top: 40px; gap: 8px; } /* under the gear */
 .touch .rp-next, .touch .m-note { display: none; }

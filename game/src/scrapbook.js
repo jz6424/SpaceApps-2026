@@ -474,7 +474,7 @@ export const PAGES = [
       'Shielding has limits. It works well against solar storms, but the most energetic cosmic rays from deep space can pass through metres of rock.',
     ],
     fact: 'Moon dust smells like burnt gunpowder. Apollo astronauts noticed it when they carried the dust back into their lander on their suits.',
-    game: 'Research this, then pile moon dirt on the Storm Shelter. Each level cuts the dose you take inside during a storm.',
+    game: 'Research this to get a Building tool. Send the robot to dig moon dirt, then build the shield over the Storm Shelter. Each level cuts the dose you take in the shelter during a storm.',
     words: [['Regolith', 'the layer of dust and broken rock that covers the Moon'], ['Cosmic rays', 'very fast particles that come from far outside the solar system']],
     links: [
       { title: 'All About the Moon (NASA Space Place)', url: 'https://spaceplace.nasa.gov/all-about-the-moon/en/', for: 'easy' },

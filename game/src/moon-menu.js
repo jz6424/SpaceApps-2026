@@ -353,6 +353,8 @@ export function createMoonMenu(canvas, missions, onPick) {
   return {
     start() { if (running) return; running = true; diving = 0; diveDone = null; fit(); last = performance.now(); requestAnimationFrame(frame); },
     stop() { running = false; },
+    // Puts the camera far away, so the Moon comes in from a distance and grows to its full size.
+    approach() { if (!picked) camera.position.set(HOME.x, HOME.y, HOME.z * 7); },
     // Which flag to face and move in on. null lets the Moon turn freely again.
     pick(id) { picked = id && flags[id] ? id : null; diving = 0; paint(); },
     setLocked(ids) { locked = new Set(ids); paint(); },

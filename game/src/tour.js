@@ -1,10 +1,12 @@
-// The guided tour for First Night. It is short: a welcome, two steps for the screen (bottom, then
-// top), two for the stations, a first moonwalk through the airlock, and a send-off.
+// The guided tour for First Night. It is short: a welcome, steps for the screen (bottom, the
+// power list, then top), two for the stations, a first moonwalk through the airlock, and a send-off.
+// After it, and in the other missions, short how-to cards appear the first time they are needed
+// (HOWTOS below): how to speed up time, and how to use the Building tool.
 // Labels ("callouts") each sit next to the thing they describe, with a red arrow pointing at it.
 // Things that sit together and belong together share one label, so no step shows more than four.
 // Steps that only explain stop the game clock; steps that ask the player to do something let it run.
 
-import { forTouch } from './touch.js';
+import { isTouch, forTouch } from './touch.js';
 
 const $ = id => document.getElementById(id);
 
@@ -24,7 +26,7 @@ const SCREEN_BOTTOM = [
     target: ['#supplies', '#rp-bar'], side: 'left', title: 'What you have collected',
     lines: [
       ['Rock samples', 'Tonight\'s goal: bring back 5 glowing rocks.'],
-      ['Moon dirt', 'The robot digs it. For repairs, Boost and shielding.'],
+      ['Moon dirt', 'The robot digs it. For building, repairs and Boost.'],
       ['Research points', '+2 for each rock, +1 for each data upload.'],
     ],
   },
@@ -62,6 +64,21 @@ function buildSteps() {
     {
       title: 'The bottom of your screen', at: 'left', freeze: true, callouts: SCREEN_BOTTOM,
       text: ['Your meters are on the left. What you have collected is on the right. Press <b>Next</b> when you have read them.'],
+    },
+    // The Power bar is also a button: it opens the list of what is using power.
+    {
+      title: 'Where your power goes', at: 'center', freeze: true, target: '#power-btn', side: 'right',
+      nextLabel: 'Show me', action: hud => hud.showUses(true), until: (sim, hud) => hud.usesOpen,
+      text: ['Your <b>Power</b> bar is also a button. <b>Click it</b> to see a list of everything that is using power.'],
+    },
+    {
+      title: 'What is using your power', at: 'center', freeze: true, target: '#power-uses', side: 'right',
+      enter: hud => hud.showUses(true), leave: hud => hud.showUses(false),
+      text: [
+        'Each row is one machine, and the power it takes every second. <b>Life Support</b> is always on. The heaters switch on by themselves at night.',
+        'Dimmed rows are switched off. To save power, turn things off or down at their stations.',
+        'You can open this list at any time. Click the Power bar again to close it.',
+      ],
     },
     {
       title: 'The top of your screen', at: 'center', freeze: true, callouts: SCREEN_TOP,
@@ -122,11 +139,70 @@ function buildSteps() {
   ];
 }
 
+// How-to cards. Each is shown once (the save remembers), when `when` first comes true and nothing
+// else is on screen. `known` skips one the player has plainly worked out already.
+const calm = sim => !sim.stormNow && !sim.nextStorm?.warnedBy;
+const HOWTOS = [
+  {
+    // First Night: nothing left to do but wait, so show how to make the wait shorter. It comes up
+    // once all the rocks are in and you are back inside, or once night has fallen and you are inside.
+    id: 'speed',
+    when: (sim, hud) => !!sim.mission.tutorial && sim.where !== 'outside' && !sim.inAirlock && sim.airlockStatus === 'pressurized' && calm(sim)
+      && (sim.samples.size >= sim.goalValue || sim.t >= sim.day),
+    known: (sim, hud) => hud.speed > 1,
+    steps: sim => [
+      {
+        title: 'Speed up time', at: 'right', nextLabel: 'Set 2x speed', action: hud => hud.setSpeed(2), until: (s, hud) => hud.speed > 1,
+        hint: isTouch ? 'Tap "Set 2x speed" on the card to make time go faster.' : 'Press T to make time go 2x as fast.',
+        text: [
+          sim.samples.size >= sim.goalValue ? `All ${sim.goalValue} rocks are in. Now the base only has to last until sunrise.` : 'Night has fallen. Once the base is set for the night, sunrise is a long wait.',
+          isTouch ? 'Tap <b>Set 2x speed</b> to make time go <b>2x</b> as fast.' : 'Press <b>T</b> to make time go <b>2x</b> as fast.',
+        ],
+      },
+      {
+        title: 'Time is going 2x as fast', at: 'right', nextLabel: 'Got it',
+        text: [
+          isTouch ? 'The <b>Game speed</b> button in Settings (the gear) steps through 2x, 3x and back to normal.' : '<b>T</b> again makes it 3x, and once more takes it back to normal. The same button is in Settings (the gear).',
+          'A solar storm always sets time back to normal, so you can get to the shelter.',
+        ],
+      },
+    ],
+  },
+  {
+    // The mission about the regolith shield: show the new tool in slot 2 and what it builds.
+    id: 'build',
+    when: (sim, hud) => hud.hasTool('builder') && sim.mission.goalType === 'dose' && sim.where !== 'outside' && calm(sim),
+    known: sim => sim.shielding > 0,
+    steps: sim => [
+      {
+        title: 'New tool: the Building tool', at: 'right', freeze: true, target: '#hotbar [data-tool="builder"]', side: 'above',
+        nextLabel: 'Take it out', action: hud => hud.holdTool('builder'), until: (s, hud) => hud.holding === 'builder',
+        text: [
+          'Your Regolith Shielding research came with a <b>Building tool</b>. It is in slot 2 at the bottom of your screen.',
+          isTouch ? '<b>Tap the slot</b> to take it out.' : 'Press <b>2</b> (or click the slot) to take it out.',
+        ],
+      },
+      {
+        title: 'Build a regolith shield', at: 'right', freeze: true, target: '#build-card', side: 'above', nextLabel: 'Got it',
+        text: [
+          'With the tool out, this card shows what you can build: a shield of moon dirt (regolith) piled over the Storm Shelter. A blue outline at the back of the Habitat shows where it will go.',
+          `<b>It needs ${sim.shieldCost} moon dirt and you have ${Math.floor(sim.regolith)}.</b> Send the robot to dig at the <b>Robot Map</b> first. When you have enough, press <b>Build it</b>${isTouch ? '' : ' (or <b>B</b>)'}.`,
+          'Build it before the first storm, then hide in the shelter. You need both for 3 stars.',
+        ],
+      },
+    ],
+  },
+];
+
 const ARROW = '<svg viewBox="0 0 22 28" width="22" height="28" aria-hidden="true"><path d="M11 4 18 14h-4.5v10h-5V14H4z" fill="#fff" stroke="rgba(3, 8, 24, .6)" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 
-export function createTour({ sim, game, hud }) {
-  const steps = buildSteps();
+// seen: the how-to cards this save has already shown. onSeen(id) is called when another one is done.
+export function createTour({ sim, game, hud, seen = [], onSeen = () => {} }) {
   const root = $('tour'), card = $('tour-card'), ring = $('tour-ring'), arrow = $('tour-arrow');
+  let steps = [];               // the steps on screen now: the tour's, or one how-to's
+  let kind = null;              // 'tour', or the id of the how-to that is showing
+  let active = false;           // a card is on screen
+  const shown = new Set(seen);
   let i = -1;
   let alive = true;
   let callouts = [];            // the labels of the current step
@@ -160,7 +236,8 @@ export function createTour({ sim, game, hud }) {
 
   // The clock stands still while the tour explains things. The first time it is let go, say so:
   // a message from the base computer, and the Sun clock flashes.
-  let started = false;
+  // Only First Night holds the clock at the start; the other missions are running from the off.
+  let started = !sim.mission.tutorial;
   function startClock() {
     if (started) return;
     started = true;
@@ -173,10 +250,20 @@ export function createTour({ sim, game, hud }) {
     setTimeout(() => clock.classList.remove('started'), 3200);
   }
 
+  function run(list, id) {
+    steps = list;
+    kind = id;
+    active = true;
+    root.hidden = false;
+    enter(0);
+  }
+
   function enter(n) {
+    steps[i]?.leave?.(hud);
     i = n;
     const s = steps[i];
     if (!s) return finish();
+    s.enter?.(hud);
     clearCallouts();
     if (s.callouts) buildCallouts(s.callouts);
     // While the screen is being labelled, the base's own labels step back so nothing crowds.
@@ -186,13 +273,16 @@ export function createTour({ sim, game, hud }) {
     setFreeze(hold);
     if (!hold) startClock();
     sim.flags.tourHint = s.hint ? forTouch(s.hint) : null;
-    $('tour-step').textContent = `Tour: step ${i + 1} of ${steps.length}`;
+    $('tour-step').textContent = `${kind === 'tour' ? 'Tour' : 'How to'}: step ${i + 1} of ${steps.length}`;
     $('tour-title').textContent = s.title;
     const text = s.last ? [...s.text, started ? 'The mission clock is already running.' : '<b>The mission clock starts when you press Start the night.</b>'] : s.text;
     $('tour-text').innerHTML = text.map(p => `<p>${forTouch(p)}</p>`).join('');
     $('tour-more').hidden = true;
     $('tour-next').hidden = !!s.noNext;
     $('tour-next').textContent = s.last ? 'Start the night' : (s.nextLabel ?? 'Next');
+    // A how-to is two cards long, so its last card needs no way to skip the rest.
+    $('tour-skip').textContent = kind === 'tour' ? 'Skip tour' : 'Skip';
+    $('tour-skip').hidden = kind !== 'tour' && i === steps.length - 1;
     $('tour-alt').hidden = !s.alt;
     if (s.alt) $('tour-alt').textContent = s.alt.label;
     card.className = `panel at-${s.at ?? 'right'}`;
@@ -328,35 +418,58 @@ export function createTour({ sim, game, hud }) {
   }
 
   function finish() {
-    if (!alive) return;
-    alive = false;
+    if (!alive || !active) return;
+    steps[i]?.leave?.(hud);
+    active = false;
+    i = -1;
     setFreeze(false);
     startClock();
     sim.flags.tourHint = null;
     clearCallouts();
     document.body.classList.remove('tour-labels');
     root.hidden = true;
-    hud.close();
+    if (kind === 'tour') hud.close();
   }
 
-  const next = () => { if (alive) enter(i + 1); };
+  // Next does the step's own thing for you where there is one (open the list, take the tool out).
+  const next = () => {
+    if (!alive || !active) return;
+    const s = steps[i];
+    s?.action?.(hud);
+    if (!s?.action || !s.until) enter(i + 1);
+  };
   const skip = () => finish();
   $('tour-next').addEventListener('click', next);
   $('tour-skip').addEventListener('click', skip);
   const alt = () => { const k = steps.findIndex(x => x.id === steps[i].alt?.to); if (k >= 0) enter(k); };
   $('tour-alt').addEventListener('click', alt);
 
-  root.hidden = false;
-  enter(0);
+  root.hidden = true;
+  if (sim.mission.tutorial) run(buildSteps(), 'tour');
+
+  // With nothing showing, see whether a how-to card is due. One the player has already worked
+  // out for themselves is ticked off without being shown.
+  function nextHowTo() {
+    if (hud.open || sim.over) return;
+    for (const how of HOWTOS) {
+      if (shown.has(how.id)) continue;
+      const known = how.known?.(sim, hud);
+      if (!known && !how.when(sim, hud)) continue;
+      shown.add(how.id);
+      onSeen(how.id);
+      if (!known) return run(how.steps(sim, hud), how.id);
+    }
+  }
 
   return {
     // Called every frame by the game.
     frame() {
       if (!alive) return;
+      if (!active) return nextHowTo();
       const s = steps[i];
       if (!s) return;
-      if (s.waitOpen && hud.open === s.waitOpen) return next();
-      if (s.until?.(sim)) return next();
+      if (s.waitOpen && hud.open === s.waitOpen) return enter(i + 1);
+      if (s.until?.(sim, hud)) return enter(i + 1);
       if (s.callouts) {
         const now = performance.now();
         const dt = Math.min(0.1, (now - (lastFrame || now)) / 1000);
@@ -368,7 +481,8 @@ export function createTour({ sim, game, hud }) {
       }
     },
     destroy() {
-      alive = false;
+      if (active) steps[i]?.leave?.(hud);
+      alive = active = false;
       setFreeze(false);
       if (sim) sim.flags.tourHint = null;
       $('tour-next').removeEventListener('click', next);

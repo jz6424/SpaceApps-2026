@@ -44,9 +44,12 @@ export const CONFIG = {
   dose: {
     inside: 0.035,    // cosmic rays every day, everywhere
     outside: 0.11,    // no hull around you on a moonwalk
-    storm: { outside: 3, inside: 1.1, shelter: 0.16 }, // extra per second while a storm is on
-    shielding: [1, 0.6, 0.35],                         // storm multiplier by shielding level
-    shieldingCost: [20, 30],                           // regolith for level 1, then level 2
+    // The shelter's own walls stop half of a storm. The rest takes a shield of moon dirt, built
+    // with the Building tool: banked up the sides (level 1), then right over the top (level 2).
+    // The dirt is piled on the shelter end only, so it helps in the shelter and nowhere else.
+    storm: { outside: 3, inside: 1.1, shelter: 0.5 }, // extra per second while a storm is on
+    shielding: [1, 0.5, 0.25],                         // storm multiplier in the shelter, by shield level
+    shieldingCost: [25, 25],                           // regolith for level 1, then level 2
   },
 
   // The suit's own air tank for moonwalks. Refills inside.
@@ -110,7 +113,7 @@ export const MODES = {
   Commander: {
     label: 'Commander', level: 'hard', points: 40,
     about: 'Longer storms, short warnings and an extra space rock. For astronauts who have done it before.',
-    crewDrain: 1.08, solar: 0.95, stormLength: 1.25, warning: 20, robotAutoPark: false, doseGoal: 0.8, extraMeteoroid: true,
+    crewDrain: 1.08, solar: 0.95, stormLength: 1.25, warning: 20, robotAutoPark: false, doseGoal: 0.9, extraMeteoroid: true,
   },
 };
 
@@ -145,15 +148,21 @@ export const MISSIONS = [
     multiplier: 1.5,
     requires: { id: 'Shielding', name: 'Regolith Shielding', about: 'Regolith is the science word for moon dirt.', cost: 10 },
     goal: 'Keep your radiation dose low through two solar storms.',
-    brief: 'Mission Control is watching a busy Sun. Keep the antenna on to get warnings, pile moon dirt on the shelter, and hide when the storm hits.',
+    brief: 'Mission Control is watching a busy Sun. Send the robot to dig moon dirt, then take out your Building tool and build a regolith shield (a wall of moon dirt) over the Storm Shelter. Keep the antenna on to get warnings, and hide in the shelter when the storm hits.',
     lesson: 'Moon dirt is a great radiation shield, and warnings from Earth give you time to hide. The shelter is the most shielded spot in the Habitat.',
     dataCards: ['storm', 'comms'],
     day: 130, night: 140,
-    start: { power: 60, air: 80, regolith: 25 },
-    storms: [{ at: 80, length: 40, strength: 'Strong' }, { at: 205, length: 35, strength: 'Strong' }],
+    // Not enough moon dirt to build with at the start: the robot has to dig first.
+    start: { power: 60, air: 80, regolith: 10 },
+    // The first storm leaves time to dig and build first; the second leaves time for level 2.
+    storms: [{ at: 95, length: 40, strength: 'Strong' }, { at: 215, length: 35, strength: 'Strong' }],
     meteoroids: [150],
     goalType: 'dose',
     goalValue: 45, // multiplied by the mode's doseGoal
+    // The third star here needs the dirt shield built, and a dose that only hiding behind it gives.
+    // Hiding in the bare shelter for both storms comes to about 35 (Cadet), 43 (Explorer) or
+    // 52 (Commander) at the very least; behind a level 1 shield it is about 26, 31 or 36 at most.
+    threeStar: { shielding: 1, maxDose: { Cadet: 30, Explorer: 36, Commander: 40 } },
   },
   {
     id: 'IceAndGreens',
@@ -174,6 +183,9 @@ export const MISSIONS = [
     goalValue: { Cadet: 2, Explorer: 3, Commander: 4 },
   },
 ];
+
+// Short how-to cards that appear once, the first time they are needed (see tour.js).
+export const HOWTOS = ['speed', 'build'];
 
 export const STAR_SHARE = { 1: 0.5, 2: 0.75, 3: 1 };
 export const missionById = id => MISSIONS.find(m => m.id === id);

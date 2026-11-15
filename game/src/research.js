@@ -83,7 +83,7 @@ export const BRANCHES = [
       {
         id: 'Shielding', icon: 'shield', name: 'Regolith Shielding', mission: 'SolarStorm',
         science: 'Solar storm particles lose energy as they pass through matter. A thick layer of moon dirt piled on the Habitat stops many of them before they reach you.',
-        change: 'You can pile moon dirt on the Storm Shelter to lower your storm dose.',
+        change: 'You get a Building tool. With it you can build a shield of moon dirt over the Storm Shelter, to lower your storm dose in there.',
       },
       {
         id: 'ParticleDetector', icon: 'alert', name: 'Particle detector', cost: 12, needs: 'Shielding',

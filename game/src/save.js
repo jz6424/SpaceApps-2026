@@ -1,6 +1,6 @@
 // Progress lives in this browser's localStorage. Storage can be blocked or cleared, so the game
 // keeps working from memory and the menu says when saving isn't possible.
-import { MISSIONS, MODES } from './config.js';
+import { MISSIONS, MODES, HOWTOS } from './config.js';
 import { NODES } from './research.js';
 import { PAGES, LEVELS } from './scrapbook.js';
 
@@ -8,8 +8,8 @@ const KEY = 'moonbase.save.v2';
 
 export function emptySave() {
   // found: Scrapbook pages met in a mission. read: pages opened (each pays research points once).
-  // reading: the Scrapbook reading level, 'easy' or 'deep'.
-  return { mode: 'Cadet', points: 0, unlocks: [], best: {}, tests: {}, openAll: false, found: [], read: [], reading: 'easy' };
+  // reading: the Scrapbook reading level, 'easy' or 'deep'. howtos: how-to cards already shown.
+  return { mode: 'Cadet', points: 0, unlocks: [], best: {}, tests: {}, openAll: false, found: [], read: [], reading: 'easy', howtos: [] };
 }
 
 // Anything hand-edited or left by an older build is dropped rather than trusted.
@@ -28,6 +28,7 @@ function clean(raw) {
   for (const list of ['found', 'read']) {
     if (Array.isArray(raw[list])) save[list] = [...new Set(raw[list].filter(id => pages.includes(id)))];
   }
+  if (Array.isArray(raw.howtos)) save.howtos = HOWTOS.filter(id => raw.howtos.includes(id));
   if (typeof raw.reading === 'string' && Object.hasOwn(LEVELS, raw.reading)) save.reading = raw.reading;
   for (const mission of MISSIONS) {
     for (const mode of Object.keys(MODES)) {

@@ -2,7 +2,7 @@
 // Also runs a mission: makes the Sim, hands it to the 3D world and the HUD, and ends it.
 import './ui.css';
 import { CONFIG as C, MISSIONS, MODES, missionById, pointsFor } from './config.js';
-import { Sim, planRun, flareLabel, flareSize } from './sim.js';
+import { Sim, planRun, flareLabel, flareSize, starRules } from './sim.js';
 import { createHud, icon } from './hud.js';
 import { createTour } from './tour.js';
 import { getFlares, dataCard, SOURCES } from './nasa.js';
@@ -52,7 +52,35 @@ const listOf = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} an
 //         sky that was waiting behind it, while the stars rush down and slow to a stop
 //   down  the way back: the stars rush up as the new screen rises over the sky
 //   fade  the old screen fades away over the new one
-const MOVES = { up: 1100, down: 1000, fade: 350 };
+//
+// Between the title screen and the mission menu there are three moves to choose from. Add
+// ?move=doors or ?move=fly to the game's address to try the others; scope is used otherwise.
+//   scope  the ring round the title's picture opens out until the menu fills the screen
+//   doors  two airlock doors slide shut over the old screen and open on the new one
+//   fly    the title rushes past and the Moon comes in from far away
+// Each has its way back: scope-back, doors again, fly-back.
+const MOVES = { up: 1100, down: 1000, fade: 350, scope: 850, 'scope-back': 700, doors: 1000, fly: 700, 'fly-back': 450 };
+const TITLE_MOVE = ['scope', 'doors', 'fly'].find(m => m === new URLSearchParams(location.search).get('move')) ?? 'scope';
+const TITLE_BACK = { scope: 'scope-back', doors: 'doors', fly: 'fly-back' }[TITLE_MOVE];
+const ALL_MOVES = Object.keys(MOVES).map(m => `move-${m}`);
+
+// Tells ui.css where the ring round the title's picture is, how big, and how far it must open
+// to uncover the whole screen.
+function aimScope() {
+  const ring = $('start').querySelector('.frame').getBoundingClientRect(), root = document.documentElement;
+  const x = ring.left + ring.width / 2, y = ring.top + ring.height / 2, r0 = Math.max(24, ring.width / 2);
+  const r1 = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)) + 8;
+  for (const [name, value] of [['x', `${x}px`], ['y', `${y}px`], ['r0', `${r0}px`], ['r1', `${r1}px`], ['grow', r1 / r0]]) root.style.setProperty(`--scope-${name}`, value);
+}
+// Runs the airlock doors across the screen: shut, a beat, open.
+function runDoors() {
+  const doors = $('doors');
+  doors.classList.remove('run');
+  void doors.offsetWidth;   // lets the doors run again straight after a run
+  doors.classList.add('run');
+  sound.airlockSound('door-close', 0.36);
+  setTimeout(() => { if (doors.classList.contains('run')) sound.airlockSound('door-open', 0.4); }, 580);
+}
 const showing = () => SCREENS.find(key => !$(key).hidden && !$(key).classList.contains('leaving'));
 let moving = null;   // { from, to, timer } while a move is playing
 function settle() {
@@ -60,7 +88,8 @@ function settle() {
   clearTimeout(moving.timer);
   const { from, to } = moving;
   moving = null;
-  for (const key of [from, to]) $(key).classList.remove('leaving', 'arriving', 'move-up', 'move-down', 'move-fade');
+  for (const key of [from, to]) $(key).classList.remove('leaving', 'arriving', ...ALL_MOVES);
+  $('doors').classList.remove('run');
   $(from).hidden = true;
   if (to !== 'missions') moonMenu?.stop();
 }
@@ -73,6 +102,8 @@ function show(name, move) {
     const old = $(from);
     old.hidden = false;
     old.style.setProperty('--scrolled', `${old.scrollTop}px`);
+    if (move.startsWith('scope')) aimScope();
+    if (move === 'doors') runDoors();
     old.classList.add('leaving', `move-${move}`);
     $(name).classList.add('arriving', `move-${move}`);
     moving = { from, to: name, timer: setTimeout(settle, MOVES[move] + 40) };
@@ -82,7 +113,9 @@ function show(name, move) {
   // so Enter does the expected thing, without that moving the page.
   const screen = $(name ?? '');
   if (screen) screen.scrollTop = 0;
-  (screen?.querySelector('.btn.primary:not([disabled])') ?? screen?.querySelector('button:not([disabled])'))?.focus({ preventScroll: true });
+  // (Only a button that is showing can take it: the mission menu's Play is tucked away until a mission is picked.)
+  const buttons = screen ? [...screen.querySelectorAll('.btn.primary:not([disabled])'), ...screen.querySelectorAll('button:not([disabled])')] : [];
+  buttons.find(button => button.getClientRects().length)?.focus({ preventScroll: true });
 }
 
 const isOpen = mission => !mission.requires || unlocksNow().includes(mission.requires.id);
@@ -101,6 +134,7 @@ function renderStart() {
   $('start-status').textContent = '';
   if (game) {
     $('start-actions').innerHTML = '<button class="btn primary" data-do="open-missions">Play</button>';
+    makeMoon();
     return;
   }
   $('start-actions').innerHTML = '<p class="loading" role="status">Loading the Moon<span class="dots" aria-hidden="true">.</span></p>';
@@ -187,12 +221,19 @@ function openMissions() {
   $('dive').classList.remove('on');
   const from = showing();
   if (from === 'research') startPan(-1, MOVES.down / 1000);
-  show('missions', { research: 'down', scrapbook: 'fade' }[from]);
+  show('missions', { research: 'down', scrapbook: 'fade', start: TITLE_MOVE }[from]);
   measureBar();
-  // The Moon is made once the menu is on screen, so it can size itself to its place on the page.
-  moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
+  makeMoon();
   renderMissions();
+  // The menu starts on its first mission, so Enter opens that and doesn't go back to the title.
+  $('mission-list').querySelector('.m-head')?.focus({ preventScroll: true });
   moonMenu.start();
+  if (from === 'start' && TITLE_MOVE === 'fly' && !calm) moonMenu.approach();
+}
+// The Moon is made once, as soon as the game has loaded, so that its maps of the real Moon have
+// arrived by the time the menu opens. It sizes itself to its place on the page when it starts.
+function makeMoon() {
+  moonMenu ??= createMoonMenu($('moon'), MISSIONS, id => { if (id ? id !== selected : selected) brief(id ?? selected); });
 }
 
 // --- Research Tree ---
@@ -746,11 +787,11 @@ function renderBriefMode() {
   $('mode-about').textContent = MODES[save.mode].about;
   // The three star tests, one under the other. A star is filled in only if that test has been
   // passed before in this mode, so a filled second star can sit between two empty ones.
-  const S = C.stars, got = testsPassed(mission.id, save.mode);
+  const S = starRules(mission, save.mode), got = testsPassed(mission.id, save.mode);
   const tests = [
     'Finish the mission: reach sunrise with the goal met',
     `Keep Life Support at ${S.two.lowestAir}% or more, with the battery empty for no more than ${S.two.maxBlackout} seconds`,
-    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, and keep your radiation dose at ${S.three.maxDose} or less`,
+    `Keep Life Support at ${S.three.lowestAir}% or more, ${S.three.maxBlackout ? `the battery empty for no more than ${S.three.maxBlackout} seconds` : 'never let the battery run empty'}, ${S.three.shielding ? 'build the regolith shield, ' : ''}and keep your radiation dose at ${S.three.maxDose} or less${S.three.shielding ? ' (that takes the shield and hiding in the Storm Shelter)' : ''}`,
   ];
   $('star-title').textContent = `How to earn 3 stars in ${MODES[save.mode].label} mode`;
   $('star-list').innerHTML = tests.map((text, i) =>
@@ -825,8 +866,10 @@ function launch(id = chosen) {
     toggleSpeed: () => hud.toggleSpeed(),
     hotbar: i => hud.selectSlot(i),
     useTool: id => hud.holdTool(id),
+    build: () => hud.build(),
   });
-  if (mission.tutorial) tour = createTour({ sim, game, hud });
+  // First Night gets the guided tour. Every mission gets the short how-to cards, each shown once.
+  tour = createTour({ sim, game, hud, seen: save.howtos, onSeen: id => { if (!save.howtos.includes(id)) { save.howtos.push(id); commit(); } } });
   show(null);
 }
 
@@ -945,7 +988,7 @@ function renderCredits() {
 const actions = {
   // Leaving the Scrapbook, the book shuts first.
   'open-missions': () => (showing() === 'scrapbook' ? scrapbook.close(openMissions) : openMissions()),
-  home: () => { renderStart(); show('start'); },
+  home: () => { renderStart(); show('start', showing() === 'missions' ? TITLE_BACK : undefined); },
   how: () => show('how'),
   credits: () => { renderCredits(); show('credits'); },
   mode: id => { save.mode = id; commit(); renderBriefMode(); $('mode-choice').querySelector(`[data-id=${id}]`).focus({ preventScroll: true }); },

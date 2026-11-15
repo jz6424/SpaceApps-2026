@@ -19,6 +19,15 @@ export function flareSize(classType) {
   return { units, strength, place };
 }
 
+// What a mission asks for its second and third stars in a mode. Most use the numbers in
+// CONFIG.stars; a mission can ask more for its third star (see threeStar in config.js).
+//   three.shielding: the dirt shield must be built to at least this level (0 = not needed).
+export function starRules(mission, modeName) {
+  const S = C.stars, own = mission.threeStar ?? {};
+  const maxDose = typeof own.maxDose === 'object' ? own.maxDose[modeName] : own.maxDose;
+  return { two: S.two, three: { ...S.three, shielding: own.shielding ?? 0, maxDose: maxDose ?? S.three.maxDose } };
+}
+
 const niceDate = iso => new Date(`${iso}T00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 export const flareLabel = f => `${f.classType} flare of ${niceDate(f.date)}`;
 
@@ -109,8 +118,6 @@ export class Sim {
     this.earthGap = [setAt, setAt + gap];
 
     this.share = 1;           // power share in a brownout (1 = everything runs)
-    this.gen = 0;
-    this.demand = 0;
     this.lowestAir = this.air;
     this.blackout = 0;
     this.emergency = 0;       // seconds spent at 0 air
@@ -140,10 +147,19 @@ export class Sim {
   get panelsWorking() { return this.panels.filter(Boolean).length; }
   get robotWorking() { return this.robot.task !== 'idle' && this.robot.offline <= 0 && !this.stormNow; }
   get shieldMult() { return C.dose.shielding[this.shielding]; }
+  // What the next level of the dirt shield costs in moon dirt (undefined once it is fully built).
+  get shieldCost() { return C.dose.shieldingCost[this.shielding]; }
   get goalValue() {
     const v = this.mission.goalValue;
     if (this.mission.goalType === 'dose') return Math.round(v * this.mode.doseGoal);
     return typeof v === 'object' ? v[this.modeName] : v;
+  }
+  // What the solar panels make and what the base draws, per second, as things stand right now.
+  get gen() { return this.panelsWorking * C.solar.perPanel * this.sunlight * this.siteSun * this.mode.solar; }
+  get demand() {
+    const P = C.power, ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
+    return (P.lifeSupport[this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
+      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
   }
   get batteryForecast() { // seconds the battery lasts at the current net drain, or Infinity
     const net = this.gen - this.demand;
@@ -180,13 +196,13 @@ export class Sim {
     return null;
   }
   addShielding() {
-    const cost = C.dose.shieldingCost[this.shielding];
+    const cost = this.shieldCost;
     if (cost === undefined) return 'The shelter already has all the shielding it can hold.';
-    if (this.regolith < cost) return `Not enough moon dirt. You need ${cost}.`;
+    if (this.regolith < cost) return `Not enough moon dirt. You need ${cost} and have ${Math.floor(this.regolith)}. Send the robot to dig more.`;
     this.regolith -= cost;
     this.shielding++;
     this.flags.shielding = true;
-    this.say(`Shelter covered with moon dirt. Storm dose there is now ${Math.round(this.shieldMult * 100)}% of before.`, 'good');
+    this.say(`${this.shielding === 1 ? 'Moon dirt is banked up round the Storm Shelter' : 'The Storm Shelter is buried in moon dirt'}. A storm in there now gives you ${Math.round(this.shieldMult * 100)}% of the dose it did.`, 'good');
     return null;
   }
   repairPanelByHand(i) {
@@ -350,16 +366,12 @@ export class Sim {
     }
 
     // Power.
-    const P = C_.power;
-    this.gen = this.panelsWorking * C_.solar.perPanel * this.sunlight * this.siteSun * mode.solar;
     const ease = this.mission.ease ?? 1; // gentler drain for the tutorial mission
-    this.demand = (P.lifeSupport[this.ls] + (this.isNight ? P.heaters : 0) + (this.comms ? P.comms : 0)
-      + (this.greenhouse ? P.greenhouse : 0) + (this.robotWorking ? P.robot : 0)) * ease;
-    const net = this.gen - this.demand;
+    const gen = this.gen, demand = this.demand, net = gen - demand;
     this.power = Math.min(C_.meters.powerMax, this.power + net * dt);
     if (this.power <= 0) {
       this.power = 0;
-      this.share = this.demand > 0 ? Math.min(1, this.gen / this.demand) : 1;
+      this.share = demand > 0 ? Math.min(1, gen / demand) : 1;
       this.blackout += dt;
       if (!this.flags.brownout) { this.flags.brownout = true; this.say('Battery empty! Everything is running slowly. Turn something off.', 'bad'); }
     } else {
@@ -403,7 +415,8 @@ export class Sim {
     let rate = this.where === 'outside' ? D.outside : D.inside;
     if (storm) {
       const k = STRENGTH[storm.strength];
-      rate += this.where === 'outside' ? D.storm.outside * k : D.storm[this.where] * k * this.shieldMult;
+      // The dirt shield is piled on the shelter end, so it only counts in the shelter.
+      rate += D.storm[this.where] * k * (this.where === 'shelter' ? this.shieldMult : 1);
     }
     this.dose += rate * dt;
     if (this.dose >= C_.meters.doseLimit) return this.end(false, 'Your radiation dose reached the mission limit, so the flight doctor called you home.');
@@ -503,11 +516,11 @@ export class Sim {
   // The three star tests, each judged on its own, for the list on the briefing. The stars a run
   // earns still build on each other (see finish), so this only says which tests were passed.
   get starTests() {
-    const S = C.stars;
+    const S = starRules(this.mission, this.modeName);
     return [
       this.goalMet(),
       this.lowestAir >= S.two.lowestAir && this.blackout <= S.two.maxBlackout,
-      this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose,
+      this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose && this.shielding >= S.three.shielding,
     ];
   }
 
@@ -521,10 +534,9 @@ export class Sim {
       }[this.mission.goalType];
       return this.end(false, why, true);
     }
-    const S = C.stars;
-    let stars = 1;
-    if (this.lowestAir >= S.two.lowestAir && this.blackout <= S.two.maxBlackout) stars = 2;
-    if (stars === 2 && this.lowestAir >= S.three.lowestAir && this.blackout <= S.three.maxBlackout && this.dose <= S.three.maxDose) stars = 3;
+    // Stars build on each other: the third is only given on top of the second.
+    const [, two, three] = this.starTests;
+    const stars = two && three ? 3 : two ? 2 : 1;
     this.end(true, 'The Sun is up and your base made it through.', true, stars);
   }
 
@@ -537,7 +549,9 @@ export class Sim {
     const tips = [];
     if (this.blackout > 0) tips.push(`The battery was empty for ${Math.round(this.blackout)} s. Try Eco life support at night, or turn the antenna off when you don't need it.`);
     if (this.lowestAir < 25) tips.push('Life support got low. Normal or Boost keeps air topped up while the Sun gives you spare power.');
-    if (this.dose > 40) tips.push('Your dose was high. Hide in the shelter during storms and pile moon dirt on it.');
+    const needShield = starRules(this.mission, this.modeName).three.shielding;
+    if (this.shielding < needShield) tips.push('The third star needs the regolith shield. Send the robot to dig moon dirt at the start, then take out the Building tool and build it before the first storm.');
+    else if (this.dose > 40) tips.push('Your dose was high. Hide in the Storm Shelter during storms, and build the regolith shield over it with the Building tool.');
     if (this.storms.some(s => s.warnedBy === 'sensor')) tips.push('A storm surprised you. With the antenna on, Mission Control warns you much earlier.');
     if (this.mission.goalType === 'samples' && this.samples.size < this.goalValue) tips.push('The rock samples glow, so they are easy to spot. Go out through the Airlock early, while the Sun is up, and take two or three short walks.');
     if (this.mission.goalType === 'food' && (this.food ?? 0) < this.goalValue) tips.push('Keep the greenhouse lit and watered. The robot can haul crater ice.');
